@@ -7,21 +7,11 @@ define('OPENAI_API_URL', 'https://api.openai.com/v1/chat/completions');
 ###############################################################
 # PRODUCAO DB
 ###############################################################
-#define('DB_HOST', 'localhost');
-#define('DB_NAME', 'u460638534_sorrisos');
-#define('DB_USER', 'u460638534_sorrisos');
-#define('DB_PASS', 'Mautone2024###');
-
-#TESTEDB
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('DB_NAME') ?: '');
-define('DB_USER', getenv('DB_USER') ?: '');
-define('DB_PASS', getenv('DB_PASS') ?: '');
-
-#define('DB_HOST', 'localhost');
-#define('DB_NAME', 'gruposorrisos');
-#define('DB_USER', 'root');
-#define('DB_PASS', '');
+#PRODUCAO
+define('DB_HOST', getenv('DB_HOST') ?: 'srv1662.hstgr.io');
+define('DB_NAME', getenv('DB_NAME') ?: 'u293057343_sorrisos');
+define('DB_USER', getenv('DB_USER') ?: 'u293057343_sorrisos');
+define('DB_PASS', getenv('DB_PASS') ?: 'N+OUZqAqN0m');
 
 // Application Settings
 define('APP_NAME', 'Grupo Sorrisos - Estoque');
