@@ -1,0 +1,63 @@
+================================================================================
+LISTA DE ARQUIVOS PARA DEPLOY - PRODUÇÃO
+Data: 03/11/2025
+================================================================================
+
+ORDEM DE EXECUÇÃO:
+
+========================================
+1. SCRIPTS SQL (Executar PRIMEIRO no banco de dados)
+========================================
+
+database/inserir_categorias_materiais.sql
+database/adicionar_campo_fabricante.sql
+
+
+========================================
+2. ARQUIVOS PHP (Upload DEPOIS dos scripts SQL)
+========================================
+
+backend/api/pedidos_compra.php
+api/fornecedores.php
+api/materiais_nova_estrutura.php
+models/Fornecedor.php
+addFornecedor.php
+addMaterial.php
+
+
+================================================================================
+RESUMO:
+================================================================================
+- 2 scripts SQL
+- 6 arquivos PHP
+
+TOTAL: 8 arquivos
+
+
+================================================================================
+COMANDOS SQL PARA VERIFICAÇÃO:
+================================================================================
+
+-- Verificar se campos foram adicionados
+DESCRIBE tbl_fornecedores;
+DESCRIBE tbl_catalogo_materiais;
+
+-- Verificar se categorias foram inseridas (deve retornar pelo menos 24)
+SELECT COUNT(*) FROM tbl_categorias;
+
+-- Listar todas as categorias inseridas
+SELECT id_categoria, nome_categoria FROM tbl_categorias ORDER BY nome_categoria;
+
+
+================================================================================
+ENDPOINTS NOVOS/MODIFICADOS:
+================================================================================
+
+✅ backend/api/pedidos_compra.php?action=create (CORRIGIDO)
+✅ api/fornecedores.php?action=fabricantes (NOVO)
+✅ addFornecedor.php - Novo checkbox "É Fabricante"
+✅ addMaterial.php - Novo select "Fabricante"
+
+
+================================================================================
+

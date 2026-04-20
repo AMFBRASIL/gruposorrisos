@@ -1,0 +1,79 @@
+/* 
+ * Estilos para o status "respondido" 
+ * Data: 2025-01-22
+ * Objetivo: Garantir que o status respondido apareça em azul
+ */
+
+/* Badge de status respondido na tabela */
+.badge.badge-primary {
+    background-color: #3b82f6 !important;
+    color: white !important;
+    border: 1px solid #2563eb;
+}
+
+/* Status respondido no modal de visualização */
+#view-status-badge[data-status="respondido"] {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #2563eb !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+#view-status-badge[data-status="respondido"] i {
+    color: #2563eb !important;
+}
+
+/* Card de status respondido */
+#view-status-card[data-status="respondido"] {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #2563eb !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+#view-status-card[data-status="respondido"] i {
+    color: #2563eb !important;
+}
+
+/* Filtro de status respondido */
+#filtro-status option[value="respondido"] {
+    color: #2563eb;
+    font-weight: 500;
+}
+
+/* Hover para status respondido */
+.badge.badge-primary:hover {
+    background-color: #2563eb !important;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+/* Status respondido em cards de resumo */
+.card-resumo .card-value[data-status="respondido"] {
+    color: #3b82f6 !important;
+}
+
+/* Ícone específico para status respondido */
+.status-respondido-icon {
+    color: #3b82f6;
+}
+
+/* Texto do status respondido */
+.status-respondido-text {
+    color: #2563eb;
+    font-weight: 600;
+}
+
+/* Override para garantir que o azul seja aplicado */
+.pedido-badge[data-status="respondido"],
+.status-card[data-status="respondido"] {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #2563eb !important;
+    border-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Estilo para quando o status for "respondido" */
+.pedido-badge.status-respondido,
+.status-card.status-respondido {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #2563eb !important;
+    border-color: rgba(59, 130, 246, 0.2) !important;
+} 

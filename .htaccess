@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+    Options -MultiViews
+    Options +FollowSymlinks
+    Options All -Indexes
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule (.*) https://%{SERVER_NAME}/$1 [R,L]
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^([^\.]+)$ $1.php [NC,L]
+    RewriteRule ^([^\.]+)$ $1.html [NC,L]
+    ErrorDocument 404 /index
+</IfModule>

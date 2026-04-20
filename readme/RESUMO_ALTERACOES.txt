@@ -1,0 +1,112 @@
+================================================================================
+RESUMO DAS ALTERAÇÕES - DEPLOY PRODUÇÃO V2
+Data: 03/11/2025
+================================================================================
+
+✅ PROBLEMAS RESOLVIDOS:
+
+1. ✅ Campo "Ativo" em addFornecedor.php agora está destacado e funcional
+2. ✅ Select "Fornecedor" em addMaterial.php mostra APENAS fornecedores (is_fabricante = 0)
+3. ✅ Select "Fabricante" em addMaterial.php mostra APENAS fabricantes (is_fabricante = 1)
+4. ✅ Bug corrigido: API pedidos_compra.php?action=create
+
+
+================================================================================
+ARQUIVOS MODIFICADOS (6 arquivos PHP):
+================================================================================
+
+1. backend/api/pedidos_compra.php
+   - Correção de bug: action não especificada
+
+2. api/fornecedores.php
+   - Novo endpoint: ?action=fabricantes
+   - Novo endpoint: ?action=apenas-fornecedores
+
+3. api/materiais_nova_estrutura.php
+   - Suporte ao campo id_fabricante
+
+4. models/Fornecedor.php
+   - Novo método: findFabricantes()
+   - Novo método: findApenasFornecedores()
+
+5. addFornecedor.php
+   - Checkbox "Ativo" melhorado e destacado
+   - Checkbox "É Fabricante" funcional
+
+6. addMaterial.php
+   - Select "Fornecedor" → apenas is_fabricante = 0
+   - Select "Fabricante" → apenas is_fabricante = 1
+   - Labels melhorados e informativos
+
+
+================================================================================
+SCRIPTS SQL (3 scripts):
+================================================================================
+
+1. database/inserir_categorias_materiais.sql
+   - Insere 24 categorias de materiais odontológicos
+
+2. database/adicionar_campo_fabricante.sql
+   - Adiciona campo is_fabricante em tbl_fornecedores
+   - Adiciona campo id_fabricante em tbl_catalogo_materiais
+
+3. database/corrigir_fabricantes.sql (NOVO - OPCIONAL)
+   - Exemplos para marcar fornecedores como fabricantes
+
+
+================================================================================
+IMPORTANTE - APÓS EXECUTAR OS SCRIPTS SQL:
+================================================================================
+
+Você DEVE marcar pelo menos 1 fornecedor como fabricante E ativo:
+
+UPDATE tbl_fornecedores SET ativo = 1, is_fabricante = 1 WHERE id_fornecedor = [ID];
+
+
+================================================================================
+ENDPOINTS DA API:
+================================================================================
+
+✅ api/fornecedores.php?action=fabricantes
+   Retorna: Apenas fornecedores com is_fabricante = 1 e ativo = 1
+
+✅ api/fornecedores.php?action=apenas-fornecedores
+   Retorna: Apenas fornecedores com is_fabricante = 0 e ativo = 1
+
+✅ api/fornecedores.php?action=ativos
+   Retorna: Todos os fornecedores ativos (fabricantes + fornecedores)
+
+
+================================================================================
+TESTE RÁPIDO:
+================================================================================
+
+1. Execute os 2 scripts SQL principais
+2. Marque 1 fornecedor como fabricante e ativo
+3. Acesse addMaterial.php
+4. Verifique se os selects estão separados corretamente:
+   - "Fornecedor" → apenas fornecedores
+   - "Fabricante" → apenas fabricantes
+
+
+================================================================================
+DIFERENÇA ENTRE FORNECEDOR E FABRICANTE:
+================================================================================
+
+FORNECEDOR (is_fabricante = 0):
+- Apenas vende/distribui
+- Não produz o material
+- Exemplo: Distribuidora XPTO
+
+FABRICANTE (is_fabricante = 1):
+- Produz/fabrica o material
+- Pode vender diretamente ou através de distribuidores
+- Exemplo: 3M DO BRASIL
+
+Um material pode ter:
+- Fornecedor: Quem você compra
+- Fabricante: Quem produz
+
+
+================================================================================
+

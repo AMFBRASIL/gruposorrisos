@@ -1,0 +1,342 @@
+/* body { background: #f7f9fb; } */
+        .card-resumo { border: none; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+        .card-resumo .card-body { padding: 1.5rem 2rem; }
+        .card-resumo .card-title { font-size: 1.1rem; font-weight: 600; color: #222; }
+        .card-resumo .card-value { font-size: 2rem; font-weight: 700; }
+        .card-resumo .card-icon { font-size: 1.5rem; opacity: 0.5; }
+        .alert-critico-box { border: 2px solid #f87171; background: #fef2f2; border-radius: 12px; margin-bottom: 1.5rem; }
+        .alert-critico-header { color: #ef4444; font-weight: 700; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #fca5a5; padding: 0.8rem 1.2rem 0.5rem 1.2rem; }
+        .alert-critico-body { padding: 1rem 1.2rem; display: flex; align-items: center; justify-content: space-between; }
+        .badge-nivel { font-size: 0.95rem; border-radius: 1rem; padding: 0.3em 1em; font-weight: 500; }
+        .badge-critico { background: #fee2e2; color: #ef4444; border: 1px solid #ef444433; }
+        .badge-medio { background: #fef9c3; color: #b45309; border: 1px solid #facc1533; }
+        .badge-baixo { background: #e0e7ef; color: #64748b; border: 1px solid #cbd5e1; }
+        .badge-alto { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .badge-status-ativo { background: #fee2e2; color: #ef4444; border: 1px solid #ef444433; }
+        .badge-status-resolvido { background: #dcfce7; color: #22c55e; border: 1px solid #22c55e33; }
+        .table-alertas th, .table-alertas td { vertical-align: middle; }
+        .table-alertas th { color: #222; font-weight: 600; font-size: 1.05rem; }
+        .table-alertas td { font-size: 1.05rem; }
+        .table-alertas tbody tr { border-bottom: 1px solid #f1f3f5; }
+        .table-alertas { background: #fff; border-radius: 14px; overflow: hidden; }
+        .icon-btn { background: none; border: none; color: #222; font-size: 1.1rem; }
+        .icon-btn.text-danger { color: #ef4444 !important; }
+        .icon-btn.text-success { color: #22c55e !important; }
+        .icon-btn.text-warning { color: #eab308 !important; }
+        .btn-resolver { background: #ef4444; color: #fff; border-radius: 8px; font-weight: 500; padding: 0.3em 1.2em; border: none; }
+        .btn-resolver:hover { background: #b91c1c; }
+        .btn-configurar { background: #fff; border: 1px solid #e5e7eb; color: #222; border-radius: 8px; font-weight: 500; }
+        .btn-configurar:hover { background: #f1f3f5; }
+        .btn-marcar { background: #fff; border: 1px solid #e5e7eb; color: #2563eb; border-radius: 8px; font-weight: 500; }
+        .btn-marcar:hover { background: #e0e7ef; }
+        .icon-alerta { font-size: 1.3rem; color: #f59e42; margin-right: 0.5rem; }
+        .icon-alerta-critico { font-size: 1.3rem; color: #ef4444; margin-right: 0.5rem; }
+        @media (max-width: 991px) {
+            .card-resumo .card-body { padding: 1rem; }
+        }
+
+/* Estilos específicos para a tela de alertas */
+
+/* Alertas críticos */
+.alert-critico-box {
+    background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+    border: 2px solid #ef4444;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1), 0 2px 4px -1px rgba(239, 68, 68, 0.06);
+}
+
+.alert-critico-header {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.icon-alerta-critico {
+    font-size: 1.5rem;
+    animation: pulse 2s infinite;
+}
+
+.alert-critico-body {
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #fecaca;
+}
+
+.alert-critico-body:last-child {
+    border-bottom: none;
+}
+
+.btn-resolver {
+    background: #22c55e;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-resolver:hover {
+    background: #16a34a;
+    transform: translateY(-1px);
+}
+
+/* Badges de nível */
+.badge-nivel {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-critico {
+    background: #ef4444;
+    color: white;
+}
+
+.badge-medio {
+    background: #f59e0b;
+    color: white;
+}
+
+.badge-baixo {
+    background: #3b82f6;
+    color: white;
+}
+
+/* Badges de status */
+.badge-status-ativo {
+    background: #ef4444;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-status-resolvido {
+    background: #22c55e;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Ícones de alerta */
+.icon-alerta {
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+}
+
+/* Tabela de alertas */
+.table-alertas {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table-alertas thead th {
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    font-weight: 600;
+    color: #475569;
+    padding: 1rem;
+}
+
+.table-alertas tbody td {
+    padding: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.table-alertas tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* Botões de ação */
+.icon-btn {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1.1rem;
+}
+
+.icon-btn:hover {
+    background: #f1f5f9;
+    transform: scale(1.1);
+}
+
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Animações */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .alert-critico-body {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .table-alertas {
+        font-size: 0.875rem;
+    }
+    
+    .table-alertas thead th,
+    .table-alertas tbody td {
+        padding: 0.75rem 0.5rem;
+    }
+}
+
+/* Estilos para filtros */
+.filters-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #e2e8f0;
+}
+
+.filters-title {
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+}
+
+.filters-subtitle {
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+/* Estilos para cards de estatísticas */
+.card-resumo .card-icon {
+    font-size: 2rem;
+    opacity: 0.7;
+}
+
+/* Estilos para paginação */
+.pagination .page-link {
+    color: #3b82f6;
+    border: 1px solid #e2e8f0;
+}
+
+.pagination .page-item.active .page-link {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+}
+
+.pagination .page-link:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+/* Estilos para botões */
+.btn-outline-success {
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.btn-outline-success:hover {
+    background: #22c55e;
+    border-color: #22c55e;
+    color: white;
+}
+
+.btn-outline-primary {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.btn-outline-primary:hover {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+}
+
+/* Estilos para mensagens vazias */
+.text-muted .bi {
+    opacity: 0.5;
+}
+
+/* Estilos para loading */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Estilos para tooltips */
+[title] {
+    position: relative;
+}
+
+/* Estilos para notificações */
+.alert-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    min-width: 300px;
+    max-width: 400px;
+}
+
+/* Estilos para modais de confirmação */
+.swal2-popup {
+    border-radius: 12px;
+}
+
+.swal2-title {
+    color: #1e293b;
+}
+
+.swal2-content {
+    color: #64748b;
+}
+
+/* Estilos para estados de loading */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

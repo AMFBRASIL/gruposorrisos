@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Teste de Produção - Inventário</title>
+</head>
+<body>
+    <h1>Teste de Verificação - Funcionalidades de Contagem</h1>
+    
+    <h2>Instruções:</h2>
+    <ol>
+        <li>Abra o console do navegador (F12 > Console)</li>
+        <li>Cole e execute o código abaixo</li>
+        <li>Verifique os resultados</li>
+    </ol>
+    
+    <h2>Código para Testar:</h2>
+    <textarea id="testCode" style="width: 100%; height: 400px; font-family: monospace;">
+// ============================================
+// TESTE DE VERIFICAÇÃO - FUNCIONALIDADES
+// ============================================
+
+console.log('🔍 Iniciando teste de verificação...\n');
+
+// 1. Verificar se funções existem
+console.log('1️⃣ Verificando funções JavaScript:');
+const funcoes = [
+    'ajustarLoteDivergentes',
+    'ajustarItemInventario',
+    'buscarTotalDivergentes',
+    'aplicarBuscaMaterialContagem',
+    'limparBuscaMaterialContagem',
+    'inicializarTooltips'
+];
+
+let funcoesOk = 0;
+funcoes.forEach(fn => {
+    const existe = typeof window[fn] === 'function';
+    console.log(`   ${existe ? '✅' : '❌'} ${fn}: ${existe ? 'EXISTE' : 'NÃO EXISTE'}`);
+    if (existe) funcoesOk++;
+});
+
+console.log(`\n   Resultado: ${funcoesOk}/${funcoes.length} funções encontradas\n`);
+
+// 2. Verificar se elementos HTML existem (após abrir modal)
+console.log('2️⃣ Verificando elementos HTML:');
+console.log('   ⚠️  Abra o modal de contagem primeiro!');
+
+function verificarElementos() {
+    const elementos = {
+        'btnAjustarLote': document.getElementById('btnAjustarLote'),
+        'busca-material-contagem': document.getElementById('busca-material-contagem'),
+        'badgeDivergentes': document.getElementById('badgeDivergentes'),
+        'tabelaContagem': document.querySelector('#tabelaContagem')
+    };
+    
+    let elementosOk = 0;
+    Object.keys(elementos).forEach(id => {
+        const existe = elementos[id] !== null;
+        console.log(`   ${existe ? '✅' : '❌'} ${id}: ${existe ? 'EXISTE' : 'NÃO EXISTE'}`);
+        if (existe) elementosOk++;
+    });
+    
+    console.log(`\n   Resultado: ${elementosOk}/${Object.keys(elementos).length} elementos encontrados\n`);
+    return elementosOk === Object.keys(elementos).length;
+}
+
+// 3. Verificar versão do arquivo JS
+console.log('3️⃣ Verificando versão do arquivo:');
+fetch('assets/js/inventario.js?v=' + Date.now())
+    .then(r => r.text())
+    .then(text => {
+        const checks = {
+            'ajustarLoteDivergentes': text.includes('ajustarLoteDivergentes'),
+            'ajustarItemInventario': text.includes('ajustarItemInventario'),
+            'busca-material-contagem': text.includes('busca-material-contagem'),
+            'btnAjustarLote': text.includes('btnAjustarLote'),
+            'Versão 2.0': text.includes('Versão do inventario.js: 2.0')
+        };
+        
+        let checksOk = 0;
+        Object.keys(checks).forEach(check => {
+            const passou = checks[check];
+            console.log(`   ${passou ? '✅' : '❌'} ${check}: ${passou ? 'ENCONTRADO' : 'NÃO ENCONTRADO'}`);
+            if (passou) checksOk++;
+        });
+        
+        console.log(`\n   Resultado: ${checksOk}/${Object.keys(checks).length} verificações passaram\n`);
+        
+        // Verificar tamanho do arquivo
+        console.log(`   📦 Tamanho do arquivo: ${(text.length / 1024).toFixed(2)} KB\n`);
+    })
+    .catch(err => {
+        console.error('   ❌ Erro ao verificar arquivo:', err);
+    });
+
+// 4. Verificar API
+console.log('4️⃣ Verificando endpoint da API:');
+console.log('   ⚠️  Verifique manualmente se api/inventario.php contém "ajustar_lote"\n');
+
+// Função auxiliar para verificar elementos após abrir modal
+window.verificarAposAbrirModal = verificarElementos;
+
+console.log('✅ Teste concluído!');
+console.log('\n💡 Dica: Execute verificarAposAbrirModal() após abrir o modal de contagem');
+    </textarea>
+    
+    <button onclick="navigator.clipboard.writeText(document.getElementById('testCode').value)">Copiar Código</button>
+    
+    <h2>Problemas Comuns:</h2>
+    <ul>
+        <li><strong>Cache do navegador:</strong> Pressione Ctrl+Shift+R para hard refresh</li>
+        <li><strong>Arquivos não enviados:</strong> Verifique se os 3 arquivos foram enviados</li>
+        <li><strong>Erros JavaScript:</strong> Verifique o console para erros em vermelho</li>
+    </ul>
+</body>
+</html>

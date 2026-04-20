@@ -1,0 +1,186 @@
+================================================================================
+LISTA FINAL DE ARQUIVOS PARA DEPLOY - PRODUÇÃO
+Data: 03/11/2025
+================================================================================
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                     ORDEM DE EXECUÇÃO (IMPORTANTE!)                      ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+========================================
+FASE 1: SCRIPTS SQL (Executar no banco)
+========================================
+
+1️⃣  database/inserir_categorias_materiais.sql
+    ├─ Descrição: Insere 24 categorias de materiais odontológicos
+    ├─ Ordem: PRIMEIRO
+    └─ Verificação: SELECT COUNT(*) FROM tbl_categorias;
+
+2️⃣  database/adicionar_campo_fabricante.sql
+    ├─ Descrição: Adiciona campos is_fabricante e id_fabricante
+    ├─ Ordem: SEGUNDO
+    └─ Verificação: DESCRIBE tbl_fornecedores; DESCRIBE tbl_catalogo_materiais;
+
+3️⃣  database/corrigir_fabricantes.sql (OPCIONAL)
+    ├─ Descrição: Ativa e marca fornecedores como fabricantes
+    ├─ Ordem: TERCEIRO
+    └─ Ajuste os IDs conforme seu ambiente
+
+4️⃣  database/materiais_odontologicos_import.sql ⭐ NOVO!
+    ├─ Descrição: Importa 391 materiais do CSV
+    ├─ Ordem: QUARTO
+    ├─ Tamanho: 191 KB
+    └─ Verificação: SELECT COUNT(*) FROM tbl_catalogo_materiais;
+
+
+========================================
+FASE 2: ARQUIVOS PHP (Upload no servidor)
+========================================
+
+5️⃣  backend/api/pedidos_compra.php
+    └─ 🐛 Correção: Bug "Ação não especificada"
+
+6️⃣  api/fornecedores.php
+    └─ ✨ Novos endpoints: fabricantes + apenas-fornecedores
+
+7️⃣  api/materiais_nova_estrutura.php
+    └─ ✨ Suporte a id_fabricante + correção JSON
+
+8️⃣  models/Fornecedor.php
+    └─ ✨ Métodos: findFabricantes() + findApenasFornecedores()
+
+9️⃣  addFornecedor.php
+    └─ ✨ Checkbox "É Fabricante" + Campo Ativo destacado
+
+🔟  addMaterial.php
+    └─ ✨ Selects separados: Fornecedor + Fabricante
+
+
+========================================
+FASE 3: CRIAR ESTOQUE (APÓS IMPORTAR)
+========================================
+
+⚠️  IMPORTANTE: Depois de importar os materiais, você precisa criar 
+    o estoque para cada filial!
+
+Opção A - Via SQL (RECOMENDADO):
+----------------------------------------------------------------
+-- Criar estoque 0 em todas as filiais para todos os materiais
+INSERT INTO tbl_estoque_filiais 
+(id_catalogo, id_filial, estoque_atual, estoque_minimo, estoque_maximo, 
+ preco_unitario, ativo)
+SELECT 
+    cm.id_catalogo,
+    f.id_filial,
+    0.00,
+    10.00,
+    100.00,
+    cm.preco_unitario_padrao,
+    1
+FROM tbl_catalogo_materiais cm
+CROSS JOIN tbl_filiais f
+WHERE cm.ativo = 1
+  AND f.filial_ativa = 1
+  AND NOT EXISTS (
+      SELECT 1 FROM tbl_estoque_filiais ef 
+      WHERE ef.id_catalogo = cm.id_catalogo 
+      AND ef.id_filial = f.id_filial
+  );
+----------------------------------------------------------------
+
+Opção B - Via Interface:
+- Acesse material.php
+- Clique no ícone 📦 de cada material
+- Configure o estoque manualmente
+
+
+================================================================================
+CRITÉRIOS PARA MATERIAL APARECER EM material.php
+================================================================================
+
+✅ OBRIGATÓRIO:
+   - ativo = 1 em tbl_catalogo_materiais
+   - codigo preenchido (único)
+   - nome preenchido
+
+⚠️  RECOMENDADO:
+   - id_categoria preenchido (senão aparece "Sem categoria")
+   - id_unidade preenchido (senão aparece sem unidade)
+   - Ter estoque em tbl_estoque_filiais para a filial selecionada
+
+❌ NÃO APARECE SE:
+   - ativo = 0
+   - Não tem estoque na filial selecionada (aparece com estoque 0)
+
+
+================================================================================
+ESTATÍSTICAS DA IMPORTAÇÃO
+================================================================================
+
+📊 Materiais no CSV: 391
+📊 Materiais processados: 391
+✅ Com unidade mapeada: 389
+✅ Com fabricante identificado: 390 (390 marcas encontradas)
+⚠️  Sem fabricante: 1 (marca não cadastrada)
+
+📂 Categorias principais identificadas:
+   - ORTODONTIA: ~150 materiais (arcos, brackets)
+   - ANESTESICOS: ~20 materiais
+   - DENTÍSTICA E ESTÉTICA: ~40 materiais (adesivos, resinas)
+   - ENDODONTIA: ~30 materiais
+   - Outras categorias: ~151 materiais
+
+
+================================================================================
+VERIFICAÇÕES PÓS-DEPLOY
+================================================================================
+
+1. Contar materiais importados:
+   SELECT COUNT(*) FROM tbl_catalogo_materiais WHERE ativo = 1;
+   → Deve retornar: ~391 ou mais
+
+2. Verificar categorias:
+   SELECT c.nome_categoria, COUNT(*) as total
+   FROM tbl_catalogo_materiais m
+   LEFT JOIN tbl_categorias c ON m.id_categoria = c.id_categoria
+   GROUP BY c.nome_categoria;
+
+3. Testar listagem:
+   - Acesse: material.php
+   - Selecione uma filial
+   - Verifique se os materiais aparecem
+
+4. Testar fabricantes:
+   - API: api/fornecedores.php?action=fabricantes
+   - Deve retornar fornecedores com is_fabricante = 1
+
+
+================================================================================
+RESUMO FINAL
+================================================================================
+
+📦 ARQUIVOS PARA DEPLOY:
+   - 4 scripts SQL
+   - 6 arquivos PHP
+   - TOTAL: 10 arquivos
+
+⏱️  TEMPO ESTIMADO: 15-30 minutos
+
+🎯 PRIORIDADE:
+   1. Scripts SQL (crítico - altera estrutura)
+   2. Arquivos PHP (importante - funcionalidades novas)
+   3. Criar estoque (necessário - para exibir na listagem)
+
+
+================================================================================
+DOCUMENTAÇÃO GERADA
+================================================================================
+
+📄 DEPLOY_PRODUCAO_V2.md - Guia completo de deploy
+📄 RESUMO_ALTERACOES.txt - Resumo executivo
+📄 LISTA_FINAL_DEPLOY.txt - Este arquivo
+📄 CRITERIOS_LISTAGEM_MATERIAIS.md - Como funciona a listagem
+
+
+================================================================================
+

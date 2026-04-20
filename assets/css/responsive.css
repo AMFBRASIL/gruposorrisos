@@ -1,0 +1,68 @@
+/* Layout responsivo para o conteúdo principal */
+.main-content {
+    padding: 2rem;
+    min-height: 100vh;
+    background: #f8f9fa;
+}
+
+/* Desktop: ajustar margem para o sidebar */
+@media (min-width: 768px) {
+    .main-content {
+        margin-left: 280px;
+    }
+}
+
+/* Mobile: ajustar padding */
+@media (max-width: 767.98px) {
+    .main-content {
+        padding: 1rem;
+        padding-top: 4rem;
+    }
+}
+
+/* Melhorar responsividade dos cards */
+@media (max-width: 767.98px) {
+    .card-resumo,
+    .card-summary {
+        margin-bottom: 1rem;
+    }
+    
+    .row.g-3 > div {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Ajustar botões no mobile */
+@media (max-width: 767.98px) {
+    .btn-action {
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .d-flex.flex-wrap.gap-2 {
+        gap: 0.5rem !important;
+    }
+}
+
+/* Melhorar tabelas responsivas */
+@media (max-width: 767.98px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem 0.25rem;
+    }
+}
+
+/* Ajustar modais no mobile */
+@media (max-width: 767.98px) {
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-xl {
+        max-width: calc(100% - 1rem);
+    }
+} 

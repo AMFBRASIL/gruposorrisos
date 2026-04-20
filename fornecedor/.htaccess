@@ -1,0 +1,30 @@
+# Proteção do diretório de fornecedores
+Options -Indexes
+
+# Redirecionar para login se não estiver logado
+RewriteEngine On
+
+# Permitir acesso direto aos arquivos de login e logout
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/fornecedor/login\.php$
+RewriteCond %{REQUEST_URI} !^/fornecedor/logout\.php$
+RewriteCond %{REQUEST_URI} !^/fornecedor/config\.php$
+
+# Redirecionar para login se não estiver logado
+RewriteRule ^(.*)$ login.php [L,R=302]
+
+# Configurações de segurança
+<Files "*.php">
+    # Permitir apenas acesso via POST para arquivos sensíveis
+    <Files "config.php">
+        Order Deny,Allow
+        Deny from all
+    </Files>
+</Files>
+
+# Headers de segurança
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Referrer-Policy "strict-origin-when-cross-origin" 

@@ -1,0 +1,5 @@
+body { background: #f5f7fa; }
+.sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #e5e9f2; }
+.sidebar .nav-link { color: #333; font-weight: 500; border-radius: 8px; margin-bottom: 6px; }
+.sidebar .nav-link.active, .sidebar .nav-link.bg-success { background: #43cea2 !important; color: #fff !important; }
+.sidebar .nav-link:hover { background: #e8f0fe; color: #1976d2; }

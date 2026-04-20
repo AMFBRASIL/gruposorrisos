@@ -1,0 +1,67 @@
+================================================================================
+LISTA SIMPLES - ARQUIVOS PARA DEPLOY EM PRODUÇÃO
+Data: 03/11/2025
+================================================================================
+
+═══════════════════════════════════════════════════════════════════════════
+PASSO 1: BACKUP (OBRIGATÓRIO!)
+═══════════════════════════════════════════════════════════════════════════
+
+mysqldump -u usuario -p banco > backup_03112025.sql
+
+
+═══════════════════════════════════════════════════════════════════════════
+PASSO 2: EXECUTAR SQL (NA ORDEM)
+═══════════════════════════════════════════════════════════════════════════
+
+1. database/inserir_categorias_materiais.sql
+2. database/adicionar_campo_fabricante.sql
+3. Executar manualmente:
+   UPDATE tbl_fornecedores SET ativo=1, is_fabricante=1 WHERE id_fornecedor=12;
+
+
+═══════════════════════════════════════════════════════════════════════════
+PASSO 3: UPLOAD DE ARQUIVOS PHP (8 ARQUIVOS)
+═══════════════════════════════════════════════════════════════════════════
+
+backend/api/pedidos_compra.php
+api/fornecedores.php
+api/materiais_nova_estrutura.php
+models/Fornecedor.php
+models/EstoqueFilial.php
+addFornecedor.php
+addMaterial.php
+material.php
+
+
+═══════════════════════════════════════════════════════════════════════════
+PASSO 4: TESTAR
+═══════════════════════════════════════════════════════════════════════════
+
+✅ material.php - Paginação funcionando?
+✅ addMaterial.php - Criar material com código de barras
+✅ addMaterial.php - Editar material mantém checkbox "Ativo"
+✅ addFornecedor.php - Checkbox "É Fabricante" funciona
+
+
+═══════════════════════════════════════════════════════════════════════════
+OPCIONAL: IMPORTAR 533 MATERIAIS
+═══════════════════════════════════════════════════════════════════════════
+
+Se quiser importar os materiais já processados:
+
+php importar_materiais_csv.php        (390 materiais odontológicos)
+php importar_materiais_limpeza.php    (47 materiais de limpeza)
+php importar_materiais_implante.php   (96 materiais de implante)
+
+
+═══════════════════════════════════════════════════════════════════════════
+FIM - PRONTO PARA PRODUÇÃO! 🚀
+═══════════════════════════════════════════════════════════════════════════
+
+TOTAL: 2 SQL + 8 PHP = 10 arquivos
+TEMPO: ~30 minutos
+
+
+================================================================================
+

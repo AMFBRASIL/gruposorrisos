@@ -1,0 +1,92 @@
+================================================================================
+LISTA DE ARQUIVOS PARA DEPLOY EM PRODUÇÃO
+Data: 2025-01-24
+Sessão: Correções no Histórico de Status e Chat de Pedidos
+================================================================================
+
+ARQUIVOS MODIFICADOS:
+---------------------
+
+1. backend/api/historico_status.php
+   - Correção: Histórico de Status mostrando "undefined"
+   - Adicionado campo 'status' e 'usuario' para compatibilidade com frontend
+   - Expandido mapeamento de status para incluir todos os possíveis
+   - Melhorado fallback para formatar status automaticamente quando não mapeado
+   - Adicionados logs de debug
+
+2. assets/js/pedidos-compra.js
+   - Correção: Histórico de Status mostrando "undefined"
+   - Correção: Mensagens do chat não aparecendo no modal
+   - Função renderizarTimelineStatus: Corrigido acesso aos campos status_novo e usuario_nome
+   - Função renderizarMensagens: 
+     * Agora usa campo 'eh_minha' quando disponível
+     * Adicionada verificação se container existe
+     * Melhorado tratamento de dados (usa data_envio_formatada se disponível)
+     * Adicionado escape HTML para prevenir XSS
+     * Adicionados logs de debug
+   - Função carregarChat: Adicionados logs de debug
+
+3. backend/api/chat-pedidos.php
+   - Correção: Chat não retornando dados corretamente
+   - Função listarMensagens:
+     * Adicionado campo id_usuario_remetente na query SQL
+     * Corrigido cálculo de 'eh_minha' comparando id_usuario_remetente com usuario_id
+     * Adicionados logs de debug
+   - Função verificarAcessoPedido:
+     * Melhorada verificação de acesso para fornecedores
+     * Verifica vínculo entre usuário e fornecedor via id_fornecedor
+     * Adicionados logs de debug
+   - Função getTipoUsuario:
+     * Verifica tanto pelo perfil_id quanto pelo nome do perfil
+     * Mais robusta para diferentes configurações
+
+================================================================================
+RESUMO DAS CORREÇÕES:
+================================================================================
+
+1. HISTÓRICO DE STATUS:
+   - Problema: Status aparecendo como "undefined" ou "Status desconhecido"
+   - Solução: Adicionados campos de compatibilidade (status, usuario) na API
+   - Solução: Melhorado tratamento no frontend para formatar status automaticamente
+
+2. CHAT DE PEDIDOS:
+   - Problema: Mensagens não aparecendo no modal
+   - Solução: Corrigido cálculo de 'eh_minha' comparando id_usuario_remetente
+   - Solução: Adicionado campo id_usuario_remetente na query SQL
+   - Solução: Melhorada função renderizarMensagens no frontend
+
+3. VERIFICAÇÃO DE ACESSO:
+   - Problema: Fornecedores não conseguiam acessar chat dos pedidos
+   - Solução: Melhorada função verificarAcessoPedido para verificar vínculo correto
+
+================================================================================
+INSTRUÇÕES PARA DEPLOY:
+================================================================================
+
+1. Fazer backup dos arquivos atuais em produção:
+   - backend/api/historico_status.php
+   - assets/js/pedidos-compra.js
+   - backend/api/chat-pedidos.php
+
+2. Fazer upload dos 3 arquivos modificados para o servidor de produção
+
+3. Verificar permissões dos arquivos (644 para arquivos, 755 para diretórios)
+
+4. Limpar cache do navegador após o deploy
+
+5. Testar:
+   - Abrir um pedido e verificar se o histórico de status está correto
+   - Abrir o chat de um pedido e verificar se as mensagens aparecem
+   - Testar como fornecedor e como usuário da empresa
+
+================================================================================
+NOTAS IMPORTANTES:
+================================================================================
+
+- Os logs de debug (error_log) foram adicionados para facilitar troubleshooting
+- Em produção, considere remover ou reduzir os logs de debug se necessário
+- As correções são compatíveis com versões anteriores do sistema
+- Não há necessidade de executar scripts SQL adicionais
+
+================================================================================
+

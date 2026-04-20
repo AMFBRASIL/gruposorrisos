@@ -1,0 +1,186 @@
+================================================================================
+LISTA FINAL DE ARQUIVOS PARA DEPLOY - PRODUÇÃO
+Versão: FINAL
+Data: 03/11/2025
+================================================================================
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  ARQUIVOS PHP PARA UPLOAD - TOTAL: 7 ARQUIVOS                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+1. backend/api/pedidos_compra.php
+   └─ 🐛 Correção: Bug "Ação não especificada"
+
+2. api/fornecedores.php
+   └─ ✨ Endpoints: fabricantes + apenas-fornecedores
+
+3. api/materiais_nova_estrutura.php ⭐ ATUALIZADO!
+   ├─ ✨ Suporte a id_fabricante
+   ├─ 🐛 Correção: ID na query string para update
+   ├─ 🐛 Correção: codigo_barras e ca na edição
+   ├─ 🐛 Correção: Display errors + JSON limpo
+   └─ 🐛 Correção: Campo ativo retornado
+
+4. models/Fornecedor.php
+   └─ ✨ Métodos: findFabricantes() + findApenasFornecedores()
+
+5. models/EstoqueFilial.php ⭐ ATUALIZADO!
+   ├─ 🐛 Query inclui: ativo, id_fabricante, observacoes
+   └─ 🐛 JOIN com fabricantes adicionado
+
+6. addFornecedor.php
+   └─ ✨ Checkbox "É Fabricante" + Campo Ativo
+
+7. addMaterial.php ⭐ ATUALIZADO!
+   ├─ ✨ Selects: Fornecedor + Fabricante separados
+   ├─ 🐛 Código de barras: mantém valor ao editar
+   └─ 🐛 Toggle checkbox sem limpar valor
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  SCRIPTS SQL - EXECUTAR NA ORDEM                                        ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+PASSO 1: Estrutura e Categorias
+────────────────────────────────────────────────────────────────────────────
+database/inserir_categorias_materiais.sql
+   └─ Insere 24 categorias de materiais odontológicos
+
+database/adicionar_campo_fabricante.sql
+   └─ Adiciona campos is_fabricante e id_fabricante
+
+
+PASSO 2: Marcar Fabricantes (CRÍTICO!)
+────────────────────────────────────────────────────────────────────────────
+Execute MANUALMENTE no banco:
+
+-- Ativar 3M e marcar como fabricante
+UPDATE tbl_fornecedores SET ativo = 1, is_fabricante = 1 WHERE id_fornecedor = 12;
+
+-- Dental Cremer já está ativo (is_fabricante = 0)
+-- Gardeis já está ativo (is_fabricante = 0)
+-- EAC já está ativo (is_fabricante = 0)
+
+Verificar:
+SELECT id_fornecedor, razao_social, ativo, is_fabricante 
+FROM tbl_fornecedores 
+WHERE ativo = 1;
+
+
+PASSO 3: Importar Materiais (OPCIONAL - se quiser 391 materiais)
+────────────────────────────────────────────────────────────────────────────
+Execute o script PHP:
+php importar_materiais_csv.php
+
+Isso vai:
+✅ Inserir 391 materiais em tbl_catalogo_materiais
+✅ Criar estoque em TODAS as 13 filiais automaticamente
+✅ Fazer lookup automático de categorias, unidades e fabricantes
+✅ Usar transação (seguro - rollback em caso de erro)
+
+
+================================================================================
+BUGS CORRIGIDOS NESTA VERSÃO
+================================================================================
+
+✅ Pedidos de compra: action não especificada
+✅ Código de barras não salvava ao criar material
+✅ Código de barras não salvava ao editar material
+✅ Campo "Ativo" não carregava ao editar material
+✅ Campo CA não salvava ao editar material
+✅ Campo observacoes não carregava ao editar
+✅ Campo id_fabricante não carregava ao editar
+✅ Erro JSON ao criar material (echo de debug)
+✅ Update de material sem ID na query string
+✅ Select fabricantes retornando vazio
+
+
+================================================================================
+NOVAS FUNCIONALIDADES
+================================================================================
+
+✨ Diferenciação entre Fornecedor e Fabricante
+✨ Campo "É Fabricante" em fornecedores
+✨ Select separado de Fabricantes em materiais
+✨ Importação automática de 391 materiais do CSV
+✨ Criação automática de estoque em todas as filiais
+✨ Lookup inteligente de categorias com LIKE
+✨ 24 categorias odontológicas pré-cadastradas
+
+
+================================================================================
+TESTES OBRIGATÓRIOS APÓS DEPLOY
+================================================================================
+
+1. ✅ Criar Material:
+   - Acesse: addMaterial.php
+   - Preencha todos os campos
+   - Marque "Código de barras" e digite um código
+   - Salve
+   - Verifique se salvou no banco
+
+2. ✅ Editar Material:
+   - Acesse: material.php
+   - Clique em Editar em qualquer material
+   - Verifique se:
+     • Checkbox "Ativo" está correto
+     • Código de barras aparece (se existir)
+     • Select Fabricante mostra o valor correto
+   - Altere o código de barras
+   - Salve
+   - Verifique se atualizou
+
+3. ✅ Fabricantes:
+   - API: api/fornecedores.php?action=fabricantes
+   - Deve retornar pelo menos 1 fabricante (3M)
+
+4. ✅ Listagem:
+   - Acesse: material.php
+   - Selecione uma filial
+   - Verifique se os materiais aparecem
+
+
+================================================================================
+ARQUIVOS DE SUPORTE (NÃO FAZER UPLOAD)
+================================================================================
+
+importar_materiais_csv.php - Script que importa CSV direto no banco
+database/import/MATERIAIS ODONTOLOGICOS.csv - Arquivo fonte (391 materiais)
+
+CRITERIOS_LISTAGEM_MATERIAIS.md - Documentação técnica
+DEPLOY_PRODUCAO_V2.md - Guia completo de deploy
+RESUMO_ALTERACOES.txt - Resumo executivo
+LISTA_ARQUIVOS_DEPLOY_FINAL.txt - Este arquivo
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problema: Código de barras não salva ao editar
+Solução: ✅ CORRIGIDO - Agora inclui codigo_barras no update
+
+Problema: Campo Ativo não carrega ao editar
+Solução: ✅ CORRIGIDO - Model agora seleciona campo ativo
+
+Problema: Select fabricantes vazio
+Solução: ✅ Executar: UPDATE tbl_fornecedores SET ativo=1, is_fabricante=1 WHERE id=12;
+
+Problema: Materiais não aparecem em material.php
+Solução: ✅ Executar importador que cria estoque automaticamente
+
+
+================================================================================
+RESUMO
+================================================================================
+
+📦 7 arquivos PHP para upload
+🗃️ 2 scripts SQL obrigatórios
+🔧 1 script PHP de importação (opcional)
+⏱️ Tempo estimado: 20-40 minutos
+
+PRONTO PARA PRODUÇÃO! 🚀
+
+
+================================================================================
+

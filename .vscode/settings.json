@@ -1,0 +1,16 @@
+{
+  // Desativar verificação ortográfica
+  "cSpell.enabled": false,
+  "editor.wordBasedSuggestions": "off",
+  "editor.suggest.showWords": false,
+  
+  // Configurações adicionais úteis para PHP
+  "files.associations": {
+    "*.php": "php"
+  },
+  
+  // Ignorar arquivos de configuração do Cursor
+  "files.exclude": {
+    "**/.cursor": true
+  }
+}
