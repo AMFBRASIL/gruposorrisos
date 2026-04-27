@@ -54,7 +54,15 @@ function ocultarModalProcessandoPedido() {
 }
 
 function pedidoPodeSerEditado(status) {
-    const statusBloqueados = ['enviado', 'em_transito', 'entregue', 'recebido', 'cancelado'];
+    const statusBloqueados = [
+        'enviar_para_faturamento',
+        'aprovado_para_faturar',
+        'enviado',
+        'em_transito',
+        'entregue',
+        'recebido',
+        'cancelado'
+    ];
     return !statusBloqueados.includes((status || '').toLowerCase());
 }
 
@@ -470,6 +478,7 @@ function renderizarResultadoPesquisa(materiais) {
     
     // Calcular total inicial
     calcularTotalPedido();
+    filtrarItensPedidoExistente();
 }
 
 function normalizarTextoComparacao(valor) {
@@ -825,6 +834,7 @@ function renderizarTabela(pedidos) {
             row.className = classeRow;
         }
         
+        const podeEditarPedido = pedidoPodeSerEditado(pedido.status);
         row.innerHTML = `
             <td><strong>${pedido.numero_pedido || 'N/A'}</strong></td>
             <td>${pedido.nome_fornecedor || 'N/A'}</td>
@@ -838,12 +848,16 @@ function renderizarTabela(pedidos) {
                 <button class="btn btn-sm btn-outline-primary btn-action-simple" onclick="visualizarPedido(${pedido.id_pedido})" title="Visualizar">
                     <i class="bi bi-eye"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-success btn-action-simple" onclick="editarPedido(${pedido.id_pedido})" title="Editar">
+                <button class="btn btn-sm ${podeEditarPedido ? 'btn-outline-success' : 'btn-outline-warning'} btn-action-simple"
+                        onclick="${podeEditarPedido ? `editarPedido(${pedido.id_pedido})` : `mostrarModalEdicaoBloqueada(${pedido.id_pedido})`}"
+                        title="${podeEditarPedido ? 'Editar' : 'Edição bloqueada'}">
                     <i class="bi bi-pencil"></i>
                 </button>
+                ${podeEditarPedido ? `
                 <button class="btn btn-sm btn-outline-danger btn-action-simple" onclick="excluirPedido(${pedido.id_pedido})" title="Excluir">
                     <i class="bi bi-trash"></i>
                 </button>
+                ` : ''}
             </td>
         `;
         tbody.appendChild(row);
@@ -1428,6 +1442,67 @@ function limparFiltroMateriaisEstoqueBaixo() {
     filtrarMateriaisEstoqueBaixoPorNome();
 }
 
+function configurarBuscaItensPedidoExistente(ativo) {
+    const box = document.getElementById('busca-itens-pedido-existente');
+    const input = document.getElementById('filtro-itens-pedido-existente');
+    const resultado = document.getElementById('resultado-busca-itens-pedido-existente');
+
+    if (!box) return;
+
+    box.classList.toggle('d-none', !ativo);
+    if (!ativo) {
+        if (input) input.value = '';
+        if (resultado) {
+            resultado.textContent = 'Informe um termo para conferir os itens deste pedido.';
+        }
+        document.querySelectorAll('.tabela-materiais-pesquisados tbody tr').forEach(linha => {
+            linha.style.display = '';
+            linha.classList.remove('table-success');
+        });
+        return;
+    }
+
+    filtrarItensPedidoExistente();
+}
+
+function filtrarItensPedidoExistente() {
+    const input = document.getElementById('filtro-itens-pedido-existente');
+    const resultado = document.getElementById('resultado-busca-itens-pedido-existente');
+    const termo = normalizarTextoComparacao(input?.value || '');
+    const linhas = document.querySelectorAll('.tabela-materiais-pesquisados tbody tr');
+
+    if (!resultado) return;
+
+    if (linhas.length === 0) {
+        resultado.textContent = 'Nenhum item carregado neste pedido.';
+        return;
+    }
+
+    let encontrados = 0;
+    linhas.forEach(linha => {
+        const textoLinha = normalizarTextoComparacao(linha.textContent || '');
+        const corresponde = !termo || textoLinha.includes(termo);
+        linha.style.display = corresponde ? '' : 'none';
+        linha.classList.toggle('table-success', Boolean(termo && corresponde));
+        if (corresponde) encontrados++;
+    });
+
+    if (!termo) {
+        resultado.textContent = `Lista com ${linhas.length} item(ns) do pedido. Digite para conferir se um item existe.`;
+        return;
+    }
+
+    resultado.textContent = encontrados > 0
+        ? `${encontrados} item(ns) encontrado(s) na lista já criada.`
+        : 'Nenhum item encontrado na lista já criada.';
+}
+
+function limparBuscaItensPedidoExistente() {
+    const input = document.getElementById('filtro-itens-pedido-existente');
+    if (input) input.value = '';
+    filtrarItensPedidoExistente();
+}
+
 function removerItemEstoqueBaixo(index) {
     const quantidadeInput = document.querySelector(`input[data-index="${index}"].quantidade-solicitada`);
     const valorTotalInput = document.querySelector(`input[data-index="${index}"].valor-total-material`);
@@ -1585,6 +1660,7 @@ function abrirModalNovoPedido() {
     statusPedidoEmEdicao = null;
     itensOriginaisEdicao = new Map();
     itensRemovidosEdicao = new Set();
+    configurarBuscaItensPedidoExistente(false);
     document.getElementById('formNovoPedido').reset();
     document.getElementById('materiais-container').innerHTML = '<div class="text-center text-muted py-4">Selecione uma filial e um fornecedor para carregar os materiais</div>';
     document.getElementById('total-pedido-modal').textContent = 'R$ 0,00';
@@ -2069,7 +2145,9 @@ async function visualizarPedido(id) {
             
             const btnEditarPedido = document.getElementById('btn-editar-pedido');
             if (btnEditarPedido) {
-                btnEditarPedido.classList.toggle('d-none', !pedidoPodeSerEditado(pedido.status));
+                btnEditarPedido.classList.remove('d-none');
+                btnEditarPedido.classList.toggle('btn-primary', pedidoPodeSerEditado(pedido.status));
+                btnEditarPedido.classList.toggle('btn-warning', !pedidoPodeSerEditado(pedido.status));
             }
             
             // Carregar histórico de status
@@ -2304,13 +2382,379 @@ function configurarStatusPedido(statusBadge, statusText, statusCard, statusAtivo
 }
 
 // Imprimir pedido
-function imprimirPedido() {
-    Swal.fire({
-        title: 'Imprimir Pedido',
-        text: 'Funcionalidade de impressão em desenvolvimento',
-        icon: 'info',
-        confirmButtonText: 'OK'
-    });
+async function imprimirPedido() {
+    const modal = document.getElementById('modalVisualizarPedido');
+    const pedidoId = modal?.getAttribute('data-pedido-id') || window.pedidoAtual?.id_pedido;
+
+    if (!pedidoId) {
+        mostrarErro('Não foi possível identificar o pedido para impressão.');
+        return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        mostrarErro('O navegador bloqueou a nova aba de impressão. Permita pop-ups para este site.');
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="pt-br">
+        <head>
+            <meta charset="UTF-8">
+            <title>Carregando impressão...</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 32px; color: #111827; }
+                .loading { text-align: center; margin-top: 20vh; color: #6b7280; }
+            </style>
+        </head>
+        <body>
+            <div class="loading">
+                <h2>Preparando impressão do pedido...</h2>
+                <p>Aguarde enquanto carregamos todos os dados.</p>
+            </div>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+
+    try {
+        const response = await fetch(`backend/api/pedidos_compra.php?action=get&id=${pedidoId}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+        if (!data.success || !data.pedido) {
+            printWindow.close();
+            mostrarErro(data.error || 'Erro ao carregar dados do pedido para impressão.');
+            return;
+        }
+
+        const pedido = data.pedido;
+        const itens = pedido.itens || [];
+        const escaparHtml = (valor) => String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        let quantidadeSolicitadaTotal = 0;
+        let quantidadeBaseTotal = 0;
+        let subtotalItens = 0;
+
+        const linhasItens = itens.map((item, index) => {
+            const quantidadeSolicitada = parseFloat(item.quantidade) || 0;
+            const quantidadeDisponivelRaw = item.quantidade_disponivel;
+            const quantidadeDisponivel = (quantidadeDisponivelRaw !== null && quantidadeDisponivelRaw !== undefined && quantidadeDisponivelRaw !== '')
+                ? parseFloat(quantidadeDisponivelRaw)
+                : null;
+            const disponivel = (item.disponivel !== null && item.disponivel !== undefined && item.disponivel !== '')
+                ? parseInt(item.disponivel, 10)
+                : null;
+            const precoFornecedor = parseFloat(item.preco_fornecedor);
+            const precoUnitarioOriginal = parseFloat(item.preco_unitario) || 0;
+            const precoUnitario = (!Number.isNaN(precoFornecedor) && precoFornecedor > 0) ? precoFornecedor : precoUnitarioOriginal;
+            const quantidadeBase = disponivel === 0
+                ? 0
+                : ((quantidadeDisponivel !== null && !Number.isNaN(quantidadeDisponivel) && quantidadeDisponivel > 0) ? quantidadeDisponivel : quantidadeSolicitada);
+            const totalItem = quantidadeBase * precoUnitario;
+
+            quantidadeSolicitadaTotal += quantidadeSolicitada;
+            quantidadeBaseTotal += quantidadeBase;
+            subtotalItens += totalItem;
+
+            const disponibilidadeTexto = disponivel === 0
+                ? 'Não disponível'
+                : (disponivel === 1 ? 'Disponível' : 'Aguardando resposta');
+
+            return `
+                <tr>
+                    <td class="center">${index + 1}</td>
+                    <td>
+                        <strong>${escaparHtml(item.codigo_material || 'N/A')}</strong><br>
+                        <span class="muted">${escaparHtml(item.nome_material || 'Material não encontrado')}</span>
+                    </td>
+                    <td>${escaparHtml(item.unidade_medida_sigla || item.unidade_medida || 'UN')}</td>
+                    <td class="right">${quantidadeSolicitada.toLocaleString('pt-BR')}</td>
+                    <td class="right">${quantidadeBase.toLocaleString('pt-BR')}</td>
+                    <td>${disponibilidadeTexto}</td>
+                    <td class="right">${formatarMoeda(precoUnitario)}</td>
+                    <td class="right strong">${formatarMoeda(totalItem)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const valorTotalPedido = parseFloat(pedido.valor_total) || subtotalItens;
+        const precoMedio = quantidadeBaseTotal > 0 ? subtotalItens / quantidadeBaseTotal : 0;
+        const dataImpressao = new Date().toLocaleString('pt-BR');
+        const statusNome = getStatusNome(pedido.status || '');
+
+        const html = `
+            <!DOCTYPE html>
+            <html lang="pt-br">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Pedido ${escaparHtml(pedido.numero_pedido || pedidoId)} - Impressão</title>
+                <style>
+                    * { box-sizing: border-box; }
+                    body {
+                        font-family: Arial, Helvetica, sans-serif;
+                        margin: 0;
+                        background: #f3f4f6;
+                        color: #111827;
+                    }
+                    .page {
+                        width: min(1180px, calc(100% - 32px));
+                        margin: 24px auto;
+                        background: #fff;
+                        padding: 32px;
+                        border-radius: 14px;
+                        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+                    }
+                    .topbar {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 16px;
+                        align-items: flex-start;
+                        border-bottom: 3px solid #2563eb;
+                        padding-bottom: 18px;
+                        margin-bottom: 22px;
+                    }
+                    h1, h2, h3 { margin: 0; }
+                    h1 { font-size: 26px; color: #1e3a8a; }
+                    h2 { font-size: 18px; color: #1f2937; margin-bottom: 10px; }
+                    .muted { color: #6b7280; font-size: 12px; }
+                    .badge {
+                        display: inline-block;
+                        padding: 6px 10px;
+                        border-radius: 999px;
+                        background: #dbeafe;
+                        color: #1e40af;
+                        font-weight: 700;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                    }
+                    .actions { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 16px; }
+                    button {
+                        border: 0;
+                        border-radius: 8px;
+                        padding: 10px 14px;
+                        cursor: pointer;
+                        font-weight: 700;
+                    }
+                    .btn-print { background: #2563eb; color: #fff; }
+                    .btn-close { background: #e5e7eb; color: #111827; }
+                    .grid {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 12px;
+                        margin-bottom: 22px;
+                    }
+                    .card {
+                        border: 1px solid #e5e7eb;
+                        border-radius: 10px;
+                        padding: 14px;
+                        background: #f9fafb;
+                    }
+                    .card-label {
+                        color: #6b7280;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                        letter-spacing: .04em;
+                        margin-bottom: 5px;
+                    }
+                    .card-value { font-weight: 800; font-size: 17px; }
+                    .section {
+                        margin-top: 22px;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 12px;
+                        overflow: hidden;
+                    }
+                    .section-header {
+                        background: #f8fafc;
+                        padding: 12px 14px;
+                        border-bottom: 1px solid #e5e7eb;
+                    }
+                    .section-body { padding: 14px; }
+                    .info-grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 10px 24px;
+                        font-size: 14px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 12px;
+                    }
+                    th {
+                        background: #eff6ff;
+                        color: #1e3a8a;
+                        text-align: left;
+                        border: 1px solid #dbeafe;
+                        padding: 9px;
+                    }
+                    td {
+                        border: 1px solid #e5e7eb;
+                        padding: 8px;
+                        vertical-align: top;
+                    }
+                    tfoot td {
+                        background: #f9fafb;
+                        font-weight: 800;
+                    }
+                    .right { text-align: right; }
+                    .center { text-align: center; }
+                    .strong { font-weight: 800; }
+                    .obs {
+                        min-height: 54px;
+                        white-space: pre-wrap;
+                        line-height: 1.45;
+                    }
+                    .footer {
+                        margin-top: 26px;
+                        display: flex;
+                        justify-content: space-between;
+                        color: #6b7280;
+                        font-size: 11px;
+                    }
+                    @media print {
+                        body { background: #fff; }
+                        .page {
+                            width: 100%;
+                            margin: 0;
+                            padding: 12mm;
+                            box-shadow: none;
+                            border-radius: 0;
+                        }
+                        .actions { display: none; }
+                        .section, .card { break-inside: avoid; }
+                        table { page-break-inside: auto; }
+                        tr { page-break-inside: avoid; page-break-after: auto; }
+                    }
+                    @media (max-width: 900px) {
+                        .grid { grid-template-columns: repeat(2, 1fr); }
+                        .info-grid { grid-template-columns: 1fr; }
+                        .topbar { flex-direction: column; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page">
+                    <div class="actions">
+                        <button class="btn-print" onclick="window.print()">Imprimir</button>
+                        <button class="btn-close" onclick="window.close()">Fechar</button>
+                    </div>
+
+                    <div class="topbar">
+                        <div>
+                            <h1>Pedido de Compra</h1>
+                            <div class="muted">Resumo completo para impressão</div>
+                        </div>
+                        <div class="right">
+                            <h2>${escaparHtml(pedido.numero_pedido || 'N/A')}</h2>
+                            <span class="badge">${escaparHtml(statusNome || pedido.status || 'Status não informado')}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid">
+                        <div class="card">
+                            <div class="card-label">Valor Total</div>
+                            <div class="card-value">${formatarMoeda(valorTotalPedido)}</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-label">Total de Itens</div>
+                            <div class="card-value">${itens.length}</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-label">Qtd. Solicitada</div>
+                            <div class="card-value">${quantidadeSolicitadaTotal.toLocaleString('pt-BR')}</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-label">Preço Médio</div>
+                            <div class="card-value">${formatarMoeda(precoMedio)}</div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-header"><h2>Dados do Pedido</h2></div>
+                        <div class="section-body info-grid">
+                            <div><strong>Clínica:</strong> ${escaparHtml(pedido.nome_filial || 'N/A')}</div>
+                            <div><strong>Fornecedor:</strong> ${escaparHtml(pedido.nome_fornecedor || 'N/A')}</div>
+                            <div><strong>Solicitante:</strong> ${escaparHtml(pedido.nome_usuario_solicitante || pedido.nome_usuario || 'Sistema')}</div>
+                            <div><strong>Data do Pedido:</strong> ${formatarData(pedido.data_solicitacao || pedido.data_criacao)}</div>
+                            <div><strong>Entrega Prevista:</strong> ${pedido.data_entrega_prevista ? formatarData(pedido.data_entrega_prevista) : 'Não informado'}</div>
+                            <div><strong>Prioridade:</strong> ${escaparHtml(getPrioridadeText(pedido.prioridade || 'padrao'))}</div>
+                            <div><strong>Prazo de Entrega:</strong> ${escaparHtml(pedido.prazo_entrega || 'Não informado')} ${pedido.prazo_entrega ? 'dias' : ''}</div>
+                            <div><strong>Última Atualização:</strong> ${pedido.data_atualizacao ? formatarData(pedido.data_atualizacao) : 'Não informado'}</div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-header"><h2>Itens do Pedido</h2></div>
+                        <div class="section-body" style="padding:0;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th class="center">#</th>
+                                        <th>Material</th>
+                                        <th>Un.</th>
+                                        <th class="right">Qtd. Solicitada</th>
+                                        <th class="right">Qtd. Cálculo</th>
+                                        <th>Disponibilidade</th>
+                                        <th class="right">Preço Unit.</th>
+                                        <th class="right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${linhasItens || '<tr><td colspan="8" class="center muted">Nenhum item encontrado</td></tr>'}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="3" class="right">Totais</td>
+                                        <td class="right">${quantidadeSolicitadaTotal.toLocaleString('pt-BR')}</td>
+                                        <td class="right">${quantidadeBaseTotal.toLocaleString('pt-BR')}</td>
+                                        <td colspan="2" class="right">Subtotal dos Itens</td>
+                                        <td class="right">${formatarMoeda(subtotalItens)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="7" class="right">Valor Total do Pedido</td>
+                                        <td class="right">${formatarMoeda(valorTotalPedido)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-header"><h2>Observações</h2></div>
+                        <div class="section-body obs">${escaparHtml(pedido.observacoes || 'Nenhuma observação registrada.')}</div>
+                    </div>
+
+                    <div class="footer">
+                        <div>Impresso em ${dataImpressao}</div>
+                        <div>${escaparHtml(document.title || 'Sistema Grupo Sorrisos')}</div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+    } catch (error) {
+        console.error('Erro ao imprimir pedido:', error);
+        printWindow.close();
+        mostrarErro('Erro ao preparar impressão do pedido.');
+    }
 }
 
 // Editar pedido atual
@@ -2328,7 +2772,7 @@ async function editarPedidoAtual() {
         
         const statusAtualPedido = (modal.getAttribute('data-pedido-status') || '').toLowerCase();
         if (statusAtualPedido && !pedidoPodeSerEditado(statusAtualPedido)) {
-            mostrarErro('Este pedido já foi enviado e não pode mais ser editado.');
+            await mostrarModalEdicaoBloqueada(pedidoId);
             return;
         }
         
@@ -2356,6 +2800,11 @@ async function editarPedidoAtual() {
                 
                 if (data.success) {
                     const pedido = data.pedido;
+
+                    if (!pedidoPodeSerEditado(pedido.status)) {
+                        await mostrarModalEdicaoBloqueada(pedidoId);
+                        return;
+                    }
                     
                     // Preencher o modal de edição com os dados do pedido
                     await preencherModalEdicao(pedido);
@@ -2458,6 +2907,7 @@ async function preencherModalEdicao(pedido) {
         }
 
         configurarBotaoImportacaoCsvCliente(true);
+        configurarBuscaItensPedidoExistente(true);
         
         console.log('✅ Modal de edição preenchido com sucesso');
         
@@ -2680,6 +3130,7 @@ function resetarModalParaCriacao() {
             modalButton.onclick = salvarNovoPedido;
         }
         configurarBotaoImportacaoCsvCliente(false);
+        configurarBuscaItensPedidoExistente(false);
         
         // Limpar container de materiais
         document.getElementById('materiais-container').innerHTML = '<div class="text-center text-muted py-4">Selecione uma Clínica e um fornecedor para carregar os materiais</div>';
@@ -2985,8 +3436,7 @@ async function mostrarOpcoesVoltarStatus() {
     }
 }
 
-// Carregar histórico de status do pedido
-async function carregarHistoricoStatus(pedidoId) {
+async function buscarHistoricoStatus(pedidoId) {
     try {
         const response = await fetch(`backend/api/historico_status.php?action=get&pedido_id=${pedidoId}`, {
             method: 'GET',
@@ -2999,15 +3449,30 @@ async function carregarHistoricoStatus(pedidoId) {
         const data = await response.json();
         
         if (data.success && data.historico) {
-            renderizarTimelineStatus(data.historico, 'timeline-status');
-        } else {
-            console.error('Erro ao carregar histórico:', data.message || 'Dados não encontrados');
-            document.getElementById('timeline-status').innerHTML = '<p class="text-muted">Nenhum histórico de status encontrado.</p>';
+            return data.historico;
         }
+
+        console.error('Erro ao carregar histórico:', data.message || 'Dados não encontrados');
+        return [];
     } catch (error) {
         console.error('Erro ao carregar histórico de status:', error);
-        document.getElementById('timeline-status').innerHTML = '<p class="text-muted">Erro ao carregar histórico de status.</p>';
+        return [];
     }
+}
+
+// Carregar histórico de status do pedido
+async function carregarHistoricoStatus(pedidoId) {
+    const historico = await buscarHistoricoStatus(pedidoId);
+    const container = document.getElementById('timeline-status');
+    if (!container) return historico;
+
+    if (historico.length > 0) {
+        renderizarTimelineStatus(historico, 'timeline-status');
+    } else {
+        container.innerHTML = '<p class="text-muted">Nenhum histórico de status encontrado.</p>';
+    }
+
+    return historico;
 }
 
 // Carregar fluxo de status do pedido
@@ -3151,6 +3616,137 @@ function getStatusNome(status) {
         'cancelado': 'Cancelado'
     };
     return nomes[status] || status;
+}
+
+function renderizarFluxoStatusBloqueio(historico, statusAtual, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const fluxoStatus = [
+        { key: 'em_analise', nome: 'Em Análise' },
+        { key: 'pendente', nome: 'Pendente' },
+        { key: 'aprovado_cotacao', nome: 'Aprovado Cotação' },
+        { key: 'enviar_para_faturamento', nome: 'Enviar para Faturamento' },
+        { key: 'aprovado_para_faturar', nome: 'Aprovado para Faturar' },
+        { key: 'em_transito', nome: 'Em Trânsito' },
+        { key: 'entregue', nome: 'Entregue' },
+        { key: 'recebido', nome: 'Recebido' }
+    ];
+
+    const historicoMap = {};
+    (historico || []).forEach(item => {
+        const statusKey = item.status_novo || item.status;
+        if (statusKey) historicoMap[statusKey] = item;
+    });
+
+    const indiceAtual = fluxoStatus.findIndex(status => status.key === statusAtual);
+    container.innerHTML = fluxoStatus.map((status, index) => {
+        const historicoStatus = historicoMap[status.key];
+        const concluido = historicoStatus || (indiceAtual >= 0 && index < indiceAtual);
+        const atual = status.key === statusAtual;
+        const badgeClass = atual ? 'bg-warning text-dark' : (concluido ? 'bg-success' : 'bg-secondary');
+        const dataStatus = historicoStatus?.data_alteracao ? formatarDataHora(historicoStatus.data_alteracao) : '';
+
+        return `
+            <div class="d-flex align-items-start gap-2 mb-2">
+                <span class="badge ${badgeClass}" style="min-width: 24px;">${atual ? 'Atual' : (concluido ? 'OK' : '-')}</span>
+                <div>
+                    <div class="fw-semibold">${status.nome}</div>
+                    ${dataStatus ? `<div class="text-muted small">${dataStatus}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function mostrarModalEdicaoBloqueada(pedidoId) {
+    try {
+        const modalVisualizar = document.getElementById('modalVisualizarPedido');
+        const modalVisualizarInstance = modalVisualizar ? bootstrap.Modal.getInstance(modalVisualizar) : null;
+        if (modalVisualizarInstance && modalVisualizar.classList.contains('show')) {
+            modalVisualizarInstance.hide();
+        }
+
+        const response = await fetch(`backend/api/pedidos_compra.php?action=get&id=${pedidoId}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+        if (!data.success || !data.pedido) {
+            mostrarErro(data.error || 'Erro ao carregar detalhes do pedido bloqueado.');
+            return;
+        }
+
+        const pedido = data.pedido;
+        const historico = await buscarHistoricoStatus(pedidoId);
+        const statusNome = getStatusNome(pedido.status || '');
+        const itens = pedido.itens || [];
+        const quantidadeTotal = itens.reduce((sum, item) => sum + (parseFloat(item.quantidade) || 0), 0);
+
+        const modalElement = document.getElementById('modalEdicaoBloqueadaPedido');
+        if (!modalElement) return;
+        modalElement.setAttribute('data-pedido-id', pedidoId);
+
+        document.getElementById('bloqueio-edicao-mensagem').textContent =
+            `O pedido está na situação "${statusNome}". A partir desta fase o processo fica bloqueado para alterações e deve ser apenas acompanhado.`;
+        document.getElementById('bloqueio-numero-pedido').textContent = pedido.numero_pedido || 'N/A';
+        document.getElementById('bloqueio-status-atual').innerHTML = getStatusBadge(pedido.status || '');
+        document.getElementById('bloqueio-valor-total').textContent = formatarMoeda(parseFloat(pedido.valor_total) || 0);
+        document.getElementById('bloqueio-total-itens').textContent = `${itens.length} item(ns) / ${quantidadeTotal} qtd.`;
+        document.getElementById('bloqueio-filial').textContent = pedido.nome_filial || 'N/A';
+        document.getElementById('bloqueio-fornecedor').textContent = pedido.nome_fornecedor || 'N/A';
+        document.getElementById('bloqueio-solicitante').textContent = pedido.nome_usuario_solicitante || pedido.nome_usuario || 'Sistema';
+        document.getElementById('bloqueio-data-pedido').textContent = formatarData(pedido.data_solicitacao || pedido.data_criacao);
+        document.getElementById('bloqueio-data-entrega').textContent = pedido.data_entrega_prevista ? formatarData(pedido.data_entrega_prevista) : 'Não informado';
+        document.getElementById('bloqueio-prioridade').textContent = getPrioridadeText(pedido.prioridade || 'padrao');
+
+        const tbody = document.getElementById('bloqueio-itens-tbody');
+        if (tbody) {
+            tbody.innerHTML = itens.length ? itens.map(item => {
+                const quantidade = parseFloat(item.quantidade) || 0;
+                const precoFornecedor = parseFloat(item.preco_fornecedor);
+                const precoUnitario = (!Number.isNaN(precoFornecedor) && precoFornecedor > 0)
+                    ? precoFornecedor
+                    : (parseFloat(item.preco_unitario) || 0);
+                const total = quantidade * precoUnitario;
+
+                return `
+                    <tr>
+                        <td>
+                            <strong>${item.codigo_material || 'N/A'}</strong><br>
+                            <small class="text-muted">${item.nome_material || 'Material não encontrado'}</small>
+                        </td>
+                        <td class="text-center">${quantidade}</td>
+                        <td class="text-center">${formatarMoeda(precoUnitario)}</td>
+                        <td class="text-center"><strong>${formatarMoeda(total)}</strong></td>
+                    </tr>
+                `;
+            }).join('') : '<tr><td colspan="4" class="text-center text-muted py-3">Nenhum item encontrado</td></tr>';
+        }
+
+        renderizarFluxoStatusBloqueio(historico, pedido.status || '', 'bloqueio-fluxo-status');
+        renderizarTimelineStatus(historico, 'bloqueio-timeline-status', true);
+
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    } catch (error) {
+        console.error('Erro ao mostrar bloqueio de edição:', error);
+        mostrarErro('Erro ao carregar detalhes do bloqueio de edição.');
+    }
+}
+
+function acompanharPedidoBloqueado() {
+    const modalElement = document.getElementById('modalEdicaoBloqueadaPedido');
+    const pedidoId = modalElement?.getAttribute('data-pedido-id');
+    const modal = modalElement ? bootstrap.Modal.getInstance(modalElement) : null;
+    if (modal) modal.hide();
+    if (pedidoId) {
+        setTimeout(() => visualizarPedido(pedidoId), 250);
+    }
 }
 
 // Renderizar timeline de status

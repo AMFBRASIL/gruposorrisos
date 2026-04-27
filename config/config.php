@@ -9,9 +9,9 @@ define('OPENAI_API_URL', 'https://api.openai.com/v1/chat/completions');
 ###############################################################
 #PRODUCAO
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('DB_NAME') ?: 'u293057343_sorrisos');
-define('DB_USER', getenv('DB_USER') ?: 'u293057343_sorrisos');
-define('DB_PASS', getenv('DB_PASS') ?: 'N+OUZqAqN0m');
+define('DB_NAME', getenv('DB_NAME') ?: 'gruposorrisos');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
 
 // Application Settings
 define('APP_NAME', 'Grupo Sorrisos - Estoque');

@@ -284,10 +284,18 @@ try {
                         break;
                     }
                     
-                    $statusBloqueadosEdicao = ['enviado', 'em_transito', 'entregue', 'recebido', 'cancelado'];
-                    if (in_array($pedidoAtual['status'], $statusBloqueadosEdicao)) {
+                    $statusBloqueadosEdicao = [
+                        'enviar_para_faturamento',
+                        'aprovado_para_faturar',
+                        'enviado',
+                        'em_transito',
+                        'entregue',
+                        'recebido',
+                        'cancelado'
+                    ];
+                    if (in_array(strtolower($pedidoAtual['status'] ?? ''), $statusBloqueadosEdicao)) {
                         http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'Este pedido já foi enviado e não pode mais ser editado']);
+                        echo json_encode(['success' => false, 'error' => 'Este pedido já foi enviado para faturamento e não pode mais ser editado']);
                         break;
                     }
                     
@@ -477,6 +485,28 @@ try {
             if (!$id) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => 'ID não fornecido']);
+                break;
+            }
+
+            $pedidoAtual = $pedidoCompra->findById($id);
+            if (!$pedidoAtual) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                break;
+            }
+
+            $statusBloqueadosExclusao = [
+                'enviar_para_faturamento',
+                'aprovado_para_faturar',
+                'enviado',
+                'em_transito',
+                'entregue',
+                'recebido',
+                'cancelado'
+            ];
+            if (in_array(strtolower($pedidoAtual['status'] ?? ''), $statusBloqueadosExclusao)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Este pedido já foi enviado para faturamento e não pode mais ser excluído']);
                 break;
             }
             

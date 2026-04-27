@@ -288,6 +288,69 @@ $menuActive = 'pedidos_fornecedores';
             color: #1e40af;
             line-height: 1.1;
         }
+
+        #modalResponderPedido .modal-body {
+            padding-top: 1rem;
+        }
+
+        #modalResponderPedido .item-row {
+            padding: 0.65rem 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        #modalResponderPedido .item-title {
+            font-size: 0.95rem;
+            line-height: 1.2;
+        }
+
+        #modalResponderPedido .item-meta {
+            font-size: 0.76rem;
+            line-height: 1.25;
+        }
+
+        #modalResponderPedido .form-label {
+            margin-bottom: 0.2rem;
+        }
+
+        #modalResponderPedido .compact-field label {
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        #modalResponderPedido .compact-field .form-control,
+        #modalResponderPedido .compact-field .form-select,
+        #modalResponderPedido .price-input {
+            min-height: 32px;
+            padding: 0.25rem 0.45rem;
+            font-size: 0.86rem;
+            border-radius: 6px;
+        }
+
+        #modalResponderPedido .compact-help {
+            font-size: 0.72rem;
+            line-height: 1.15;
+        }
+
+        #modalResponderPedido .obs-solicitacao-box {
+            background: #f8fafc;
+            border-left: 3px solid #cbd5e1;
+            padding: 0.35rem 0.5rem;
+            border-radius: 6px;
+        }
+
+        #modalResponderPedido .obs-item-compact {
+            min-height: 34px;
+            resize: vertical;
+            font-size: 0.84rem;
+        }
+
+        #modalResponderPedido .qtd-field {
+            max-width: 105px;
+        }
         
         @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -536,11 +599,17 @@ $menuActive = 'pedidos_fornecedores';
                 
                 <div class="mb-3">
                     <label class="form-label">Observações:</label>
-                    <textarea class="form-control" id="observacoes-fornecedor" rows="3" 
+                    <textarea class="form-control form-control-sm" id="observacoes-fornecedor" rows="2" 
                               placeholder="Adicione observações sobre preços, prazos ou condições..."></textarea>
                 </div>
                 
                 <h6 class="mb-3">Itens do Pedido</h6>
+                <div class="mb-3">
+                    <label class="form-label">Pesquisar Itens</label>
+                    <input type="text" class="form-control" id="filtro-itens-resposta"
+                           placeholder="Digite nome ou código do item..."
+                           oninput="filtrarItensRespostaFornecedor()">
+                </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <input type="file" id="input-csv-resposta-fornecedor" accept=".csv,text/csv" class="d-none">
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-exportar-csv-resposta-fornecedor">
@@ -568,12 +637,14 @@ $menuActive = 'pedidos_fornecedores';
                 <div class="row mt-4">
                     <div class="col-md-6">
                         <strong>Prazo de Entrega:</strong>
+                        <span class="text-muted small">(opcional)</span>
                         <input type="date" class="form-control mt-2" id="prazo-entrega">
                     </div>
                     <div class="col-md-6">
                         <strong>Condições de Pagamento:</strong>
+                        <span class="text-muted small">(opcional)</span>
                         <select class="form-select mt-2" id="condicoes-pagamento">
-                            <option value="">Selecione...</option>
+                            <option value="">Não informado</option>
                             <option value="30_dias">30 dias</option>
                             <option value="45_dias">45 dias</option>
                             <option value="60_dias">60 dias</option>
@@ -663,6 +734,17 @@ $menuActive = 'pedidos_fornecedores';
 // Variáveis globais
 let pedidosData = [];
 let pedidoAtual = null;
+
+function pedidoFornecedorPodeResponder(status) {
+    return ['em_analise', 'pendente', 'aprovado_cotacao'].includes((status || '').toLowerCase());
+}
+
+function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
 
 // Funções de prioridade
 function getPrioridadeClass(prioridade) {
@@ -834,7 +916,7 @@ function renderizarPedidos() {
                 <button class="btn btn-outline-info btn-action" onclick="abrirChatPedido(${pedido.id}, '${pedido.numero}')">
                     <i class="bi bi-chat-dots me-2"></i>Chat
                 </button>
-                ${(['em_analise', 'pendente', 'aprovado_cotacao', 'aprovado_para_faturar'].includes(pedido.status)) ? `
+                ${pedidoFornecedorPodeResponder(pedido.status) ? `
                     <button class="btn btn-success btn-action" onclick="responderPedido(${pedido.id})">
                         <i class="bi bi-reply me-2"></i>Responder
                     </button>
@@ -1019,7 +1101,7 @@ function visualizarPedido(pedidoId) {
     setTimeout(() => {
         const btnResponderModal = document.getElementById('btn-responder-modal');
         if (btnResponderModal) {
-            if (['em_analise', 'pendente', 'aprovado_cotacao', 'aprovado_para_faturar'].includes(pedido.status)) {
+            if (pedidoFornecedorPodeResponder(pedido.status)) {
                 btnResponderModal.style.display = 'inline-block';
             } else {
                 btnResponderModal.style.display = 'none';
@@ -1035,6 +1117,11 @@ function visualizarPedido(pedidoId) {
 function responderPedido(pedidoId = null) {
     const pedido = pedidoId ? pedidosData.find(p => p.id === pedidoId) : pedidoAtual;
     if (!pedido) return;
+
+    if (!pedidoFornecedorPodeResponder(pedido.status)) {
+        Swal.fire('Acompanhamento', 'Este pedido já foi enviado para faturamento e não pode mais ser editado.', 'info');
+        return;
+    }
     
     pedidoAtual = pedido;
     
@@ -1052,6 +1139,7 @@ function responderPedido(pedidoId = null) {
     document.getElementById('desconto-final-valor').placeholder = '0,00';
     document.getElementById('subtotal-itens-resposta').value = 'R$ 0,00';
     document.getElementById('valor-final-resposta').textContent = 'R$ 0,00';
+    document.getElementById('filtro-itens-resposta').value = '';
     atualizarBadgeCsvFornecedor(0);
     renderizarItensNaoEncontradosCsvFornecedor([]);
     const inputCsvResposta = document.getElementById('input-csv-resposta-fornecedor');
@@ -1062,70 +1150,61 @@ function responderPedido(pedidoId = null) {
     // Renderizar itens para resposta
     const itensContainer = document.getElementById('itens-resposta');
     itensContainer.innerHTML = pedido.itens.map((item, index) => `
-        <div class="item-row mb-3">
-            <div class="row align-items-start">
-                <div class="col-md-4 mb-2">
-                    <strong>${item.nome}</strong>
-                    <div class="text-muted small mt-1">
-                        <strong>Código:</strong> ${item.codigo || 'N/A'} | 
-                        <strong>Categoria:</strong> ${item.categoria || 'N/A'}
+        <div class="item-row" data-item-nome="${(item.nome || '').toLowerCase()}" data-item-codigo="${(item.codigo || '').toString().toLowerCase()}">
+            <div class="row g-2 align-items-start">
+                <div class="col-lg-5">
+                    <div class="item-title fw-semibold">${item.nome}</div>
+                    <div class="text-muted item-meta mt-1">
+                        <strong>Cód.:</strong> ${item.codigo || 'N/A'} |
+                        <strong>Categoria:</strong> ${item.categoria || 'N/A'} |
+                        <strong>Preço atual:</strong> R$ ${item.preco_unitario.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                     </div>
-                    <div class="text-muted small mt-1">
-                        <strong>Solicitado:</strong> <span class="badge bg-info">${item.quantidade} ${item.unidade}</span>
+                    <div class="item-meta mt-1">
+                        <span class="text-muted">Solicitado:</span>
+                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">${item.quantidade} ${item.unidade}</span>
+                        <span class="text-info ms-2" id="info-quantidade-${index}"></span>
                     </div>
-                    ${item.observacoes ? `<div class="text-muted small mt-1"><em>${item.observacoes}</em></div>` : ''}
-                    <div class="mt-1">
-                        <small class="text-muted">Preço atual: R$ ${item.preco_unitario.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</small>
+                    <div id="obs-solicitacao-wrap-${index}" class="obs-solicitacao-box mt-2" style="display:none">
+                        <div class="item-meta text-muted fw-semibold">Obs. solicitação</div>
+                        <div id="obs-solicitacao-${index}" class="item-meta text-body-secondary"></div>
                     </div>
                 </div>
-                <div class="col-md-8">
-                    <div class="row g-2">
-                        <div class="col-md-3">
-                            <label class="form-label small">Quantidade Disponível</label>
-                            <input type="number" class="form-control price-input" 
+                <div class="col-lg-7">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-2 compact-field qtd-field">
+                            <label class="form-label" for="quantidade-${index}">Qtd. Disp.</label>
+                            <input type="number" class="form-control form-control-sm price-input" 
                                    id="quantidade-${index}" step="0.01" min="0" 
                                    value="${item.quantidade}" 
                                    placeholder="0,00" 
                                    onchange="calcularTotalItem(${index})"
                                    oninput="validarQuantidade(${index}, ${item.quantidade})">
-                            <small class="text-muted">Máx: ${item.quantidade} ${item.unidade}</small>
-                            <small class="text-info d-block mt-1" id="info-quantidade-${index}"></small>
+                            <div class="text-muted compact-help">Máx: ${item.quantidade} ${item.unidade}</div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small">Preço Unitário (R$)</label>
-                            <input type="text" class="form-control price-input" 
+                        <div class="col-6 col-md-2 compact-field">
+                            <label class="form-label" for="preco-${index}">Preço</label>
+                            <input type="text" class="form-control form-control-sm price-input" 
                                    id="preco-${index}" 
                                    placeholder="R$ 0,00" 
                                    oninput="aplicarMascaraMoeda(this, ${index})"
                                    onblur="calcularTotalItem(${index})"
                                    onfocus="this.select()">
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label small">Desconto</label>
-                            <select class="form-select" id="desconto-tipo-${index}" onchange="alterarTipoDesconto(${index})">
-                                <option value="">Nenhum</option>
-                                <option value="valor">Valor</option>
-                                <option value="percentual">Percentual</option>
-                            </select>
+                        <div class="col-6 col-md-2 compact-field">
+                            <label class="form-label" for="total-${index}">Total</label>
+                            <input type="text" class="form-control form-control-sm" id="total-${index}" readonly>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label small">Desc. Aplicado</label>
-                            <input type="text" class="form-control price-input"
-                                   id="desconto-valor-${index}"
-                                   placeholder="0,00"
-                                   oninput="aplicarMascaraDesconto(this, ${index})"
-                                   onblur="calcularTotalItem(${index})">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small">Total (R$)</label>
-                            <input type="text" class="form-control" id="total-${index}" readonly>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small">Disponível</label>
-                            <select class="form-select" id="disponivel-${index}" onchange="atualizarDisponibilidade(${index})">
+                        <div class="col-6 col-md-2 compact-field">
+                            <label class="form-label" for="disponivel-${index}">Disponível</label>
+                            <select class="form-select form-select-sm" id="disponivel-${index}" onchange="atualizarDisponibilidade(${index})">
                                 <option value="sim">Sim</option>
                                 <option value="nao">Não</option>
                             </select>
+                        </div>
+                        <div class="col-12 col-md-4 compact-field">
+                            <label class="form-label" for="observacoes-item-${index}">Obs. do item</label>
+                            <textarea class="form-control form-control-sm obs-item-compact" id="observacoes-item-${index}" rows="1" maxlength="2000"
+                                placeholder="Prazo, substituição, lote ou observação curta..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -1143,8 +1222,6 @@ function responderPedido(pedidoId = null) {
             const quantidadeInput = document.getElementById(`quantidade-${index}`);
             const precoInput = document.getElementById(`preco-${index}`);
             const disponivelInput = document.getElementById(`disponivel-${index}`);
-            const descontoTipoInput = document.getElementById(`desconto-tipo-${index}`);
-            const descontoValorInput = document.getElementById(`desconto-valor-${index}`);
 
             const disponivelRaw = item?.disponivel;
             const disponivel = (disponivelRaw !== null && disponivelRaw !== undefined && disponivelRaw !== '') ? parseInt(disponivelRaw, 10) : 1;
@@ -1153,10 +1230,6 @@ function responderPedido(pedidoId = null) {
             const quantidadeDisponivel = (quantidadeDisponivelRaw !== null && quantidadeDisponivelRaw !== undefined && quantidadeDisponivelRaw !== '')
                 ? parseFloat(quantidadeDisponivelRaw)
                 : null;
-
-            // Resetar desconto ao abrir, mantendo subtotal baseado no preço salvo
-            if (descontoTipoInput) descontoTipoInput.value = '';
-            if (descontoValorInput) descontoValorInput.value = '';
 
             if (disponivelInput) {
                 disponivelInput.value = (disponivel === 0) ? 'nao' : 'sim';
@@ -1195,9 +1268,43 @@ function responderPedido(pedidoId = null) {
             } else {
                 calcularTotalItem(index);
             }
+
+            const wrapSol = document.getElementById(`obs-solicitacao-wrap-${index}`);
+            const elSol = document.getElementById(`obs-solicitacao-${index}`);
+            const obsSol = (item.observacoes_solicitacao !== undefined && item.observacoes_solicitacao !== null)
+                ? String(item.observacoes_solicitacao)
+                : (item.observacoes || '');
+            if (wrapSol && elSol) {
+                if (obsSol.trim()) {
+                    elSol.textContent = obsSol;
+                    wrapSol.style.display = '';
+                } else {
+                    wrapSol.style.display = 'none';
+                }
+            }
+            const obsFornEl = document.getElementById(`observacoes-item-${index}`);
+            if (obsFornEl) {
+                const obsForn = (item.observacoes_item_fornecedor !== undefined && item.observacoes_item_fornecedor !== null)
+                    ? String(item.observacoes_item_fornecedor)
+                    : '';
+                obsFornEl.value = obsForn;
+            }
         });
         calcularResumoFinal();
     }, 300);
+}
+
+function filtrarItensRespostaFornecedor() {
+    const filtroInput = document.getElementById('filtro-itens-resposta');
+    const termo = (filtroInput?.value || '').trim().toLowerCase();
+    const itens = document.querySelectorAll('#itens-resposta .item-row');
+
+    itens.forEach((itemRow) => {
+        const nome = itemRow.getAttribute('data-item-nome') || '';
+        const codigo = itemRow.getAttribute('data-item-codigo') || '';
+        const exibir = !termo || nome.includes(termo) || codigo.includes(termo);
+        itemRow.style.display = exibir ? '' : 'none';
+    });
 }
 
 // Validar quantidade
@@ -1209,13 +1316,13 @@ function validarQuantidade(index, quantidadeSolicitada) {
     if (quantidade > quantidadeSolicitada) {
         quantidadeInput.value = quantidadeSolicitada;
         infoQuantidade.textContent = 'Quantidade ajustada para o máximo solicitado';
-        infoQuantidade.className = 'text-warning d-block mt-1';
+        infoQuantidade.className = 'text-warning ms-2';
     } else if (quantidade < quantidadeSolicitada && quantidade > 0) {
         infoQuantidade.textContent = `Disponível: ${quantidade} de ${quantidadeSolicitada} solicitados`;
-        infoQuantidade.className = 'text-warning d-block mt-1';
+        infoQuantidade.className = 'text-warning ms-2';
     } else if (quantidade === quantidadeSolicitada) {
         infoQuantidade.textContent = 'Quantidade completa disponível';
-        infoQuantidade.className = 'text-success d-block mt-1';
+        infoQuantidade.className = 'text-success ms-2';
     } else {
         infoQuantidade.textContent = '';
     }
@@ -1228,8 +1335,6 @@ function atualizarDisponibilidade(index) {
     const disponivel = document.getElementById(`disponivel-${index}`).value;
     const quantidadeInput = document.getElementById(`quantidade-${index}`);
     const precoInput = document.getElementById(`preco-${index}`);
-    const descontoTipoInput = document.getElementById(`desconto-tipo-${index}`);
-    const descontoValorInput = document.getElementById(`desconto-valor-${index}`);
     const infoQuantidade = document.getElementById(`info-quantidade-${index}`);
     
     if (disponivel === 'nao') {
@@ -1237,12 +1342,8 @@ function atualizarDisponibilidade(index) {
         quantidadeInput.disabled = true;
         precoInput.value = '';
         precoInput.disabled = true;
-        descontoTipoInput.value = '';
-        descontoTipoInput.disabled = true;
-        descontoValorInput.value = '';
-        descontoValorInput.disabled = true;
         infoQuantidade.textContent = 'Item não disponível';
-        infoQuantidade.className = 'text-danger d-block mt-1';
+        infoQuantidade.className = 'text-danger ms-2';
     } else {
         const pedido = pedidosData.find(p => p.id === pedidoAtual.id);
         const item = pedido.itens[index];
@@ -1250,9 +1351,6 @@ function atualizarDisponibilidade(index) {
         quantidadeInput.disabled = false;
         precoInput.disabled = false;
         precoInput.placeholder = 'R$ 0,00';
-        descontoTipoInput.disabled = false;
-        descontoValorInput.disabled = false;
-        descontoValorInput.placeholder = '0,00';
         infoQuantidade.textContent = '';
     }
     
@@ -1413,16 +1511,10 @@ function processarCsvRespostaFornecedor(textoCsv) {
         const quantidadeInput = document.getElementById(`quantidade-${itemIndex}`);
         const precoInput = document.getElementById(`preco-${itemIndex}`);
         const disponivelInput = document.getElementById(`disponivel-${itemIndex}`);
-        const descontoTipoInput = document.getElementById(`desconto-tipo-${itemIndex}`);
-        const descontoValorInput = document.getElementById(`desconto-valor-${itemIndex}`);
-
         if (!quantidadeInput || !precoInput || !disponivelInput) {
             itensNaoEncontrados.push(codigoCsv || nomeCsv);
             continue;
         }
-
-        if (descontoTipoInput) descontoTipoInput.value = '';
-        if (descontoValorInput) descontoValorInput.value = '';
 
         disponivelInput.value = 'sim';
 
@@ -1539,59 +1631,6 @@ function exportarItensRespostaFornecedor() {
     URL.revokeObjectURL(url);
 }
 
-// Alterar tipo de desconto por item
-function alterarTipoDesconto(index) {
-    const descontoTipoInput = document.getElementById(`desconto-tipo-${index}`);
-    const descontoValorInput = document.getElementById(`desconto-valor-${index}`);
-    const tipo = descontoTipoInput.value;
-
-    descontoValorInput.value = '';
-    descontoValorInput.classList.remove('is-invalid');
-
-    if (tipo === 'valor') {
-        descontoValorInput.placeholder = 'R$ 0,00';
-    } else if (tipo === 'percentual') {
-        descontoValorInput.placeholder = '0,00%';
-    } else {
-        descontoValorInput.placeholder = '0,00';
-    }
-
-    calcularTotalItem(index);
-}
-
-// Aplicar máscara de desconto de acordo com o tipo selecionado
-function aplicarMascaraDesconto(input, index) {
-    const tipo = document.getElementById(`desconto-tipo-${index}`).value;
-
-    if (!tipo) {
-        input.value = '';
-        calcularTotalItem(index);
-        return;
-    }
-
-    if (tipo === 'valor') {
-        aplicarMascaraMoeda(input, index);
-        return;
-    }
-
-    if (tipo === 'percentual') {
-        let value = input.value.replace(/[^\d,]/g, '');
-        if (!value) {
-            input.value = '';
-            calcularTotalItem(index);
-            return;
-        }
-
-        const partes = value.split(',');
-        if (partes.length > 2) {
-            value = `${partes[0]},${partes.slice(1).join('')}`;
-        }
-
-        input.value = value;
-        calcularTotalItem(index);
-    }
-}
-
 function removerMascaraPercentual(valorFormatado) {
     if (!valorFormatado) return 0;
     const valorLimpo = valorFormatado.replace('%', '').replace(/\./g, '').replace(',', '.').trim();
@@ -1599,40 +1638,12 @@ function removerMascaraPercentual(valorFormatado) {
 }
 
 function obterDescontoItem(index, precoUnitario) {
-    const descontoTipo = document.getElementById(`desconto-tipo-${index}`).value;
-    const descontoValorInput = document.getElementById(`desconto-valor-${index}`);
-
-    let descontoValor = 0;
-    if (descontoTipo === 'valor') {
-        descontoValor = removerMascaraMoeda(descontoValorInput.value);
-    } else if (descontoTipo === 'percentual') {
-        descontoValor = removerMascaraPercentual(descontoValorInput.value);
-    }
-
-    descontoValorInput.classList.remove('is-invalid');
-
-    if (descontoTipo === 'percentual' && descontoValor > 100) {
-        descontoValorInput.classList.add('is-invalid');
-        descontoValor = 100;
-    }
-
-    let descontoUnitario = 0;
-    if (descontoTipo === 'valor') {
-        descontoUnitario = descontoValor;
-    } else if (descontoTipo === 'percentual') {
-        descontoUnitario = (precoUnitario * descontoValor) / 100;
-    }
-
-    if (descontoUnitario > precoUnitario) {
-        descontoUnitario = precoUnitario;
-    }
-
-    const precoFinalUnitario = Math.max(precoUnitario - descontoUnitario, 0);
+    const precoFinalUnitario = Math.max(precoUnitario, 0);
 
     return {
-        desconto_tipo: descontoTipo || null,
-        desconto_valor: descontoValor,
-        desconto_unitario: descontoUnitario,
+        desconto_tipo: null,
+        desconto_valor: 0,
+        desconto_unitario: 0,
         preco_final_unitario: precoFinalUnitario
     };
 }
@@ -1788,16 +1799,11 @@ async function salvarResposta() {
     }
     
     try {
-        // Validar campos obrigatórios
+        // Campos de prazo e pagamento são opcionais.
         const observacoes = document.getElementById('observacoes-fornecedor').value;
         const prazoEntrega = document.getElementById('prazo-entrega').value;
         const condicoesPagamento = document.getElementById('condicoes-pagamento').value;
         const resumoFinal = calcularResumoFinal();
-        
-        if (!prazoEntrega || !condicoesPagamento) {
-            Swal.fire('Erro', 'Preencha todos os campos obrigatórios', 'error');
-            return;
-        }
         
         // Ativar estado de loading
         btnSalvar.disabled = true;
@@ -1834,6 +1840,9 @@ async function salvarResposta() {
                 }
             }
             
+            const obsItemEl = document.getElementById(`observacoes-item-${i}`);
+            const observacoes_item = obsItemEl ? obsItemEl.value.trim() : '';
+
             itensResposta.push({
                 item_id: pedido.itens[i].id || i,
                 quantidade_solicitada: pedido.itens[i].quantidade,
@@ -1843,7 +1852,8 @@ async function salvarResposta() {
                 desconto_valor: desconto.desconto_valor,
                 desconto_unitario: desconto.desconto_unitario,
                 preco: desconto.preco_final_unitario,
-                disponivel: disponivel
+                disponivel: disponivel,
+                observacoes_item: observacoes_item
             });
         }
         
@@ -1961,11 +1971,19 @@ function renderizarLinhasItensDetalhes(pedido) {
         const totalItem = quantidadeCalculo * precoCalculo;
         const quantidadeSolicitada = parseFloat(item.quantidade) || 0;
 
+        const obsSol = (item.observacoes_solicitacao !== undefined && item.observacoes_solicitacao !== null)
+            ? String(item.observacoes_solicitacao)
+            : (item.observacoes || '');
+        const obsForn = (item.observacoes_item_fornecedor !== undefined && item.observacoes_item_fornecedor !== null)
+            ? String(item.observacoes_item_fornecedor)
+            : '';
+
         return `
             <tr>
                 <td>
                     <strong>${item.nome}</strong>
-                    ${item.observacoes ? `<br><small class="text-muted">${item.observacoes}</small>` : ''}
+                    ${obsSol.trim() ? `<br><small class="text-muted">Solicitação: ${escapeHtml(obsSol)}</small>` : ''}
+                    ${obsForn.trim() ? `<br><small class="text-primary">Fornecedor: ${escapeHtml(obsForn)}</small>` : ''}
                 </td>
                 <td>${item.codigo || 'N/A'}</td>
                 <td>${item.categoria || 'N/A'}</td>

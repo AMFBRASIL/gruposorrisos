@@ -13,6 +13,40 @@ require_once '../../config/config.php';
 require_once '../../config/database.php';
 require_once '../../config/session.php';
 
+/** Separador entre observação do solicitante e do fornecedor no campo `observacoes` do item */
+if (!defined('OBS_ITEM_SEP_FORNECEDOR')) {
+    define('OBS_ITEM_SEP_FORNECEDOR', "\n\n--- Fornecedor ---\n");
+}
+
+/**
+ * @return array [solicitacao, fornecedor]
+ */
+function splitObservacoesItemPedido($raw) {
+    $sep = OBS_ITEM_SEP_FORNECEDOR;
+    $raw = $raw ?? '';
+    if ($raw === '') {
+        return ['', ''];
+    }
+    $pos = strpos($raw, $sep);
+    if ($pos === false) {
+        return [trim($raw), ''];
+    }
+    return [trim(substr($raw, 0, $pos)), trim(substr($raw, $pos + strlen($sep)))];
+}
+
+function mergeObservacoesItemPedido($buyerPart, $supplierPart) {
+    $sep = OBS_ITEM_SEP_FORNECEDOR;
+    $b = trim((string)($buyerPart ?? ''));
+    $s = trim((string)($supplierPart ?? ''));
+    if ($s === '') {
+        return $b;
+    }
+    if ($b === '') {
+        return $sep . $s;
+    }
+    return $b . $sep . $s;
+}
+
 // Verificar se é uma requisição OPTIONS (preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -46,6 +80,9 @@ try {
     
     // Obter dados da requisição
     $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        $input = [];
+    }
     $action = $input['action'] ?? '';
     
     // Verificar se o usuário logado é realmente um fornecedor válido
@@ -122,7 +159,8 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                     p.status,
                     p.valor_total,
                     p.observacoes,
-                    f.nome_filial as cliente,
+                    COALESCE(NULLIF(f.razao_social, ''), f.nome_filial) as cliente,
+                    f.cnpj as cliente_cnpj,
                     u.nome_completo as solicitante,
                     COUNT(DISTINCT pi.id_item) as total_itens
                 FROM tbl_pedidos_compra p
@@ -133,7 +171,7 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                 WHERE p.id_fornecedor = ? 
                 AND (p.ativo = 1 OR p.ativo IS NULL)
                 GROUP BY p.id_pedido, p.numero_pedido, p.data_criacao, p.data_solicitacao, 
-                         p.status, p.valor_total, p.observacoes, f.nome_filial, u.nome_completo
+                         p.status, p.valor_total, p.observacoes, f.razao_social, f.nome_filial, f.cnpj, u.nome_completo
                 ORDER BY COALESCE(p.data_criacao, p.data_solicitacao) DESC";
         
         error_log("Buscando pedidos para fornecedor ID: {$fornecedor_id}");
@@ -146,13 +184,19 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             // Obter itens do pedido
             $itens = obterItensPedido($pdo, $row['id_pedido']);
+            $cliente = trim((string)($row['cliente'] ?: 'N/A'));
+            $clienteCnpj = trim((string)($row['cliente_cnpj'] ?? ''));
+            $clienteComCnpj = $clienteCnpj !== '' && $cliente !== 'N/A'
+                ? "{$cliente} - {$clienteCnpj}"
+                : $cliente;
             
             $pedidos[] = [
                 'id' => $row['id_pedido'],
                 'numero' => $row['numero_pedido'] ?: 'N/A',
                 'data' => $row['data_pedido'] ?: $row['data_pedido_alt'] ?: date('Y-m-d'),
                 'status' => $row['status'] ?: 'pendente',
-                'cliente' => $row['cliente'] ?: 'N/A',
+                'cliente' => $clienteComCnpj,
+                'cliente_cnpj' => $clienteCnpj,
                 'solicitante' => $row['solicitante'] ?: 'N/A',
                 'valor_total' => floatval($row['valor_total'] ?: 0),
                 'observacoes' => $row['observacoes'] ?: '',
@@ -174,7 +218,6 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
         return [];
     }
 }
-
 
 /**
  * Obtém itens de um pedido específico
@@ -204,6 +247,8 @@ function obterItensPedido($pdo, $pedido_id) {
     
     $itens = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $rawObs = $row['observacoes'] ?? '';
+        list($obsSolic, $obsForn) = splitObservacoesItemPedido($rawObs);
         $itens[] = [
             'id' => $row['id_item'],
             'nome' => $row['nome_material'] ?: 'Material não encontrado',
@@ -213,7 +258,9 @@ function obterItensPedido($pdo, $pedido_id) {
             'preco_unitario' => floatval($row['preco_unitario'] ?: 0),
             'preco_fornecedor' => $row['preco_fornecedor'] ? floatval($row['preco_fornecedor']) : null,
             'categoria' => $row['nome_categoria'] ?: 'Sem categoria',
-            'observacoes' => $row['observacoes'] ?: ''
+            'observacoes' => $rawObs,
+            'observacoes_solicitacao' => $obsSolic,
+            'observacoes_item_fornecedor' => $obsForn
         ];
     }
     
@@ -235,8 +282,8 @@ function responderPedido($pdo, $input, $fornecedor_id) {
     $itens = $input['itens'] ?? [];
     
     // Validar dados obrigatórios
-    if (!$pedido_id || !$condicoes_pagamento) {
-        return ['success' => false, 'error' => 'ID do pedido e condições de pagamento são obrigatórios'];
+    if (!$pedido_id) {
+        return ['success' => false, 'error' => 'ID do pedido é obrigatório'];
     }
     
     // Se não foi enviada data específica, usar o prazo em dias para calcular
@@ -261,10 +308,9 @@ function responderPedido($pdo, $input, $fornecedor_id) {
         return ['success' => false, 'error' => 'Pedido não encontrado ou não pertence ao fornecedor'];
     }
     
-    // Permitir resposta se o pedido estiver em análise, pendente ou se já foi respondido (para atualização)
-    // Status permitidos: em_analise, pendente, aprovado_cotacao, aprovado_para_faturar
-    $statusPermitidos = ['em_analise', 'pendente', 'aprovado_cotacao', 'aprovado_para_faturar'];
-    if (!in_array($pedido['status'], $statusPermitidos)) {
+    // Após enviar para faturamento, o fornecedor apenas acompanha o pedido.
+    $statusPermitidos = ['em_analise', 'pendente', 'aprovado_cotacao'];
+    if (!in_array(strtolower($pedido['status'] ?? ''), $statusPermitidos)) {
         return ['success' => false, 'error' => 'Pedido não está disponível para resposta. Status atual: ' . $pedido['status']];
     }
     
@@ -311,6 +357,7 @@ function responderPedido($pdo, $input, $fornecedor_id) {
             $preco = $item['preco'];
             $disponivel_raw = $item['disponivel'] ?? 'nao';
             $quantidade_disponivel = floatval($item['quantidade_disponivel'] ?? 0);
+            $obsItemFornecedor = isset($item['observacoes_item']) ? trim((string)$item['observacoes_item']) : '';
             
             // Converter 'sim'/'nao' para 1/0 (TINYINT)
             // Aceita: 'sim', true, 1, '1' -> converte para 1
@@ -323,6 +370,13 @@ function responderPedido($pdo, $input, $fornecedor_id) {
             }
             
             try {
+                $stmtObsAtual = $pdo->prepare("SELECT observacoes FROM tbl_itens_pedido_compra WHERE id_item = ? AND id_pedido = ? LIMIT 1");
+                $stmtObsAtual->execute([$item_id, $pedido_id]);
+                $rowObs = $stmtObsAtual->fetch(PDO::FETCH_ASSOC);
+                $obsAtual = $rowObs['observacoes'] ?? '';
+                list($buyerPart, $_oldForn) = splitObservacoesItemPedido($obsAtual);
+                $novasObservacoes = mergeObservacoesItemPedido($buyerPart, $obsItemFornecedor);
+
                 // Atualizar campos do item
                 // quantidade: mantém a quantidade solicitada no pedido (não altera)
                 // quantidade_disponivel: quantidade que o fornecedor informou que tem disponível
@@ -332,11 +386,12 @@ function responderPedido($pdo, $input, $fornecedor_id) {
                         SET preco_fornecedor = ?,
                             disponivel = ?,
                             quantidade_disponivel = ?,
+                            observacoes = ?,
                             data_atualizacao = NOW()
                         WHERE id_item = ? AND id_pedido = ?";
                 
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$preco, $disponivel, $quantidade_disponivel, $item_id, $pedido_id]);
+                $stmt->execute([$preco, $disponivel, $quantidade_disponivel, $novasObservacoes, $item_id, $pedido_id]);
                 
                 // Verificar se a atualização foi bem-sucedida
                 if ($stmt->rowCount() > 0) {
@@ -418,7 +473,8 @@ function responderPedido($pdo, $input, $fornecedor_id) {
 function obterDetalhesPedido($pdo, $pedido_id, $fornecedor_id) {
     $sql = "SELECT 
                 p.*,
-                f.nome_filial,
+                COALESCE(NULLIF(f.razao_social, ''), f.nome_filial) as nome_filial,
+                f.cnpj as cnpj_filial,
                 f.endereco as endereco_filial,
                 f.telefone as telefone_filial,
                 u.nome_completo as solicitante,
@@ -434,6 +490,11 @@ function obterDetalhesPedido($pdo, $pedido_id, $fornecedor_id) {
     
     if (!$pedido) {
         return null;
+    }
+
+    $cnpjFilial = trim((string)($pedido['cnpj_filial'] ?? ''));
+    if ($cnpjFilial !== '' && !empty($pedido['nome_filial'])) {
+        $pedido['nome_filial'] = trim($pedido['nome_filial']) . ' - ' . $cnpjFilial;
     }
     
     // Obter itens

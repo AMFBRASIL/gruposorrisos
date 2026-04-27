@@ -408,6 +408,27 @@ $menuActive = 'pedidos_compra';
                         </div>
                     </div>
 
+                    <div id="busca-itens-pedido-existente" class="mb-3 d-none">
+                        <label for="filtro-itens-pedido-existente" class="form-label mb-1">
+                            Buscar item na lista já criada
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="filtro-itens-pedido-existente"
+                                placeholder="Digite código ou nome para conferir se o item existe no pedido..."
+                                oninput="filtrarItensPedidoExistente()">
+                            <button type="button" class="btn btn-outline-secondary" onclick="limparBuscaItensPedidoExistente()">
+                                <i class="bi bi-x-circle me-1"></i>Limpar
+                            </button>
+                        </div>
+                        <small class="text-muted" id="resultado-busca-itens-pedido-existente">
+                            Informe um termo para conferir os itens deste pedido.
+                        </small>
+                    </div>
+
                     <div class="alert alert-danger py-2 px-3 d-none" id="itens-nao-encontrados-csv-box">
                         <div class="fw-semibold mb-1">
                             <i class="bi bi-exclamation-triangle me-1"></i>Itens do CSV não encontrados no catálogo
@@ -859,6 +880,138 @@ $menuActive = 'pedidos_compra';
                 
                 <button type="button" class="btn btn-success" onclick="imprimirPedido()">
                     <i class="bi bi-printer me-2"></i>Imprimir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Bloqueio de Edição -->
+<div class="modal fade modal-modern" id="modalEdicaoBloqueadaPedido" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning bg-opacity-10 border-0">
+                <div>
+                    <h5 class="modal-title text-warning mb-1">
+                        <i class="bi bi-lock-fill me-2"></i>Edição não permitida
+                    </h5>
+                    <div class="text-muted">Este pedido está em uma fase somente para acompanhamento.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <div class="fw-semibold mb-1">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Não é permitido editar este pedido.
+                    </div>
+                    <div id="bloqueio-edicao-mensagem">
+                        O pedido está em uma etapa do processo que não permite alterações.
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Pedido</div>
+                                <div class="fw-bold" id="bloqueio-numero-pedido">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Situação atual</div>
+                                <div class="fw-bold" id="bloqueio-status-atual">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Valor total</div>
+                                <div class="fw-bold text-success" id="bloqueio-valor-total">R$ 0,00</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Itens</div>
+                                <div class="fw-bold" id="bloqueio-total-itens">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-light border-0">
+                                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Detalhes do Pedido</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 small">
+                                    <div class="col-md-6"><strong>Clínica:</strong> <span id="bloqueio-filial">-</span></div>
+                                    <div class="col-md-6"><strong>Fornecedor:</strong> <span id="bloqueio-fornecedor">-</span></div>
+                                    <div class="col-md-6"><strong>Solicitante:</strong> <span id="bloqueio-solicitante">-</span></div>
+                                    <div class="col-md-6"><strong>Data:</strong> <span id="bloqueio-data-pedido">-</span></div>
+                                    <div class="col-md-6"><strong>Entrega prevista:</strong> <span id="bloqueio-data-entrega">-</span></div>
+                                    <div class="col-md-6"><strong>Prioridade:</strong> <span id="bloqueio-prioridade">-</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-light border-0">
+                                <h6 class="mb-0"><i class="bi bi-box-seam me-2"></i>Itens e Valores</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 320px;">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Material</th>
+                                                <th class="text-center">Qtd.</th>
+                                                <th class="text-center">Preço</th>
+                                                <th class="text-center">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="bloqueio-itens-tbody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-light border-0">
+                                <h6 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Trajetória do Pedido</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="bloqueio-fluxo-status"></div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-light border-0">
+                                <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Timelapse / Histórico</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="timeline-container" id="bloqueio-timeline-status" style="max-height: 420px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Fechar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="acompanharPedidoBloqueado()">
+                    <i class="bi bi-eye me-2"></i>Acompanhar Pedido
                 </button>
             </div>
         </div>
