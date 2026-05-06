@@ -40,16 +40,22 @@ function ocultarModalProcessandoPedido() {
 
     // Fallback para casos em que o backdrop fica preso.
     setTimeout(() => {
+        const modalEdicaoAberto = document.getElementById('modalNovoPedido')?.classList.contains('show');
+        const modalVisualizacaoAberto = document.getElementById('modalVisualizarPedido')?.classList.contains('show');
+
         modalElement.classList.remove('show');
         modalElement.style.display = 'none';
         modalElement.setAttribute('aria-hidden', 'true');
         modalElement.removeAttribute('aria-modal');
         modalElement.removeAttribute('role');
 
-        document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('overflow');
-        document.body.style.removeProperty('padding-right');
+        // Só limpa backdrop global quando não há outro modal aberto.
+        if (!modalEdicaoAberto && !modalVisualizacaoAberto) {
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        }
     }, 250);
 }
 
@@ -517,6 +523,32 @@ function obterObservacoesPedidoFormulario() {
     const campoObservacoes = document.getElementById('novo_observacoes');
     if (!campoObservacoes) return '';
     return (campoObservacoes.value || '').toString().trim();
+}
+
+function mostrarAvisoProcessandoFiltroTodos(filtroEstoque = 'todos') {
+    const container = document.getElementById('materiais-container');
+    if (!container) return;
+
+    let aviso = document.getElementById('aviso-processando-filtro-todos');
+    if (!aviso) {
+        aviso = document.createElement('div');
+        aviso.id = 'aviso-processando-filtro-todos';
+        aviso.className = 'alert alert-info py-2 px-3 mb-3';
+        container.parentElement?.insertBefore(aviso, container);
+    }
+    const filtroNormalizado = (filtroEstoque || '').toLowerCase();
+    const filtroLabel = filtroNormalizado === 'critico'
+        ? 'Crítico'
+        : (filtroNormalizado === 'normal' ? 'Normal' : 'Todos');
+    aviso.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processando dados do filtro "${filtroLabel}"...`;
+    aviso.classList.remove('d-none');
+}
+
+function ocultarAvisoProcessandoFiltroTodos() {
+    const aviso = document.getElementById('aviso-processando-filtro-todos');
+    if (aviso) {
+        aviso.classList.add('d-none');
+    }
 }
 
 function atualizarAvisoItensPendentesRespostaCompra(prefixo, itens = []) {
@@ -1302,7 +1334,8 @@ async function carregarMateriaisEstoqueBaixo() {
     const filtroEstoque = document.getElementById('filtro-estoque-pedido')?.value || 'critico';
     const container = document.getElementById('materiais-container');
     const tabelaPesquisadosExistente = container?.querySelector('.tabela-materiais-pesquisados');
-    let modalProcessandoAberto = false;
+    let avisoProcessandoAberto = false;
+    const deveMostrarProcessando = true;
     
     if (!idFilial || !idFornecedor) {
         const filtroMateriaisBaixo = document.getElementById('filtro-materiais-baixo');
@@ -1321,10 +1354,14 @@ async function carregarMateriaisEstoqueBaixo() {
     }
     
     try {
-        mostrarModalProcessandoPedido('Carregando materiais do filtro selecionado...');
-        modalProcessandoAberto = true;
+        if (deveMostrarProcessando) {
+            mostrarAvisoProcessandoFiltroTodos(filtroEstoque);
+            avisoProcessandoAberto = true;
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
 
-        const response = await fetch(`backend/api/pedidos_compra.php?action=materiais-estoque-baixo&id_filial=${idFilial}&id_fornecedor=${idFornecedor}&filtro_estoque=${encodeURIComponent(filtroEstoque)}`, {
+        const limiteConsulta = filtroEstoque === 'todos' ? 300 : 600;
+        const response = await fetch(`backend/api/pedidos_compra.php?action=materiais-estoque-baixo&id_filial=${idFilial}&id_fornecedor=${idFornecedor}&filtro_estoque=${encodeURIComponent(filtroEstoque)}&limite=${limiteConsulta}`, {
             method: 'GET',
             credentials: 'same-origin',
             headers: {
@@ -1336,6 +1373,14 @@ async function carregarMateriaisEstoqueBaixo() {
         
         if (data.success) {
             materiaisEstoqueBaixo = data.materiais;
+            if (data.truncated) {
+                const total = parseInt(data.total_encontrado || 0, 10);
+                const limite = parseInt(data.limite_aplicado || limiteConsulta, 10);
+                const subtitulo = document.getElementById('subtitulo-materiais');
+                if (subtitulo) {
+                    subtitulo.textContent = `Mostrando ${limite} de ${total} itens para evitar travamento. Use filtro por nome para refinar.`;
+                }
+            }
             
             if (materiaisEstoqueBaixo.length === 0) {
                 const filtroMateriaisBaixo = document.getElementById('filtro-materiais-baixo');
@@ -1388,8 +1433,8 @@ async function carregarMateriaisEstoqueBaixo() {
             document.getElementById('materiais-container').appendChild(tabelaPesquisadosExistente);
         }
     } finally {
-        if (modalProcessandoAberto) {
-            ocultarModalProcessandoPedido();
+        if (avisoProcessandoAberto) {
+            ocultarAvisoProcessandoFiltroTodos();
         }
     }
 }

@@ -895,8 +895,25 @@ class PedidoCompra extends BaseModel {
     /**
      * Buscar materiais com estoque baixo por filial e fornecedor
      */
-    public function buscarMateriaisEstoqueBaixo($idFilial, $idFornecedor, $filtroEstoque = 'critico') {
-        $sql = "SELECT cm.id_catalogo as id_material, cm.codigo, cm.nome, um.sigla as unidade_medida, 
+    public function buscarMateriaisEstoqueBaixo($idFilial, $idFornecedor, $filtroEstoque = 'critico', $limite = 300) {
+        $filtroSql = '';
+        if ($filtroEstoque === 'normal') {
+            $filtroSql = " AND ef.estoque_atual > COALESCE(ef.estoque_minimo, cm.estoque_minimo_padrao, 0)";
+        } elseif ($filtroEstoque === 'critico') {
+            $filtroSql = " AND (ef.estoque_atual IS NULL OR ef.estoque_atual <= COALESCE(ef.estoque_minimo, cm.estoque_minimo_padrao, 0))";
+        } // 'todos' não adiciona filtro adicional
+
+        $sqlCount = "SELECT COUNT(*) as total
+                     FROM tbl_catalogo_materiais cm
+                     LEFT JOIN tbl_estoque_filiais ef ON cm.id_catalogo = ef.id_catalogo AND ef.id_filial = ?
+                     WHERE cm.ativo = 1
+                       AND cm.id_fornecedor = ?{$filtroSql}";
+        $stmtCount = $this->pdo->prepare($sqlCount);
+        $stmtCount->execute([$idFilial, $idFornecedor]);
+        $totalEncontrado = (int)($stmtCount->fetchColumn() ?: 0);
+
+        $limiteFinal = max(50, min((int)$limite, 1000));
+        $sql = "SELECT cm.id_catalogo as id_material, cm.codigo, cm.nome, um.sigla as unidade_medida,
                        COALESCE(ef.estoque_atual, 0) as estoque_atual,
                        COALESCE(ef.preco_unitario, 0) as preco_unitario,
                        COALESCE(ef.estoque_minimo, cm.estoque_minimo_padrao, 0) as estoque_minimo
@@ -904,19 +921,20 @@ class PedidoCompra extends BaseModel {
                 LEFT JOIN tbl_estoque_filiais ef ON cm.id_catalogo = ef.id_catalogo AND ef.id_filial = ?
                 LEFT JOIN tbl_unidades_medida um ON cm.id_unidade = um.id_unidade
                 WHERE cm.ativo = 1
-                  AND cm.id_fornecedor = ?";
-        
-        if ($filtroEstoque === 'normal') {
-            $sql .= " AND ef.estoque_atual > COALESCE(ef.estoque_minimo, cm.estoque_minimo_padrao, 0)";
-        } elseif ($filtroEstoque === 'critico') {
-            $sql .= " AND (ef.estoque_atual IS NULL OR ef.estoque_atual <= COALESCE(ef.estoque_minimo, cm.estoque_minimo_padrao, 0))";
-        } // 'todos' não adiciona filtro adicional
-        
-        $sql .= " ORDER BY cm.nome";
-        
+                  AND cm.id_fornecedor = ?{$filtroSql}
+                ORDER BY cm.nome
+                LIMIT {$limiteFinal}";
+
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$idFilial, $idFornecedor]);
-        return $stmt->fetchAll();
+        $materiais = $stmt->fetchAll();
+
+        return [
+            'materiais' => $materiais,
+            'total_encontrado' => $totalEncontrado,
+            'limite_aplicado' => $limiteFinal,
+            'truncated' => $totalEncontrado > count($materiais)
+        ];
     }
     
     /**

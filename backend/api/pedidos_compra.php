@@ -130,6 +130,7 @@ try {
                     $idFilial = $_GET['id_filial'] ?? null;
                     $idFornecedor = $_GET['id_fornecedor'] ?? null;
                     $filtroEstoque = $_GET['filtro_estoque'] ?? 'critico';
+                    $limite = $_GET['limite'] ?? (($filtroEstoque === 'todos') ? 300 : 600);
                     
                     if (!$idFilial || !$idFornecedor) {
                         http_response_code(400);
@@ -137,8 +138,14 @@ try {
                         break;
                     }
                     
-                    $materiais = $pedidoCompra->buscarMateriaisEstoqueBaixo($idFilial, $idFornecedor, $filtroEstoque);
-                    echo json_encode(['success' => true, 'materiais' => $materiais]);
+                    $resultado = $pedidoCompra->buscarMateriaisEstoqueBaixo($idFilial, $idFornecedor, $filtroEstoque, (int)$limite);
+                    echo json_encode([
+                        'success' => true,
+                        'materiais' => $resultado['materiais'] ?? [],
+                        'total_encontrado' => $resultado['total_encontrado'] ?? 0,
+                        'limite_aplicado' => $resultado['limite_aplicado'] ?? (int)$limite,
+                        'truncated' => (bool)($resultado['truncated'] ?? false)
+                    ]);
                     break;
                     
                 case 'ultimo-preco-material':
