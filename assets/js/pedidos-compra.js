@@ -490,6 +490,33 @@ function normalizarTextoComparacao(valor) {
         .trim();
 }
 
+function extrairObservacaoFornecedorItem(observacoesBrutas) {
+    const texto = (observacoesBrutas || '').toString();
+    if (!texto.trim()) return '';
+
+    const marcadorFornecedor = '\n\n--- Fornecedor ---\n';
+    if (texto.includes(marcadorFornecedor)) {
+        const partes = texto.split(marcadorFornecedor);
+        return (partes[1] || '').trim();
+    }
+    return texto.trim();
+}
+
+function obterObservacoesPedidoFormulario() {
+    const campoObservacoes = document.getElementById('novo_observacoes');
+    if (!campoObservacoes) return '';
+    return (campoObservacoes.value || '').toString().trim();
+}
+
+function escaparHtml(valor) {
+    return String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function parseNumeroCSV(valor) {
     if (valor === null || valor === undefined) return 0;
 
@@ -1867,7 +1894,7 @@ async function salvarNovoPedido() {
             data_entrega_prevista: formData.get('data_entrega_prevista'),
             prioridade: formData.get('prioridade'),
             prazo_entrega: parseInt(formData.get('prazo_entrega')),
-            observacoes: formData.get('observacoes'),
+            observacoes: obterObservacoesPedidoFormulario(),
             valor_total: parseFloat(document.getElementById('total-pedido-modal').textContent.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
             itens: itens
         };
@@ -2104,6 +2131,9 @@ async function visualizarPedido(id) {
                             <td class="text-center">
                                 <strong class="text-success">${formatarMoeda(valorItem)}</strong>
                             </td>
+                            <td>
+                                <small class="text-muted">${extrairObservacaoFornecedorItem(item.observacoes) || 'Sem observação'}</small>
+                            </td>
                     `;
                     tbody.appendChild(row);
                 });
@@ -2115,7 +2145,7 @@ async function visualizarPedido(id) {
                         precoMedio = 0;
                     }
             } else {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum item encontrado</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum item encontrado</td></tr>';
                 }
             }
             
@@ -2140,7 +2170,21 @@ async function visualizarPedido(id) {
             // Observações
             const observacoesElement = document.getElementById('view_observacoes');
             if (observacoesElement) {
-                observacoesElement.textContent = pedido.observacoes || 'Nenhuma observação registrada';
+                const observacaoSolicitante = (pedido.observacoes || '').toString().trim();
+                const observacaoFornecedor = (pedido.observacoes_fornecedor || '').toString().trim();
+
+                if (!observacaoSolicitante && !observacaoFornecedor) {
+                    observacoesElement.textContent = 'Nenhuma observação registrada';
+                } else if (observacaoSolicitante && observacaoFornecedor) {
+                    observacoesElement.innerHTML = `
+                        <div><strong>Solicitante:</strong> ${escaparHtml(observacaoSolicitante)}</div>
+                        <div class="mt-2"><strong>Fornecedor:</strong> ${escaparHtml(observacaoFornecedor)}</div>
+                    `;
+                } else if (observacaoFornecedor) {
+                    observacoesElement.innerHTML = `<div><strong>Fornecedor:</strong> ${escaparHtml(observacaoFornecedor)}</div>`;
+                } else {
+                    observacoesElement.innerHTML = `<div><strong>Solicitante:</strong> ${escaparHtml(observacaoSolicitante)}</div>`;
+                }
             }
             
             // Nota Fiscal
@@ -3155,7 +3199,7 @@ async function atualizarPedido(pedidoId) {
             prioridade: formData.get('prioridade') || 'padrao',
             prazo_entrega: parseInt(formData.get('prazo_entrega')) || 8,
             status: statusPedidoEmEdicao,
-            observacoes: formData.get('observacoes'),
+            observacoes: obterObservacoesPedidoFormulario(),
             valor_total: parseFloat(document.getElementById('total-pedido-modal').textContent.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
             itens: itens
         };

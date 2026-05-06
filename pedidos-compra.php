@@ -692,6 +692,7 @@ $menuActive = 'pedidos_compra';
                                         <th class="text-center">Quantidade Disponível</th>
                                         <th class="text-center">Preço Unit.</th>
                                         <th class="text-center">Total</th>
+                                        <th>Observação do Item</th>
                                     </tr>
                                 </thead>
                                 <tbody id="view_itens_tbody">
@@ -699,7 +700,7 @@ $menuActive = 'pedidos_compra';
                                 </tbody>
                                 <tfoot class="table-light">
                                     <tr>
-                                        <th colspan="4" class="text-end">Total:</th>
+                                        <th colspan="5" class="text-end">Total:</th>
                                         <th class="text-center" id="view_itens_total_footer">R$ 0,00</th>
                                     </tr>
                                 </tfoot>

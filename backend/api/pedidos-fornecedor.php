@@ -47,6 +47,24 @@ function mergeObservacoesItemPedido($buyerPart, $supplierPart) {
     return $b . $sep . $s;
 }
 
+function garantirColunasPedidoFornecedor(PDO $pdo): void {
+    $stmtCols = $pdo->prepare("
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'tbl_pedidos_compra'
+    ");
+    $stmtCols->execute();
+    $colunas = array_map('strtolower', $stmtCols->fetchAll(PDO::FETCH_COLUMN));
+
+    if (!in_array('observacoes_fornecedor', $colunas, true)) {
+        $pdo->exec("ALTER TABLE tbl_pedidos_compra ADD COLUMN observacoes_fornecedor TEXT NULL AFTER observacoes");
+    }
+    if (!in_array('condicoes_pagamento', $colunas, true)) {
+        $pdo->exec("ALTER TABLE tbl_pedidos_compra ADD COLUMN condicoes_pagamento VARCHAR(255) NULL AFTER data_entrega_prevista");
+    }
+}
+
 // Verificar se é uma requisição OPTIONS (preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -77,6 +95,7 @@ if ($_SESSION['usuario_perfil'] !== 'Fornecedor') {
 try {
     $database = new Database();
     $pdo = $database->getConnection();
+    garantirColunasPedidoFornecedor($pdo);
     
     // Obter dados da requisição
     $input = json_decode(file_get_contents('php://input'), true);
@@ -159,6 +178,7 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                     p.status,
                     p.valor_total,
                     p.observacoes,
+                    p.observacoes_fornecedor,
                     COALESCE(NULLIF(f.razao_social, ''), f.nome_filial) as cliente,
                     f.cnpj as cliente_cnpj,
                     u.nome_completo as solicitante,
@@ -171,7 +191,7 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                 WHERE p.id_fornecedor = ? 
                 AND (p.ativo = 1 OR p.ativo IS NULL)
                 GROUP BY p.id_pedido, p.numero_pedido, p.data_criacao, p.data_solicitacao, 
-                         p.status, p.valor_total, p.observacoes, f.razao_social, f.nome_filial, f.cnpj, u.nome_completo
+                         p.status, p.valor_total, p.observacoes, p.observacoes_fornecedor, f.razao_social, f.nome_filial, f.cnpj, u.nome_completo
                 ORDER BY COALESCE(p.data_criacao, p.data_solicitacao) DESC";
         
         error_log("Buscando pedidos para fornecedor ID: {$fornecedor_id}");
@@ -200,6 +220,7 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                 'solicitante' => $row['solicitante'] ?: 'N/A',
                 'valor_total' => floatval($row['valor_total'] ?: 0),
                 'observacoes' => $row['observacoes'] ?: '',
+                'observacoes_fornecedor' => $row['observacoes_fornecedor'] ?: '',
                 'total_itens' => intval($row['total_itens'] ?: 0),
                 'itens' => $itens
             ];
@@ -326,29 +347,25 @@ function responderPedido($pdo, $input, $fornecedor_id) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$pedido_id]);
         
-        // Atualizar campos específicos do fornecedor
+        // Atualizar campos específicos do fornecedor (campos separados)
         try {
-            $sql_campos = "UPDATE tbl_pedidos_compra 
-                            SET observacoes_fornecedor = ?,
-                                data_entrega_prevista = ?,
-                                condicoes_pagamento = ?
-                            WHERE id_pedido = ?";
-            
+            $sql_campos = "UPDATE tbl_pedidos_compra
+                           SET observacoes_fornecedor = ?,
+                               data_entrega_prevista = ?,
+                               condicoes_pagamento = ?
+                           WHERE id_pedido = ?";
             $stmt_campos = $pdo->prepare($sql_campos);
             $stmt_campos->execute([
                 $observacoes,
-                $prazo_entrega, // Este valor será salvo em data_entrega_prevista
+                $prazo_entrega,
                 $condicoes_pagamento,
                 $pedido_id
             ]);
             
-            // Log de debug
-            error_log("Pedido {$pedido_id}: data_entrega_prevista atualizada para: {$data_entrega_prevista}");
-            error_log("Pedido {$pedido_id}: prazo_entrega recebido: {$prazo_entrega}");
+            error_log("Pedido {$pedido_id}: observacao do fornecedor processada com sucesso.");
             
         } catch (Exception $e) {
             error_log("Erro ao atualizar campos do fornecedor no pedido {$pedido_id}: " . $e->getMessage());
-            // Continuar mesmo com erro
         }
         
         // Atualizar preços dos itens na tabela tbl_itens_pedido_compra

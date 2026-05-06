@@ -922,6 +922,12 @@ function renderizarPedidos() {
                 <span class="info-value">${pedido.observacoes}</span>
             </div>
             ` : ''}
+            ${pedido.observacoes_fornecedor ? `
+            <div class="mb-3">
+                <span class="info-label">Sua Observação (Fornecedor):</span>
+                <span class="info-value">${pedido.observacoes_fornecedor}</span>
+            </div>
+            ` : ''}
             
             <div class="pedido-actions">
                 <button class="btn btn-outline-primary btn-action" onclick="visualizarPedido(${pedido.id})">
@@ -1027,6 +1033,20 @@ function visualizarPedido(pedidoId) {
                     </div>
                     <div class="card-body">
                         ${pedido.observacoes}
+                    </div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+        ${pedido.observacoes_fornecedor ? `
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success-subtle">
+                        <h6 class="mb-0"><i class="bi bi-chat-right-text me-2"></i>Sua Observação (Fornecedor)</h6>
+                    </div>
+                    <div class="card-body">
+                        ${pedido.observacoes_fornecedor}
                     </div>
                 </div>
             </div>
@@ -1148,6 +1168,7 @@ function responderPedido(pedidoId = null) {
     // Preencher dados do modal de resposta
     document.getElementById('pedido-numero-resposta').textContent = pedido.numero;
     document.getElementById('pedido-data-resposta').textContent = formatarData(pedido.data);
+    document.getElementById('observacoes-fornecedor').value = pedido.observacoes_fornecedor || '';
     document.getElementById('desconto-final-tipo').value = '';
     document.getElementById('desconto-final-valor').value = '';
     document.getElementById('desconto-final-valor').placeholder = '0,00';
@@ -2061,6 +2082,7 @@ async function salvarResposta() {
             if (data.success) {
                 // Atualizar status do pedido para 'pendente'
                 pedido.status = 'pendente';
+                pedido.observacoes_fornecedor = (observacoes || '').trim();
                 atualizarEstatisticas();
                 renderizarPedidos();
                 

@@ -203,7 +203,7 @@ try {
                         'prazo_entrega' => $input['prazo_entrega'] ?? 8,
                         // Removido o status padrão para usar o padrão do banco (em_analise)
                         'valor_total' => $input['valor_total'] ?? 0,
-                        'observacoes' => $input['observacoes'] ?? '',
+                        'observacoes' => isset($input['observacoes']) ? trim((string)$input['observacoes']) : '',
                         'id_usuario_solicitante' => getCurrentUser()['id'] ?? 1,
                         'itens' => $input['itens'] ?? []
                     ];
@@ -307,7 +307,9 @@ try {
                         'prazo_entrega' => $input['prazo_entrega'] ?? 8,
                         'status' => $input['status'] ?? $pedidoAtual['status'],
                         'valor_total' => $input['valor_total'] ?? 0,
-                        'observacoes' => $input['observacoes'] ?? '',
+                        'observacoes' => array_key_exists('observacoes', $input)
+                            ? trim((string)$input['observacoes'])
+                            : ($pedidoAtual['observacoes'] ?? ''),
                         'itens' => $input['itens'] ?? []
                     ];
                     
