@@ -13,8 +13,6 @@ define('DB_NAME', getenv('DB_NAME') ?: 'u293057343_sorrisos');
 define('DB_USER', getenv('DB_USER') ?: 'u293057343_sorrisos');
 define('DB_PASS', getenv('DB_PASS') ?: 'ean7G#lc7X+');
 
-
-
 #PRODUCAO
 #define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 #define('DB_NAME', getenv('DB_NAME') ?: 'gruposorrisos');

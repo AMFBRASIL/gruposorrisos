@@ -2938,8 +2938,29 @@ function preencherItensExistentes(itens) {
         // Criar lista base de itens já escolhidos para exibir imediatamente na edição
         const itensNormalizados = itens.map(item => {
             const itemId = item.id_material || item.id_catalogo;
-            const quantidade = parseFloat(item.quantidade) || 0;
-            const precoUnitario = parseFloat(item.preco_unitario) || 0;
+            const quantidadeSolicitada = parseFloat(item.quantidade) || 0;
+            const quantidadeDisponivelRaw = item.quantidade_disponivel;
+            const quantidadeDisponivel = (quantidadeDisponivelRaw !== null && quantidadeDisponivelRaw !== undefined && quantidadeDisponivelRaw !== '')
+                ? parseFloat(quantidadeDisponivelRaw)
+                : null;
+            const disponivelRaw = item.disponivel;
+            const disponivel = (disponivelRaw !== null && disponivelRaw !== undefined && disponivelRaw !== '')
+                ? parseInt(disponivelRaw, 10)
+                : null;
+            const quantidade = disponivel === 0
+                ? 0
+                : ((quantidadeDisponivel !== null && !Number.isNaN(quantidadeDisponivel) && quantidadeDisponivel > 0)
+                    ? quantidadeDisponivel
+                    : quantidadeSolicitada);
+
+            const precoFornecedorRaw = item.preco_fornecedor;
+            const precoFornecedor = (precoFornecedorRaw !== null && precoFornecedorRaw !== undefined && precoFornecedorRaw !== '')
+                ? parseFloat(precoFornecedorRaw)
+                : null;
+            const precoUnitarioOriginal = parseFloat(item.preco_unitario) || 0;
+            const precoUnitario = (precoFornecedor !== null && !Number.isNaN(precoFornecedor) && precoFornecedor > 0)
+                ? precoFornecedor
+                : precoUnitarioOriginal;
 
             itensOriginaisEdicao.set(String(itemId), {
                 id_material: String(itemId),
@@ -2962,8 +2983,29 @@ function preencherItensExistentes(itens) {
         itens.forEach((item, index) => {
             const materialId = String(item.id_material || item.id_catalogo);
             const materialEstoqueBaixo = materiaisEstoqueBaixo.find(m => String(m.id_material) === materialId);
-            const quantidade = parseFloat(item.quantidade) || 0;
-            const precoUnitario = parseFloat(item.preco_unitario) || 0;
+            const quantidadeSolicitada = parseFloat(item.quantidade) || 0;
+            const quantidadeDisponivelRaw = item.quantidade_disponivel;
+            const quantidadeDisponivel = (quantidadeDisponivelRaw !== null && quantidadeDisponivelRaw !== undefined && quantidadeDisponivelRaw !== '')
+                ? parseFloat(quantidadeDisponivelRaw)
+                : null;
+            const disponivelRaw = item.disponivel;
+            const disponivel = (disponivelRaw !== null && disponivelRaw !== undefined && disponivelRaw !== '')
+                ? parseInt(disponivelRaw, 10)
+                : null;
+            const quantidade = disponivel === 0
+                ? 0
+                : ((quantidadeDisponivel !== null && !Number.isNaN(quantidadeDisponivel) && quantidadeDisponivel > 0)
+                    ? quantidadeDisponivel
+                    : quantidadeSolicitada);
+
+            const precoFornecedorRaw = item.preco_fornecedor;
+            const precoFornecedor = (precoFornecedorRaw !== null && precoFornecedorRaw !== undefined && precoFornecedorRaw !== '')
+                ? parseFloat(precoFornecedorRaw)
+                : null;
+            const precoUnitarioOriginal = parseFloat(item.preco_unitario) || 0;
+            const precoUnitario = (precoFornecedor !== null && !Number.isNaN(precoFornecedor) && precoFornecedor > 0)
+                ? precoFornecedor
+                : precoUnitarioOriginal;
 
             const quantidadePesquisadaInput = document.querySelector(`.quantidade-pesquisada[data-material-id="${materialId}"]`);
             const valorUnitarioPesquisadoInput = document.querySelector(`.valor-unitario-pesquisado[data-material-id="${materialId}"]`);

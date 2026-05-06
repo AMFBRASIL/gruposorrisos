@@ -628,6 +628,20 @@ $menuActive = 'pedidos_fornecedores';
                     </div>
                     <div class="small" id="itens-nao-encontrados-csv-fornecedor-lista"></div>
                 </div>
+                <div class="alert alert-info py-2 px-3 d-none mb-2" id="csv-validacao-local-fornecedor-box">
+                    <div class="fw-semibold mb-1">
+                        <i class="bi bi-calculator me-1"></i>Validação local da importação (CSV x Sistema)
+                    </div>
+                    <div class="small">
+                        <div><strong>Total linhas CSV (coluna Total):</strong> <span id="csv-validacao-total-coluna">R$ 0,00</span></div>
+                        <div><strong>Total linhas CSV (Qtd x Unit.):</strong> <span id="csv-validacao-total-calculado">R$ 0,00</span></div>
+                        <div><strong>Total aplicado no sistema:</strong> <span id="csv-validacao-total-sistema">R$ 0,00</span></div>
+                        <div><strong>Desconto aplicado:</strong> <span id="csv-validacao-desconto">R$ 0,00</span></div>
+                        <div><strong>Valor final (modal):</strong> <span id="csv-validacao-valor-final">R$ 0,00</span></div>
+                        <div><strong>Diferença (CSV col. Total - Sistema):</strong> <span id="csv-validacao-diferenca">R$ 0,00</span></div>
+                        <div><strong>Itens ajustados no sistema:</strong> <span id="csv-validacao-itens-ajustados">0</span></div>
+                    </div>
+                </div>
                 <div class="itens-scroll-container">
                     <div id="itens-resposta">
                         <!-- Itens serão carregados aqui -->
@@ -1142,6 +1156,7 @@ function responderPedido(pedidoId = null) {
     document.getElementById('filtro-itens-resposta').value = '';
     atualizarBadgeCsvFornecedor(0);
     renderizarItensNaoEncontradosCsvFornecedor([]);
+    limparValidacaoCsvLocalFornecedor();
     const inputCsvResposta = document.getElementById('input-csv-resposta-fornecedor');
     if (inputCsvResposta) {
         inputCsvResposta.value = '';
@@ -1406,11 +1421,30 @@ function parseNumeroCsvFornecedor(valor) {
 
     texto = texto.replace(/\s/g, '').replace(/R\$/gi, '');
 
-    if (texto.includes(',')) {
+    // Suportar formatos BR e EN:
+    // BR: 1.234,56 | EN: 1,234.56 | simples: 1234,56 / 1234.56
+    const ultimoPonto = texto.lastIndexOf('.');
+    const ultimaVirgula = texto.lastIndexOf(',');
+
+    if (ultimoPonto !== -1 && ultimaVirgula !== -1) {
+        // O último separador encontrado tende a ser o decimal.
+        if (ultimoPonto > ultimaVirgula) {
+            // EN: remove vírgulas de milhar
+            texto = texto.replace(/,/g, '');
+        } else {
+            // BR: remove pontos de milhar e troca vírgula decimal
+            texto = texto.replace(/\./g, '').replace(',', '.');
+        }
+        return parseFloat(texto) || 0;
+    }
+
+    if (ultimaVirgula !== -1) {
+        // Apenas vírgula: tratar como decimal
         texto = texto.replace(/\./g, '').replace(',', '.');
         return parseFloat(texto) || 0;
     }
 
+    // Apenas ponto: pode ser decimal ou milhar.
     if (/^\d{1,3}(\.\d{3})+$/.test(texto)) {
         texto = texto.replace(/\./g, '');
     }
@@ -1438,6 +1472,58 @@ function atualizarBadgeCsvFornecedor(totalAtualizados = 0) {
     const badge = document.getElementById('badge-csv-resposta-fornecedor');
     if (!badge) return;
     badge.textContent = `Itens atualizados via CSV: ${totalAtualizados}`;
+}
+
+function ambienteLocalDebugCsvFornecedor() {
+    const host = (window.location.hostname || '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
+function formatarMoedaCsvValidacaoFornecedor(valor) {
+    const numero = parseFloat(valor) || 0;
+    return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function limparValidacaoCsvLocalFornecedor() {
+    const box = document.getElementById('csv-validacao-local-fornecedor-box');
+    if (!box) return;
+    box.classList.add('d-none');
+    const campos = [
+        'csv-validacao-total-coluna',
+        'csv-validacao-total-calculado',
+        'csv-validacao-total-sistema',
+        'csv-validacao-desconto',
+        'csv-validacao-valor-final',
+        'csv-validacao-diferenca',
+        'csv-validacao-itens-ajustados'
+    ];
+    campos.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = id === 'csv-validacao-itens-ajustados' ? '0' : 'R$ 0,00';
+    });
+}
+
+function atualizarValidacaoCsvLocalFornecedor({
+    totalColuna = 0,
+    totalCalculado = 0,
+    totalSistema = 0,
+    desconto = 0,
+    valorFinal = 0,
+    itensAjustados = 0
+}) {
+    if (!ambienteLocalDebugCsvFornecedor()) return;
+    const box = document.getElementById('csv-validacao-local-fornecedor-box');
+    if (!box) return;
+
+    const diferenca = totalColuna - totalSistema;
+    box.classList.remove('d-none');
+    document.getElementById('csv-validacao-total-coluna').textContent = formatarMoedaCsvValidacaoFornecedor(totalColuna);
+    document.getElementById('csv-validacao-total-calculado').textContent = formatarMoedaCsvValidacaoFornecedor(totalCalculado);
+    document.getElementById('csv-validacao-total-sistema').textContent = formatarMoedaCsvValidacaoFornecedor(totalSistema);
+    document.getElementById('csv-validacao-desconto').textContent = formatarMoedaCsvValidacaoFornecedor(desconto);
+    document.getElementById('csv-validacao-valor-final').textContent = formatarMoedaCsvValidacaoFornecedor(valorFinal);
+    document.getElementById('csv-validacao-diferenca').textContent = formatarMoedaCsvValidacaoFornecedor(diferenca);
+    document.getElementById('csv-validacao-itens-ajustados').textContent = String(itensAjustados);
 }
 
 function processarCsvRespostaFornecedor(textoCsv) {
@@ -1486,6 +1572,21 @@ function processarCsvRespostaFornecedor(textoCsv) {
 
     const itensNaoEncontrados = [];
     const indicesAtualizados = new Set();
+    const agregadosPorItem = new Map();
+    let totalCsvColunaTotal = 0;
+    let totalCsvCalculado = 0;
+    let totalAplicadoSistema = 0;
+    let itensAjustadosSistema = 0;
+
+    if (ambienteLocalDebugCsvFornecedor()) {
+        limparValidacaoCsvLocalFornecedor();
+    }
+
+    // Ao importar CSV, sempre zera desconto final para evitar divergência silenciosa.
+    const descontoTipoEl = document.getElementById('desconto-final-tipo');
+    const descontoValorEl = document.getElementById('desconto-final-valor');
+    if (descontoTipoEl) descontoTipoEl.value = '';
+    if (descontoValorEl) descontoValorEl.value = '';
 
     for (let i = 1; i < linhas.length; i++) {
         const colunas = linhas[i].split(delimitador);
@@ -1495,6 +1596,13 @@ function processarCsvRespostaFornecedor(textoCsv) {
         const nomeCsv = (colunas[idxProduto] || '').toString().trim();
         const quantidadeCsv = parseNumeroCsvFornecedor(colunas[idxQuant]);
         const unitarioCsv = parseNumeroCsvFornecedor(colunas[idxUnitario]);
+        const totalCsv = parseNumeroCsvFornecedor(colunas[idxTotal]);
+        totalCsvColunaTotal += totalCsv > 0 ? totalCsv : 0;
+        if (quantidadeCsv > 0 && unitarioCsv > 0) {
+            totalCsvCalculado += quantidadeCsv * unitarioCsv;
+        } else if (totalCsv > 0) {
+            totalCsvCalculado += totalCsv;
+        }
 
         if (!codigoCsv && !nomeCsv) continue;
 
@@ -1508,32 +1616,88 @@ function processarCsvRespostaFornecedor(textoCsv) {
             continue;
         }
 
+        if (!agregadosPorItem.has(itemIndex)) {
+            agregadosPorItem.set(itemIndex, {
+                quantidadeSomada: 0,
+                totalSomadoCsv: 0,
+                totalSomadoCalculado: 0,
+                ultimoUnitario: 0
+            });
+        }
+
+        const agregado = agregadosPorItem.get(itemIndex);
+        if (quantidadeCsv > 0) {
+            agregado.quantidadeSomada += quantidadeCsv;
+        }
+        if (totalCsv > 0) {
+            agregado.totalSomadoCsv += totalCsv;
+        }
+        if (quantidadeCsv > 0 && unitarioCsv > 0) {
+            agregado.totalSomadoCalculado += quantidadeCsv * unitarioCsv;
+        }
+        if (unitarioCsv > 0) {
+            agregado.ultimoUnitario = unitarioCsv;
+        }
+    }
+
+    agregadosPorItem.forEach((agregado, itemIndex) => {
         const quantidadeInput = document.getElementById(`quantidade-${itemIndex}`);
         const precoInput = document.getElementById(`preco-${itemIndex}`);
         const disponivelInput = document.getElementById(`disponivel-${itemIndex}`);
         if (!quantidadeInput || !precoInput || !disponivelInput) {
-            itensNaoEncontrados.push(codigoCsv || nomeCsv);
-            continue;
+            return;
         }
 
         disponivelInput.value = 'sim';
 
-        if (quantidadeCsv > 0) {
-            quantidadeInput.value = quantidadeCsv;
+        const quantidadeParaAplicar = agregado.quantidadeSomada > 0
+            ? agregado.quantidadeSomada
+            : (parseFloat(quantidadeInput.value) || 0);
+
+        let unitarioParaAplicar = 0;
+        if (agregado.totalSomadoCsv > 0 && quantidadeParaAplicar > 0) {
+            unitarioParaAplicar = agregado.totalSomadoCsv / quantidadeParaAplicar;
+        } else if (agregado.totalSomadoCalculado > 0 && quantidadeParaAplicar > 0) {
+            unitarioParaAplicar = agregado.totalSomadoCalculado / quantidadeParaAplicar;
+        } else if (agregado.ultimoUnitario > 0) {
+            unitarioParaAplicar = agregado.ultimoUnitario;
         }
-        if (unitarioCsv > 0) {
-            precoInput.value = `R$ ${unitarioCsv.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        if (quantidadeParaAplicar > 0) {
+            quantidadeInput.value = quantidadeParaAplicar;
+        }
+        if (unitarioParaAplicar > 0) {
+            precoInput.value = `R$ ${unitarioParaAplicar.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
 
         const quantidadeSolicitada = parseFloat(pedido.itens[itemIndex].quantidade) || 0;
         validarQuantidade(itemIndex, quantidadeSolicitada);
         calcularTotalItem(itemIndex);
         indicesAtualizados.add(itemIndex);
-    }
 
-    calcularResumoFinal();
+        const quantidadeAplicada = parseFloat(quantidadeInput.value) || 0;
+        const precoAplicado = removerMascaraMoeda(precoInput.value);
+        totalAplicadoSistema += (quantidadeAplicada * precoAplicado);
+
+        const teveAjusteQuantidade = Math.abs(quantidadeAplicada - (quantidadeParaAplicar || 0)) > 0.0001;
+        const teveAjustePreco = Math.abs(precoAplicado - (unitarioParaAplicar || 0)) > 0.0001;
+        if (teveAjusteQuantidade || teveAjustePreco) {
+            itensAjustadosSistema++;
+        }
+    });
+
+    const resumo = calcularResumoFinal();
     atualizarBadgeCsvFornecedor(indicesAtualizados.size);
     renderizarItensNaoEncontradosCsvFornecedor(itensNaoEncontrados);
+    totalAplicadoSistema = obterSubtotalAtualItensRespostaFornecedor(pedido);
+    atualizarValidacaoCsvLocalFornecedor({
+        totalColuna: totalCsvColunaTotal,
+        totalCalculado: totalCsvCalculado,
+        totalSistema: totalAplicadoSistema,
+        desconto: resumo?.desconto_final_total || 0,
+        valorFinal: resumo?.total_final || totalAplicadoSistema,
+        itensAjustados: itensAjustadosSistema
+    });
 
     if (indicesAtualizados.size === 0) {
         Swal.fire('Erro', 'Nenhum item do CSV foi encontrado entre os itens do pedido.', 'error');
@@ -1705,23 +1869,36 @@ function aplicarMascaraDescontoFinal(input) {
     calcularResumoFinal();
 }
 
-function calcularResumoFinal() {
-    if (!pedidoAtual) return null;
-
-    const pedido = pedidosData.find(p => p.id === pedidoAtual.id);
-    if (!pedido) return null;
+function obterSubtotalAtualItensRespostaFornecedor(pedido) {
+    if (!pedido || !Array.isArray(pedido.itens)) return 0;
 
     let subtotal = 0;
     for (let i = 0; i < pedido.itens.length; i++) {
         const quantidadeEl = document.getElementById(`quantidade-${i}`);
         const precoEl = document.getElementById(`preco-${i}`);
+        const disponivelEl = document.getElementById(`disponivel-${i}`);
         if (!quantidadeEl || !precoEl) continue;
+
+        if (disponivelEl && disponivelEl.value === 'nao') {
+            continue;
+        }
 
         const quantidade = parseFloat(quantidadeEl.value) || 0;
         const preco = removerMascaraMoeda(precoEl.value);
         const desconto = obterDescontoItem(i, preco);
         subtotal += quantidade * desconto.preco_final_unitario;
     }
+
+    return subtotal;
+}
+
+function calcularResumoFinal() {
+    if (!pedidoAtual) return null;
+
+    const pedido = pedidosData.find(p => p.id === pedidoAtual.id);
+    if (!pedido) return null;
+
+    const subtotal = obterSubtotalAtualItensRespostaFornecedor(pedido);
 
     const descontoFinalTipo = document.getElementById('desconto-final-tipo').value;
     const descontoFinalValorInput = document.getElementById('desconto-final-valor');
