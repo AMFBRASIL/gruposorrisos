@@ -1302,6 +1302,7 @@ async function carregarMateriaisEstoqueBaixo() {
     const filtroEstoque = document.getElementById('filtro-estoque-pedido')?.value || 'critico';
     const container = document.getElementById('materiais-container');
     const tabelaPesquisadosExistente = container?.querySelector('.tabela-materiais-pesquisados');
+    let modalProcessandoAberto = false;
     
     if (!idFilial || !idFornecedor) {
         const filtroMateriaisBaixo = document.getElementById('filtro-materiais-baixo');
@@ -1320,6 +1321,9 @@ async function carregarMateriaisEstoqueBaixo() {
     }
     
     try {
+        mostrarModalProcessandoPedido('Carregando materiais do filtro selecionado...');
+        modalProcessandoAberto = true;
+
         const response = await fetch(`backend/api/pedidos_compra.php?action=materiais-estoque-baixo&id_filial=${idFilial}&id_fornecedor=${idFornecedor}&filtro_estoque=${encodeURIComponent(filtroEstoque)}`, {
             method: 'GET',
             credentials: 'same-origin',
@@ -1383,6 +1387,10 @@ async function carregarMateriaisEstoqueBaixo() {
         if (tabelaPesquisadosExistente) {
             document.getElementById('materiais-container').appendChild(tabelaPesquisadosExistente);
         }
+    } finally {
+        if (modalProcessandoAberto) {
+            ocultarModalProcessandoPedido();
+        }
     }
 }
 
@@ -1418,8 +1426,6 @@ function restaurarValoresMateriaisEstoqueBaixo(valoresAnteriores = new Map()) {
 
 // Renderizar materiais com estoque baixo
 function renderizarMateriaisEstoqueBaixo() {
-    console.log('🔧 Renderizando materiais com estoque baixo:', materiaisEstoqueBaixo);
-    
     const container = document.getElementById('materiais-container');
     const tabelaPesquisadosExistente = container.querySelector('.tabela-materiais-pesquisados');
     const valoresAnteriores = capturarValoresMateriaisEstoqueBaixo();
@@ -1454,8 +1460,6 @@ function renderizarMateriaisEstoqueBaixo() {
     `;
     
     materiaisEstoqueBaixo.forEach((material, index) => {
-        console.log(`🔧 Renderizando material ${index}:`, material);
-        
         const statusClass = material.estoque_atual <= 0 ? 'table-danger' : 'table-warning';
         const statusText = material.estoque_atual <= 0 ? 'Zerado' : 'Baixo';
         
@@ -1520,13 +1524,6 @@ function renderizarMateriaisEstoqueBaixo() {
     }
     restaurarValoresMateriaisEstoqueBaixo(valoresAnteriores);
     filtrarMateriaisEstoqueBaixoPorNome();
-    
-    console.log('✅ Tabela de materiais com estoque baixo renderizada com sucesso');
-    console.log('🔍 Campos encontrados:', {
-        quantidade: document.querySelectorAll('.quantidade-solicitada').length,
-        valorUnitario: document.querySelectorAll('.valor-unitario').length,
-        valorTotal: document.querySelectorAll('.valor-total-material').length
-    });
     
     calcularTotalPedido();
 }
@@ -1815,40 +1812,23 @@ function abrirModalNovoPedido() {
 // Calcular total do pedido
 function calcularTotalPedido() {
     let total = 0;
-    
-    console.log('🔄 Calculando total do pedido...');
-    
+
     // Calcular total dos materiais com estoque baixo
     const camposEstoqueBaixo = document.querySelectorAll('.valor-total-material');
-    console.log(`🔍 Campos estoque baixo encontrados: ${camposEstoqueBaixo.length}`);
     
     const totaisEstoqueBaixo = Array.from(camposEstoqueBaixo)
-        .map(input => {
-            const valor = converterMoedaParaNumero(input.value);
-            console.log(`📦 Campo estoque baixo: valor="${input.value}" -> parseado=${valor}`);
-            return valor;
-        });
+        .map(input => converterMoedaParaNumero(input.value));
     const totalEstoqueBaixo = totaisEstoqueBaixo.reduce((sum, valor) => sum + valor, 0);
     total += totalEstoqueBaixo;
-    
-    console.log(`📦 Total estoque baixo: ${formatarMoeda(totalEstoqueBaixo)}`);
-    
+
     // Calcular total dos materiais pesquisados (pedidos críticos/urgentes)
     const camposPesquisados = document.querySelectorAll('.valor-total-material-pesquisado');
-    console.log(`🔍 Campos pesquisados encontrados: ${camposPesquisados.length}`);
     
     const totaisPesquisados = Array.from(camposPesquisados)
-        .map(input => {
-            const valor = converterMoedaParaNumero(input.value);
-            console.log(`🔍 Campo pesquisado: valor="${input.value}" -> parseado=${valor}`);
-            return valor;
-        });
+        .map(input => converterMoedaParaNumero(input.value));
     const totalPesquisados = totaisPesquisados.reduce((sum, valor) => sum + valor, 0);
     total += totalPesquisados;
-    
-    console.log(`🔍 Total pesquisados: ${formatarMoeda(totalPesquisados)}`);
-    console.log(`💰 Total geral: ${formatarMoeda(total)}`);
-    
+
     document.getElementById('total-pedido-modal').textContent = formatarMoeda(total);
 
     const itensSelecionados = coletarItensSelecionados();
