@@ -4,6 +4,7 @@ require_once 'BaseModel.php';
 class PedidoCompra extends BaseModel {
     protected $table = 'tbl_pedidos_compra';
     protected $primaryKey = 'id_pedido';
+    private $colunasItensCache = null;
     
     /**
      * Valida e limpa uma data antes de salvar
@@ -285,26 +286,112 @@ class PedidoCompra extends BaseModel {
                 $id
             ]);
             
-            // Se houver itens, atualizar/inserir
+            // Se houver itens, atualizar/inserir (sem perder histórico de resposta)
             if (!empty($dados['itens'])) {
-                // Remover itens existentes
-                $sqlDelete = "DELETE FROM tbl_itens_pedido_compra WHERE id_pedido = ?";
-                $stmtDelete = $this->pdo->prepare($sqlDelete);
-                $stmtDelete->execute([$id]);
-                
-                // Inserir novos itens
+                $colunasItens = $this->obterColunasItensPedidoCompra();
+                $temFlagNovoPosResposta = in_array('novo_pos_resposta', $colunasItens, true);
+                $temDataInclusaoNovo = in_array('data_inclusao_pos_resposta', $colunasItens, true);
+                $temUsuarioInclusaoNovo = in_array('id_usuario_inclusao_pos_resposta', $colunasItens, true);
+
+                // Carregar itens existentes para preservar respostas de fornecedor e mapear por material
+                $stmtExistentes = $this->pdo->prepare("
+                    SELECT id_item, id_catalogo, preco_fornecedor, quantidade_disponivel, disponivel
+                    FROM tbl_itens_pedido_compra
+                    WHERE id_pedido = ?
+                ");
+                $stmtExistentes->execute([$id]);
+                $itensExistentes = $stmtExistentes->fetchAll(PDO::FETCH_ASSOC);
+
+                $existentesPorMaterial = [];
+                $respostaFornecedorJaExiste = false;
+                foreach ($itensExistentes as $existente) {
+                    $idCatalogo = (string)($existente['id_catalogo'] ?? '');
+                    if ($idCatalogo !== '') {
+                        $existentesPorMaterial[$idCatalogo] = $existente;
+                    }
+                    $temPrecoFornecedor = isset($existente['preco_fornecedor']) && (float)$existente['preco_fornecedor'] > 0;
+                    $temQtdDisponivel = isset($existente['quantidade_disponivel']) && $existente['quantidade_disponivel'] !== null && $existente['quantidade_disponivel'] !== '';
+                    $temDisponivel = isset($existente['disponivel']) && $existente['disponivel'] !== null && $existente['disponivel'] !== '';
+                    if ($temPrecoFornecedor || $temQtdDisponivel || $temDisponivel) {
+                        $respostaFornecedorJaExiste = true;
+                    }
+                }
+
+                $materiaisRecebidos = [];
                 foreach ($dados['itens'] as $item) {
-                    $sqlItem = "INSERT INTO tbl_itens_pedido_compra 
-                               (id_pedido, id_catalogo, quantidade, preco_unitario, valor_total) 
-                               VALUES (?, ?, ?, ?, ?)";
-                    $stmtItem = $this->pdo->prepare($sqlItem);
-                    $stmtItem->execute([
+                    $idMaterial = (string)($item['id_material'] ?? '');
+                    if ($idMaterial === '') {
+                        continue;
+                    }
+                    $materiaisRecebidos[] = $idMaterial;
+
+                    if (isset($existentesPorMaterial[$idMaterial])) {
+                        // Item já existia: apenas atualiza dados de compra e reativa
+                        $sqlUpdateItem = "UPDATE tbl_itens_pedido_compra
+                                          SET quantidade = ?,
+                                              preco_unitario = ?,
+                                              valor_total = ?,
+                                              ativo = 1,
+                                              data_atualizacao = NOW()
+                                          WHERE id_item = ?";
+                        $stmtUpdateItem = $this->pdo->prepare($sqlUpdateItem);
+                        $stmtUpdateItem->execute([
+                            $item['quantidade'],
+                            $item['preco_unitario'],
+                            $item['valor_total'],
+                            $existentesPorMaterial[$idMaterial]['id_item']
+                        ]);
+                        continue;
+                    }
+
+                    // Item novo inserido após resposta: marcar pendência para fornecedor
+                    $camposInsert = ['id_pedido', 'id_catalogo', 'quantidade', 'preco_unitario', 'valor_total', 'ativo'];
+                    $placeholders = ['?', '?', '?', '?', '?', '1'];
+                    $valoresInsert = [
                         $id,
                         $item['id_material'],
                         $item['quantidade'],
                         $item['preco_unitario'],
                         $item['valor_total']
-                    ]);
+                    ];
+
+                    if ($temFlagNovoPosResposta) {
+                        $camposInsert[] = 'novo_pos_resposta';
+                        $placeholders[] = '?';
+                        $valoresInsert[] = $respostaFornecedorJaExiste ? 1 : 0;
+                    }
+                    if ($temDataInclusaoNovo) {
+                        $camposInsert[] = 'data_inclusao_pos_resposta';
+                        $placeholders[] = $respostaFornecedorJaExiste ? 'NOW()' : 'NULL';
+                    }
+                    if ($temUsuarioInclusaoNovo) {
+                        $camposInsert[] = 'id_usuario_inclusao_pos_resposta';
+                        $placeholders[] = '?';
+                        $valoresInsert[] = $respostaFornecedorJaExiste ? ($_SESSION['usuario_id'] ?? null) : null;
+                    }
+
+                    $sqlInsertNovo = "INSERT INTO tbl_itens_pedido_compra (" . implode(', ', $camposInsert) . ")
+                                      VALUES (" . implode(', ', $placeholders) . ")";
+                    $stmtInsertNovo = $this->pdo->prepare($sqlInsertNovo);
+                    $stmtInsertNovo->execute($valoresInsert);
+                }
+
+                // Itens removidos da edição: apenas desativar para manter histórico
+                if (!empty($materiaisRecebidos)) {
+                    $placeholdersIn = implode(',', array_fill(0, count($materiaisRecebidos), '?'));
+                    $sqlInativar = "UPDATE tbl_itens_pedido_compra
+                                    SET ativo = 0, data_atualizacao = NOW()
+                                    WHERE id_pedido = ?
+                                      AND id_catalogo NOT IN ($placeholdersIn)";
+                    $stmtInativar = $this->pdo->prepare($sqlInativar);
+                    $stmtInativar->execute(array_merge([$id], $materiaisRecebidos));
+                } else {
+                    $stmtInativarTudo = $this->pdo->prepare("
+                        UPDATE tbl_itens_pedido_compra
+                        SET ativo = 0, data_atualizacao = NOW()
+                        WHERE id_pedido = ?
+                    ");
+                    $stmtInativarTudo->execute([$id]);
                 }
             }
             
@@ -315,6 +402,21 @@ class PedidoCompra extends BaseModel {
             $this->pdo->rollBack();
             throw $e;
         }
+    }
+
+    private function obterColunasItensPedidoCompra() {
+        if ($this->colunasItensCache !== null) {
+            return $this->colunasItensCache;
+        }
+        $stmt = $this->pdo->prepare("
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'tbl_itens_pedido_compra'
+        ");
+        $stmt->execute();
+        $this->colunasItensCache = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return $this->colunasItensCache;
     }
     
 

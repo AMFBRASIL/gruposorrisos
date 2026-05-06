@@ -401,16 +401,27 @@ function renderizarResultadoPesquisa(materiais) {
         // Verificar se o material já existe na tabela
         const materialExistente = tbody.querySelector(`[data-material-id="${material.id_material}"]`);
         if (materialExistente) {
+            if (parseInt(material?.novo_pos_resposta || 0, 10) === 1) {
+                materialExistente.classList.add('item-pendente-resposta');
+                const nomeCell = materialExistente.querySelector('td:first-child');
+                if (nomeCell && !nomeCell.querySelector('.badge-item-pendente-resposta')) {
+                    nomeCell.innerHTML += '<br><span class="badge-item-pendente-resposta">Pendente de resposta</span>';
+                }
+            }
             console.log(`⚠️ Material ${material.codigo} já existe na tabela`);
             return;
         }
         
         const tr = document.createElement('tr');
         tr.setAttribute('data-material-id', material.id_material);
+        if (parseInt(material?.novo_pos_resposta || 0, 10) === 1) {
+            tr.classList.add('item-pendente-resposta');
+        }
         tr.innerHTML = `
             <td>
                 <strong>${material.codigo}</strong><br>
                 <small class="text-muted">${material.nome}</small>
+                ${parseInt(material?.novo_pos_resposta || 0, 10) === 1 ? '<br><span class="badge-item-pendente-resposta">Pendente de resposta</span>' : ''}
             </td>
             <td>
                 <span class="badge bg-secondary">${material.estoque_atual || 0} ${material.unidade_medida || 'UN'}</span>
@@ -506,6 +517,21 @@ function obterObservacoesPedidoFormulario() {
     const campoObservacoes = document.getElementById('novo_observacoes');
     if (!campoObservacoes) return '';
     return (campoObservacoes.value || '').toString().trim();
+}
+
+function atualizarAvisoItensPendentesRespostaCompra(prefixo, itens = []) {
+    const alerta = document.getElementById(`${prefixo}-alerta-itens-pendentes-resposta`);
+    const texto = document.getElementById(`${prefixo}-alerta-itens-pendentes-resposta-texto`);
+    if (!alerta || !texto) return;
+
+    const totalPendentes = (itens || []).filter((item) => parseInt(item?.novo_pos_resposta || 0, 10) === 1).length;
+    if (totalPendentes > 0) {
+        texto.textContent = `Atenção: ${totalPendentes} item(ns) ainda está(ão) pendente(s) de nova resposta do fornecedor.`;
+        alerta.classList.remove('d-none');
+    } else {
+        texto.textContent = '';
+        alerta.classList.add('d-none');
+    }
 }
 
 function escaparHtml(valor) {
@@ -1960,6 +1986,7 @@ async function visualizarPedido(id) {
         
         if (data.success) {
             const pedido = data.pedido;
+            atualizarAvisoItensPendentesRespostaCompra('view', pedido.itens || []);
             
             // Debug: verificar campos do pedido
             console.log('📦 Dados completos do pedido:', pedido);
@@ -2535,6 +2562,7 @@ async function imprimirPedido() {
         }
 
         const pedido = data.pedido;
+        atualizarAvisoItensPendentesRespostaCompra('edit', pedido.itens || []);
         const itens = pedido.itens || [];
         const escaparHtml = (valor) => String(valor ?? '')
             .replace(/&/g, '&amp;')
@@ -3075,7 +3103,8 @@ function preencherItensExistentes(itens) {
             nome: item.nome_material || 'Material',
             preco_unitario: precoUnitario,
             unidade_medida: item.unidade_medida || item.unidade_medida_sigla || item.unidade || 'UN',
-            estoque_atual: item.estoque_atual || 0
+            estoque_atual: item.estoque_atual || 0,
+            novo_pos_resposta: parseInt(item.novo_pos_resposta || 0, 10)
         }});
 
         renderizarResultadoPesquisa(itensNormalizados);
@@ -3252,6 +3281,7 @@ async function atualizarPedido(pedidoId) {
 // Resetar modal para modo de criação
 function resetarModalParaCriacao() {
     try {
+        atualizarAvisoItensPendentesRespostaCompra('edit', []);
         // Limpar formulário
         document.getElementById('formNovoPedido').reset();
         
@@ -4508,6 +4538,8 @@ function limparModalVisualizacao() {
         if (tbody) {
             tbody.innerHTML = '';
         }
+
+        atualizarAvisoItensPendentesRespostaCompra('view', []);
         
         // Resetar status badge e card - PRESERVAR os elementos, apenas atualizar conteúdo
         const statusBadge = document.getElementById('view-status-badge');

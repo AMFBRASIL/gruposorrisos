@@ -63,6 +63,36 @@ function garantirColunasPedidoFornecedor(PDO $pdo): void {
     if (!in_array('condicoes_pagamento', $colunas, true)) {
         $pdo->exec("ALTER TABLE tbl_pedidos_compra ADD COLUMN condicoes_pagamento VARCHAR(255) NULL AFTER data_entrega_prevista");
     }
+
+    $stmtItens = $pdo->prepare("
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'tbl_itens_pedido_compra'
+    ");
+    $stmtItens->execute();
+    $colunasItens = array_map('strtolower', $stmtItens->fetchAll(PDO::FETCH_COLUMN));
+
+    if (!in_array('novo_pos_resposta', $colunasItens, true)) {
+        $pdo->exec("ALTER TABLE tbl_itens_pedido_compra ADD COLUMN novo_pos_resposta TINYINT(1) NOT NULL DEFAULT 0 AFTER observacoes");
+    }
+    if (!in_array('data_resposta_novo_item', $colunasItens, true)) {
+        $pdo->exec("ALTER TABLE tbl_itens_pedido_compra ADD COLUMN data_resposta_novo_item DATETIME NULL AFTER novo_pos_resposta");
+    }
+}
+
+function obterColunasItensPedido(PDO $pdo): array {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $stmt = $pdo->prepare("
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'tbl_itens_pedido_compra'
+    ");
+    $stmt->execute();
+    $cache = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    return $cache;
 }
 
 // Verificar se é uma requisição OPTIONS (preflight)
@@ -244,6 +274,11 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
  * Obtém itens de um pedido específico
  */
 function obterItensPedido($pdo, $pedido_id) {
+    $colunasItens = obterColunasItensPedido($pdo);
+    $selectNovoPosResposta = in_array('novo_pos_resposta', $colunasItens, true)
+        ? "pi.novo_pos_resposta"
+        : "0 as novo_pos_resposta";
+
     // Buscar itens na tabela tbl_itens_pedido_compra
     $sql = "SELECT 
                 pi.id_item,
@@ -251,6 +286,7 @@ function obterItensPedido($pdo, $pedido_id) {
                 pi.preco_unitario,
                 pi.preco_fornecedor,
                 pi.observacoes,
+                {$selectNovoPosResposta},
                 pi.unidade_medida,
                 cm.nome as nome_material,
                 cm.codigo as codigo_material,
@@ -281,7 +317,8 @@ function obterItensPedido($pdo, $pedido_id) {
             'categoria' => $row['nome_categoria'] ?: 'Sem categoria',
             'observacoes' => $rawObs,
             'observacoes_solicitacao' => $obsSolic,
-            'observacoes_item_fornecedor' => $obsForn
+            'observacoes_item_fornecedor' => $obsForn,
+            'novo_pos_resposta' => intval($row['novo_pos_resposta'] ?? 0)
         ];
     }
     
@@ -404,6 +441,8 @@ function responderPedido($pdo, $input, $fornecedor_id) {
                             disponivel = ?,
                             quantidade_disponivel = ?,
                             observacoes = ?,
+                            novo_pos_resposta = 0,
+                            data_resposta_novo_item = NOW(),
                             data_atualizacao = NOW()
                         WHERE id_item = ? AND id_pedido = ?";
                 

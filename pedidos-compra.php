@@ -63,6 +63,20 @@ $menuActive = 'pedidos_compra';
             background-color: #007bff;
             color: white;
         }
+        .item-pendente-resposta {
+            background: #fff5f5 !important;
+            border-left: 4px solid #dc3545;
+        }
+        .badge-item-pendente-resposta {
+            background: #dc3545;
+            color: #fff;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-left: 8px;
+            display: inline-block;
+        }
         
         /* Estilos simples para a tabela */
         .table-simple {
@@ -429,6 +443,11 @@ $menuActive = 'pedidos_compra';
                         </small>
                     </div>
 
+                    <div class="alert alert-danger py-2 px-3 d-none mb-3" id="edit-alerta-itens-pendentes-resposta">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <span id="edit-alerta-itens-pendentes-resposta-texto"></span>
+                    </div>
+
                     <div class="alert alert-danger py-2 px-3 d-none" id="itens-nao-encontrados-csv-box">
                         <div class="fw-semibold mb-1">
                             <i class="bi bi-exclamation-triangle me-1"></i>Itens do CSV não encontrados no catálogo
@@ -683,6 +702,10 @@ $menuActive = 'pedidos_compra';
                         </div>
                     </div>
                     <div class="card-body">
+                        <div class="alert alert-danger py-2 px-3 d-none mb-3" id="view-alerta-itens-pendentes-resposta">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <span id="view-alerta-itens-pendentes-resposta-texto"></span>
+                        </div>
                         <div class="table-responsive itens-scroll-box">
                             <table class="table table-hover mb-0">
                                 <thead class="table-light">

@@ -298,6 +298,22 @@ $menuActive = 'pedidos_fornecedores';
             margin-bottom: 0.5rem;
             border: 1px solid #e5e7eb;
         }
+        #modalResponderPedido .item-row.item-novo-pos-resposta {
+            border-color: #dc3545;
+            background: #fff5f5;
+            box-shadow: inset 0 0 0 1px rgba(220, 53, 69, 0.15);
+        }
+        #modalResponderPedido .badge-item-novo-pos-resposta {
+            background: #dc3545;
+            color: #fff;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-left: 8px;
+            display: inline-block;
+            vertical-align: middle;
+        }
 
         #modalResponderPedido .item-title {
             font-size: 0.95rem;
@@ -595,6 +611,10 @@ $menuActive = 'pedidos_fornecedores';
                     <div class="col-md-6">
                         <strong>Data:</strong> <span id="pedido-data-resposta"></span>
                     </div>
+                </div>
+                <div class="alert alert-danger py-2 px-3 d-none mb-3" id="alerta-itens-pendentes-resposta-fornecedor">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <span id="alerta-itens-pendentes-resposta-fornecedor-texto"></span>
                 </div>
                 
                 <div class="mb-3">
@@ -1178,6 +1198,10 @@ function responderPedido(pedidoId = null) {
     atualizarBadgeCsvFornecedor(0);
     renderizarItensNaoEncontradosCsvFornecedor([]);
     limparValidacaoCsvLocalFornecedor();
+    const alertaPendencias = document.getElementById('alerta-itens-pendentes-resposta-fornecedor');
+    const alertaPendenciasTexto = document.getElementById('alerta-itens-pendentes-resposta-fornecedor-texto');
+    if (alertaPendencias) alertaPendencias.classList.add('d-none');
+    if (alertaPendenciasTexto) alertaPendenciasTexto.textContent = '';
     const inputCsvResposta = document.getElementById('input-csv-resposta-fornecedor');
     if (inputCsvResposta) {
         inputCsvResposta.value = '';
@@ -1186,10 +1210,13 @@ function responderPedido(pedidoId = null) {
     // Renderizar itens para resposta
     const itensContainer = document.getElementById('itens-resposta');
     itensContainer.innerHTML = pedido.itens.map((item, index) => `
-        <div class="item-row" data-item-nome="${(item.nome || '').toLowerCase()}" data-item-codigo="${(item.codigo || '').toString().toLowerCase()}">
+        <div class="item-row ${item.novo_pos_resposta == 1 ? 'item-novo-pos-resposta' : ''}" data-item-nome="${(item.nome || '').toLowerCase()}" data-item-codigo="${(item.codigo || '').toString().toLowerCase()}">
             <div class="row g-2 align-items-start">
                 <div class="col-lg-5">
-                    <div class="item-title fw-semibold">${item.nome}</div>
+                    <div class="item-title fw-semibold">
+                        ${item.nome}
+                        ${item.novo_pos_resposta == 1 ? '<span class="badge-item-novo-pos-resposta">Novo item - responder</span>' : ''}
+                    </div>
                     <div class="text-muted item-meta mt-1">
                         <strong>Cód.:</strong> ${item.codigo || 'N/A'} |
                         <strong>Categoria:</strong> ${item.categoria || 'N/A'} |
@@ -1247,6 +1274,17 @@ function responderPedido(pedidoId = null) {
             </div>
         </div>
     `).join('');
+
+    const totalPendentesResposta = (pedido.itens || []).filter(item => parseInt(item?.novo_pos_resposta || 0, 10) === 1).length;
+    if (alertaPendencias && alertaPendenciasTexto) {
+        if (totalPendentesResposta > 0) {
+            alertaPendenciasTexto.textContent = `Atenção: este pedido possui ${totalPendentesResposta} item(ns) novo(s) incluído(s) após a resposta anterior. Revise e responda esses itens destacados em vermelho.`;
+            alertaPendencias.classList.remove('d-none');
+        } else {
+            alertaPendencias.classList.add('d-none');
+            alertaPendenciasTexto.textContent = '';
+        }
+    }
     
     // Abrir modal de resposta
     const modal = new bootstrap.Modal(document.getElementById('modalResponderPedido'));
@@ -2083,6 +2121,11 @@ async function salvarResposta() {
                 // Atualizar status do pedido para 'pendente'
                 pedido.status = 'pendente';
                 pedido.observacoes_fornecedor = (observacoes || '').trim();
+                if (Array.isArray(pedido.itens)) {
+                    pedido.itens.forEach((item) => {
+                        item.novo_pos_resposta = 0;
+                    });
+                }
                 atualizarEstatisticas();
                 renderizarPedidos();
                 
