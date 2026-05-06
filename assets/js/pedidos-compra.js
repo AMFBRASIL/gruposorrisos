@@ -920,11 +920,14 @@ function renderizarTabela(pedidos) {
         }
         
         const podeEditarPedido = pedidoPodeSerEditado(pedido.status);
+        const clinicaComCnpj = [pedido.nome_filial || 'N/A', pedido.cnpj_filial || '']
+            .filter(Boolean)
+            .join(' - ');
         row.innerHTML = `
             <td><strong>${pedido.numero_pedido || 'N/A'}</strong></td>
             <td>
                 <div>${pedido.nome_fornecedor || 'N/A'}</div>
-                <small class="text-muted">Clínica: ${pedido.nome_filial || 'N/A'}</small>
+                <small class="text-muted">Clínica: ${clinicaComCnpj || 'N/A'}</small>
             </td>
             <td>${formatarData(pedido.data_solicitacao)}</td>
             <td>${getDataEntregaComIndicador(pedido.data_entrega_prevista, pedido.status)}</td>

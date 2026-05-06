@@ -36,6 +36,7 @@ class PedidoCompra extends BaseModel {
         $sql = "SELECT pc.*, 
                        f.razao_social as nome_fornecedor,
                        fil.nome_filial,
+                       fil.cnpj as cnpj_filial,
                        u.nome_completo as nome_usuario
                 FROM {$this->table} pc
                 LEFT JOIN tbl_fornecedores f ON pc.id_fornecedor = f.id_fornecedor
@@ -60,6 +61,7 @@ class PedidoCompra extends BaseModel {
         $sql = "SELECT pc.*, 
                        f.razao_social as nome_fornecedor,
                        fil.nome_filial,
+                       fil.cnpj as cnpj_filial,
                        u.nome_completo as nome_usuario
                 FROM {$this->table} pc
                 LEFT JOIN tbl_fornecedores f ON pc.id_fornecedor = f.id_fornecedor
@@ -120,6 +122,7 @@ class PedidoCompra extends BaseModel {
         $sql = "SELECT pc.*, 
                        f.razao_social as nome_fornecedor,
                        fil.nome_filial,
+                       fil.cnpj as cnpj_filial,
                        u.nome_completo as nome_usuario
                 FROM {$this->table} pc
                 LEFT JOIN tbl_fornecedores f ON pc.id_fornecedor = f.id_fornecedor
