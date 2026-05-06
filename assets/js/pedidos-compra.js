@@ -922,7 +922,10 @@ function renderizarTabela(pedidos) {
         const podeEditarPedido = pedidoPodeSerEditado(pedido.status);
         row.innerHTML = `
             <td><strong>${pedido.numero_pedido || 'N/A'}</strong></td>
-            <td>${pedido.nome_fornecedor || 'N/A'}</td>
+            <td>
+                <div>${pedido.nome_fornecedor || 'N/A'}</div>
+                <small class="text-muted">Clínica: ${pedido.nome_filial || 'N/A'}</small>
+            </td>
             <td>${formatarData(pedido.data_solicitacao)}</td>
             <td>${getDataEntregaComIndicador(pedido.data_entrega_prevista, pedido.status)}</td>
             <td class="text-center">${getPrioridadeBadge(pedido.prioridade)}</td>
