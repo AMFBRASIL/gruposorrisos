@@ -1247,6 +1247,8 @@ async function carregarMateriaisEstoqueBaixo() {
     const idFilial = document.getElementById('novo_id_filial').value;
     const idFornecedor = document.getElementById('novo_id_fornecedor').value;
     const filtroEstoque = document.getElementById('filtro-estoque-pedido')?.value || 'critico';
+    const container = document.getElementById('materiais-container');
+    const tabelaPesquisadosExistente = container?.querySelector('.tabela-materiais-pesquisados');
     
     if (!idFilial || !idFornecedor) {
         const filtroMateriaisBaixo = document.getElementById('filtro-materiais-baixo');
@@ -1257,6 +1259,9 @@ async function carregarMateriaisEstoqueBaixo() {
             document.getElementById('materiais-container').innerHTML = '<div class="text-center text-muted py-4">Selecione uma Clinica para carregar os materiais</div>';
         } else {
             document.getElementById('materiais-container').innerHTML = '<div class="text-center text-muted py-4">Selecione um fornecedor para carregar os materiais</div>';
+        }
+        if (tabelaPesquisadosExistente) {
+            document.getElementById('materiais-container').appendChild(tabelaPesquisadosExistente);
         }
         return;
     }
@@ -1299,6 +1304,9 @@ async function carregarMateriaisEstoqueBaixo() {
                 
                 // Limpar container
                 document.getElementById('materiais-container').innerHTML = '<div class="text-center text-muted py-4">Nenhum material com estoque baixo encontrado para esta filial e fornecedor</div>';
+                if (tabelaPesquisadosExistente) {
+                    document.getElementById('materiais-container').appendChild(tabelaPesquisadosExistente);
+                }
             } else {
                 const filtroMateriaisBaixo = document.getElementById('filtro-materiais-baixo');
                 if (filtroMateriaisBaixo && document.getElementById('novo_prioridade')?.value === 'padrao') {
@@ -1310,13 +1318,49 @@ async function carregarMateriaisEstoqueBaixo() {
             const filtroMateriaisBaixo = document.getElementById('filtro-materiais-baixo');
             if (filtroMateriaisBaixo) filtroMateriaisBaixo.style.display = 'none';
             document.getElementById('materiais-container').innerHTML = '<div class="text-center text-danger py-4">Erro ao carregar materiais</div>';
+            if (tabelaPesquisadosExistente) {
+                document.getElementById('materiais-container').appendChild(tabelaPesquisadosExistente);
+            }
         }
     } catch (error) {
         console.error('Erro ao carregar materiais com estoque baixo:', error);
         const filtroMateriaisBaixo = document.getElementById('filtro-materiais-baixo');
         if (filtroMateriaisBaixo) filtroMateriaisBaixo.style.display = 'none';
         document.getElementById('materiais-container').innerHTML = '<div class="text-center text-danger py-4">Erro ao carregar materiais</div>';
+        if (tabelaPesquisadosExistente) {
+            document.getElementById('materiais-container').appendChild(tabelaPesquisadosExistente);
+        }
     }
+}
+
+function capturarValoresMateriaisEstoqueBaixo() {
+    const valores = new Map();
+    document.querySelectorAll('.quantidade-solicitada[data-material-id]').forEach((inputQtd) => {
+        const materialId = String(inputQtd.getAttribute('data-material-id') || '');
+        if (!materialId) return;
+        const inputValorUnitario = document.querySelector(`.valor-unitario[data-material-id="${materialId}"]`);
+        valores.set(materialId, {
+            quantidade: parseFloat(inputQtd.value) || 0,
+            valorUnitario: converterMoedaParaNumero(inputValorUnitario?.value || '')
+        });
+    });
+    return valores;
+}
+
+function restaurarValoresMateriaisEstoqueBaixo(valoresAnteriores = new Map()) {
+    valoresAnteriores.forEach((valor, materialId) => {
+        const inputQtd = document.querySelector(`.quantidade-solicitada[data-material-id="${materialId}"]`);
+        const inputValorUnitario = document.querySelector(`.valor-unitario[data-material-id="${materialId}"]`);
+        if (!inputQtd || !inputValorUnitario) return;
+
+        inputQtd.value = valor.quantidade > 0 ? valor.quantidade : '';
+        inputValorUnitario.value = formatarMoeda(valor.valorUnitario || 0);
+
+        const index = parseInt(inputQtd.getAttribute('data-index') || '-1', 10);
+        if (index >= 0) {
+            calcularTotalMaterial(index);
+        }
+    });
 }
 
 // Renderizar materiais com estoque baixo
@@ -1324,9 +1368,17 @@ function renderizarMateriaisEstoqueBaixo() {
     console.log('🔧 Renderizando materiais com estoque baixo:', materiaisEstoqueBaixo);
     
     const container = document.getElementById('materiais-container');
+    const tabelaPesquisadosExistente = container.querySelector('.tabela-materiais-pesquisados');
+    const valoresAnteriores = capturarValoresMateriaisEstoqueBaixo();
+    if (tabelaPesquisadosExistente) {
+        tabelaPesquisadosExistente.remove();
+    }
     
     if (materiaisEstoqueBaixo.length === 0) {
         container.innerHTML = '<div class="text-center text-muted py-4">Nenhum material com estoque baixo encontrado para esta filial</div>';
+        if (tabelaPesquisadosExistente) {
+            container.appendChild(tabelaPesquisadosExistente);
+        }
         return;
     }
     
@@ -1345,7 +1397,7 @@ function renderizarMateriaisEstoqueBaixo() {
                         <th>Ação</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tbody-materiais-estoque-baixo">
     `;
     
     materiaisEstoqueBaixo.forEach((material, index) => {
@@ -1410,6 +1462,10 @@ function renderizarMateriaisEstoqueBaixo() {
     `;
     
     container.innerHTML = html;
+    if (tabelaPesquisadosExistente) {
+        container.appendChild(tabelaPesquisadosExistente);
+    }
+    restaurarValoresMateriaisEstoqueBaixo(valoresAnteriores);
     filtrarMateriaisEstoqueBaixoPorNome();
     
     console.log('✅ Tabela de materiais com estoque baixo renderizada com sucesso');
@@ -1425,7 +1481,7 @@ function renderizarMateriaisEstoqueBaixo() {
 function filtrarMateriaisEstoqueBaixoPorNome() {
     const input = document.getElementById('filtro-nome-material-baixo');
     const termo = (input?.value || '').toLowerCase().trim();
-    const linhas = document.querySelectorAll('#materiais-container tbody tr');
+    const linhas = document.querySelectorAll('#tbody-materiais-estoque-baixo tr');
 
     linhas.forEach(linha => {
         const codigoEl = linha.querySelector('td strong');
