@@ -164,7 +164,12 @@ try {
           </div>
           <!-- Permissões de Módulos/Telas -->
           <div class="mb-4">
-            <div class="fw-semibold mb-2" style="color:#f59e42;"><i class="bi bi-unlock-fill me-2"></i>Permissões por Página/Módulo</div>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div class="fw-semibold" style="color:#f59e42;"><i class="bi bi-unlock-fill me-2"></i>Permissões por Página/Módulo</div>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnAlternarPermissoes" onclick="alternarPermissoes('#tabela-permissoes', this)">
+                <i class="bi bi-check2-square me-1"></i> Selecionar todas
+              </button>
+            </div>
             <div class="table-responsive">
               <table class="table table-bordered align-middle" id="tabela-permissoes">
                 <thead>
@@ -297,7 +302,12 @@ try {
           </div>
           <!-- Permissões de Módulos/Telas -->
           <div class="mb-4">
-            <div class="fw-semibold mb-2" style="color:#f59e42;"><i class="bi bi-unlock-fill me-2"></i>Permissões por Página/Módulo</div>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div class="fw-semibold" style="color:#f59e42;"><i class="bi bi-unlock-fill me-2"></i>Permissões por Página/Módulo</div>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnAlternarPermissoesEdit" onclick="alternarPermissoes('#tabela-permissoes-edit', this)">
+                <i class="bi bi-check2-square me-1"></i> Selecionar todas
+              </button>
+            </div>
             <div class="table-responsive">
               <table class="table table-bordered align-middle" id="tabela-permissoes-edit">
                 <thead>
@@ -342,6 +352,7 @@ let currentPage = 1;
 // Carregar dados iniciais
 document.addEventListener('DOMContentLoaded', function() {
     carregarPerfis();
+    inicializarBotoesPermissoes();
 });
 
 // Carregar perfis
@@ -446,6 +457,43 @@ function limparBusca() {
     carregarPerfis(1, '');
 }
 
+function alternarPermissoes(tabelaSelector, botao) {
+    const checkboxes = Array.from(document.querySelectorAll(`${tabelaSelector} tbody input[type=checkbox]`));
+    if (checkboxes.length === 0) return;
+
+    const deveSelecionar = checkboxes.some(cb => !cb.checked);
+    checkboxes.forEach(cb => {
+        cb.checked = deveSelecionar;
+    });
+
+    atualizarBotaoPermissoes(tabelaSelector, botao);
+}
+
+function atualizarBotaoPermissoes(tabelaSelector, botao) {
+    if (!botao) return;
+
+    const checkboxes = Array.from(document.querySelectorAll(`${tabelaSelector} tbody input[type=checkbox]`));
+    const todosSelecionados = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+
+    botao.classList.toggle('btn-outline-primary', !todosSelecionados);
+    botao.classList.toggle('btn-outline-danger', todosSelecionados);
+    botao.innerHTML = todosSelecionados
+        ? '<i class="bi bi-x-square me-1"></i> Desmarcar todas'
+        : '<i class="bi bi-check2-square me-1"></i> Selecionar todas';
+}
+
+function inicializarBotoesPermissoes() {
+    [
+        ['#tabela-permissoes', document.getElementById('btnAlternarPermissoes')],
+        ['#tabela-permissoes-edit', document.getElementById('btnAlternarPermissoesEdit')]
+    ].forEach(([tabelaSelector, botao]) => {
+        atualizarBotaoPermissoes(tabelaSelector, botao);
+        document.querySelectorAll(`${tabelaSelector} tbody input[type=checkbox]`).forEach(cb => {
+            cb.addEventListener('change', () => atualizarBotaoPermissoes(tabelaSelector, botao));
+        });
+    });
+}
+
 // Abrir modal novo perfil
 document.querySelector('.btn.btn-primary.btn-action').addEventListener('click', function() {
     const modal = new bootstrap.Modal(document.getElementById('modalNovoPerfil'));
@@ -521,6 +569,7 @@ async function salvarPerfil(event) {
             
             // Limpar formulário
             document.getElementById('formPerfil').reset();
+            atualizarBotaoPermissoes('#tabela-permissoes', document.getElementById('btnAlternarPermissoes'));
             
             // Recarregar lista
             carregarPerfis();
@@ -583,6 +632,8 @@ async function editarPerfil(id) {
                      if (checkbox4 && perm.permissao_excluir) checkbox4.checked = true;
                  });
              }
+            
+            atualizarBotaoPermissoes('#tabela-permissoes-edit', document.getElementById('btnAlternarPermissoesEdit'));
             
             // Abrir modal
             const modal = new bootstrap.Modal(document.getElementById('modalEditarPerfil'));
@@ -793,11 +844,19 @@ function limparBusca() {
     // Recarregar lista sem filtros
     carregarPerfis();
 }
+
+function limparBackdropModal() {
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+}
+
+['modalNovoPerfil', 'modalEditarPerfil'].forEach(modalId => {
+    const modalEl = document.getElementById(modalId);
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', limparBackdropModal);
+    }
+});
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-</main>
 </body>
 </html>

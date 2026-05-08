@@ -60,7 +60,7 @@ try {
                     <div class="card card-resumo">
                         <div class="card-body">
                             <div class="card-title">Total de Usuários</div>
-                            <div class="card-value"><?= $estatisticas['total_usuarios'] ?></div>
+                            <div class="card-value" id="total-usuarios"><?= $estatisticas['total_usuarios'] ?></div>
                             <div class="text-success small">Usuários cadastrados</div>
                         </div>
                     </div>
@@ -69,7 +69,7 @@ try {
                     <div class="card card-resumo">
                         <div class="card-body">
                             <div class="card-title">Usuários Ativos</div>
-                            <div class="card-value" style="color:#22c55e;"><?= $estatisticas['usuarios_ativos'] ?></div>
+                            <div class="card-value" style="color:#22c55e;" id="usuarios-ativos"><?= $estatisticas['usuarios_ativos'] ?></div>
                             <div class="text-muted small">Usuários com acesso</div>
                         </div>
                     </div>
@@ -78,7 +78,7 @@ try {
                     <div class="card card-resumo">
                         <div class="card-body">
                             <div class="card-title">Ativos (7 dias)</div>
-                            <div class="card-value" style="color:#eab308;"><?= $estatisticas['usuarios_ativos_7dias'] ?></div>
+                            <div class="card-value" style="color:#eab308;" id="usuarios-ativos-7dias"><?= $estatisticas['usuarios_ativos_7dias'] ?></div>
                             <div class="text-muted small">Acessaram recentemente</div>
                         </div>
                     </div>
@@ -87,7 +87,7 @@ try {
                     <div class="card card-resumo">
                         <div class="card-body">
                             <div class="card-title">Ativos (30 dias)</div>
-                            <div class="card-value" style="color:#3b82f6;"><?= $estatisticas['usuarios_ativos_30dias'] ?></div>
+                            <div class="card-value" style="color:#3b82f6;" id="usuarios-ativos-30dias"><?= $estatisticas['usuarios_ativos_30dias'] ?></div>
                             <div class="text-muted small">Acessaram no mês</div>
                         </div>
                     </div>
@@ -371,18 +371,32 @@ document.querySelector('.btn.btn-primary.btn-action').addEventListener('click', 
   modal.show();
 });
 
+function atualizarTextoStat(id, valor) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = valor;
+    }
+}
+
 // Carregar estatísticas
 async function carregarEstatisticas() {
     try {
         const response = await fetch('backend/api/usuarios.php?action=estatisticas');
-        const result = await response.json();
-        
-        if (result.success) {
+        const raw = await response.text();
+        let result = {};
+        try {
+            result = raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            console.error('Resposta inválida em estatísticas:', e, raw);
+            return;
+        }
+
+        if (result.success && result.data) {
             const stats = result.data;
-            document.getElementById('total-usuarios').textContent = stats.total_usuarios || 0;
-            document.getElementById('usuarios-ativos').textContent = stats.usuarios_ativos || 0;
-            document.getElementById('usuarios-ativos-7dias').textContent = stats.usuarios_ativos_7dias || 0;
-            document.getElementById('usuarios-ativos-30dias').textContent = stats.usuarios_ativos_30dias || 0;
+            atualizarTextoStat('total-usuarios', stats.total_usuarios ?? 0);
+            atualizarTextoStat('usuarios-ativos', stats.usuarios_ativos ?? 0);
+            atualizarTextoStat('usuarios-ativos-7dias', stats.usuarios_ativos_7dias ?? 0);
+            atualizarTextoStat('usuarios-ativos-30dias', stats.usuarios_ativos_30dias ?? 0);
         }
     } catch (error) {
         console.error('Erro ao carregar estatísticas:', error);
@@ -769,15 +783,32 @@ async function salvarUsuario(event) {
             },
             body: JSON.stringify(dados)
         });
-        
-        const result = await response.json();
+
+        const rawBody = await response.text();
+        let result = {};
+        try {
+            result = rawBody ? JSON.parse(rawBody) : {};
+        } catch (parseErr) {
+            console.error('Resposta inválida ao criar usuário:', parseErr, rawBody);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: response.ok
+                    ? 'O servidor não retornou dados válidos. Se o usuário foi criado, pode ser bloqueio ou lentidão no envio de e-mail.'
+                    : `Erro HTTP ${response.status}. Verifique o servidor ou os logs.`,
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
         
         if (result.success) {
-            // Mostrar mensagem de sucesso
+            const msgEmail = result.email_enviado === false
+                ? ' Usuário criado. O e-mail de boas-vindas não foi enviado (SMTP/indisponível).'
+                : '';
             Swal.fire({
                 icon: 'success',
                 title: 'Sucesso!',
-                text: 'Usuário criado com sucesso!',
+                text: (result.message || 'Usuário criado com sucesso!') + msgEmail,
                 confirmButtonText: 'OK'
             });
             
@@ -797,7 +828,7 @@ async function salvarUsuario(event) {
             Swal.fire({
                 icon: 'error',
                 title: 'Erro!',
-                text: result.error || 'Erro ao criar usuário',
+                text: result.error || `Erro ao criar usuário (HTTP ${response.status}).`,
                 confirmButtonText: 'OK'
             });
         }

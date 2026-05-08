@@ -45,6 +45,7 @@ class EmailUtils {
         error_log("Para: {$toEmail} ({$toName})");
         error_log("Assunto: {$subject}");
         
+        $mail = null;
         try {
             $mail = new PHPMailer(true);
             
@@ -56,6 +57,8 @@ class EmailUtils {
             $mail->Password = self::$smtpConfig['password'];
             $mail->SMTPSecure = self::$smtpConfig['secure'];
             $mail->Port = self::$smtpConfig['port'];
+            // Evita travar a requisição HTTP por minutos em hospedagens que bloqueiam SMTP ou demoram na conexão
+            $mail->Timeout = 15;
             
             // Configurações de charset UTF-8
             $mail->CharSet = 'UTF-8';
@@ -96,9 +99,11 @@ class EmailUtils {
             error_log("E-mail enviado com sucesso para {$toEmail}");
             return true;
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             error_log("Erro ao enviar e-mail para {$toEmail}: " . $e->getMessage());
-            error_log("PHPMailer Error: " . $mail->ErrorInfo);
+            if ($mail instanceof PHPMailer) {
+                error_log("PHPMailer Error: " . $mail->ErrorInfo);
+            }
             error_log("Arquivo: " . $e->getFile() . " Linha: " . $e->getLine());
             return false;
         } finally {

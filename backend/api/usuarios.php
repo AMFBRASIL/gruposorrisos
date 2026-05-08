@@ -96,7 +96,6 @@ try {
                 throw new Exception('Dados inválidos');
             }
             
-            // Validações básicas
             if (empty($input['nome_completo'])) {
                 throw new Exception('Nome completo é obrigatório');
             }
@@ -105,49 +104,80 @@ try {
                 throw new Exception('E-mail é obrigatório');
             }
             
-            // Verificar se e-mail já existe
+            if (empty($input['id_perfil'])) {
+                throw new Exception('Perfil é obrigatório');
+            }
+            
             if ($usuarioModel->emailExiste($input['email'])) {
                 throw new Exception('E-mail já está em uso');
             }
             
-            // Validar que senha foi fornecida
             if (empty($input['senha'])) {
                 throw new Exception('Senha é obrigatória');
             }
             
-            // Usar a senha fornecida pelo administrador
             $senhaOriginal = $input['senha'];
-            $input['senha'] = password_hash($input['senha'], PASSWORD_DEFAULT);
             
-            // Inserir usuário
-            $id = $usuarioModel->insert($input);
-            
-            // Buscar informações do perfil para o email
-            $perfilNome = 'Usuário';
-            if (isset($input['id_perfil'])) {
-                $perfil = $perfilModel->findById($input['id_perfil']);
-                if ($perfil) {
-                    $perfilNome = $perfil['nome_perfil'];
+            $filialRaw = $input['id_filial'] ?? null;
+            if ($filialRaw === '' || $filialRaw === false || $filialRaw === null) {
+                $filialId = null;
+            } else {
+                $filialId = (int)$filialRaw;
+                if ($filialId <= 0) {
+                    $filialId = null;
                 }
             }
             
-            // Enviar email de boas-vindas
+            $cpf = isset($input['cpf']) && $input['cpf'] !== '' && $input['cpf'] !== null
+                ? trim((string)$input['cpf'])
+                : null;
+            $telefone = isset($input['telefone']) && $input['telefone'] !== '' && $input['telefone'] !== null
+                ? trim((string)$input['telefone'])
+                : null;
+            
+            $ativo = isset($input['ativo']) ? (int)$input['ativo'] : 1;
+            
+            // Somente colunas da tabela — evita SQL inválido se o JSON trouxer campos extras
+            $dadosInsert = [
+                'nome_completo' => trim((string)$input['nome_completo']),
+                'email' => trim((string)$input['email']),
+                'senha' => password_hash($senhaOriginal, PASSWORD_DEFAULT),
+                'cpf' => $cpf,
+                'telefone' => $telefone,
+                'id_perfil' => (int)$input['id_perfil'],
+                'id_filial' => $filialId,
+                'ativo' => $ativo,
+            ];
+            
+            $id = $usuarioModel->insert($dadosInsert);
+            
+            $perfilNome = 'Usuário';
+            $perfil = $perfilModel->findById($dadosInsert['id_perfil']);
+            if ($perfil) {
+                $perfilNome = $perfil['nome_perfil'];
+            }
+            
             $emailEnviado = false;
-            try {
-                require_once '../utils/EmailUtils.php';
-                $emailEnviado = EmailUtils::enviarEmailBoasVindas(
-                    $input['email'],
-                    $input['nome_completo'],
-                    $senhaOriginal,
-                    $perfilNome
-                );
-            } catch (Exception $e) {
-                error_log("Erro ao enviar email de boas-vindas: " . $e->getMessage());
+            $vendorAutoload = realpath(__DIR__ . '/../../vendor/autoload.php');
+            if ($vendorAutoload && is_readable($vendorAutoload)) {
+                try {
+                    require_once __DIR__ . '/../utils/EmailUtils.php';
+                    $emailEnviado = EmailUtils::enviarEmailBoasVindas(
+                        $dadosInsert['email'],
+                        $dadosInsert['nome_completo'],
+                        $senhaOriginal,
+                        $perfilNome
+                    );
+                } catch (Throwable $e) {
+                    error_log('Erro ao enviar email de boas-vindas: ' . $e->getMessage());
+                }
+            } else {
+                error_log('usuarios create: vendor/autoload.php ausente; e-mail de boas-vindas não enviado.');
             }
             
             echo json_encode([
                 'success' => true,
-                'message' => 'Usuário criado com sucesso' . ($emailEnviado ? ' e email de boas-vindas enviado' : ''),
+                'message' => 'Usuário criado com sucesso' . ($emailEnviado ? ' e e-mail de boas-vindas enviado.' : ''),
                 'id' => $id,
                 'email_enviado' => $emailEnviado
             ]);
@@ -240,11 +270,25 @@ try {
             throw new Exception('Ação não reconhecida');
     }
     
+} catch (PDOException $e) {
+    error_log('usuarios API PDO: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Erro ao gravar no banco de dados. Verifique os dados (ex.: filial inválida) ou os logs do servidor.'
+    ]);
 } catch (Exception $e) {
     http_response_code(400);
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage()
+    ]);
+} catch (Throwable $e) {
+    error_log('usuarios API: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Erro interno no servidor. Verifique os logs ou se Composer (vendor) está instalado em produção.'
     ]);
 }
 

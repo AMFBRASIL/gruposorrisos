@@ -62,6 +62,12 @@ async function carregarSeletorFiliais() {
             if (data.success && data.filiais) {
                 console.log('✅ Clínicas carregadas:', data.filiais.length);
                 filiais = data.filiais;
+
+                // Garante que a clínica salva no navegador ainda está permitida para o usuário.
+                if (filialSelecionada && !filiais.some(f => f.id === filialSelecionada)) {
+                    filialSelecionada = null;
+                    localStorage.removeItem('filialSelecionada');
+                }
                 renderizarSeletorFiliais();
             } else {
                 console.error('❌ Erro na resposta:', data);
