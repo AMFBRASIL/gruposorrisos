@@ -773,6 +773,38 @@ function pedidoFornecedorPodeResponder(status) {
     return ['em_analise', 'pendente', 'aprovado_cotacao'].includes((status || '').toLowerCase());
 }
 
+/** Item que ainda exige preenchimento pelo fornecedor (lista / cartão). */
+function itemSemRespostaFornecedor(item) {
+    if (parseInt(item?.novo_pos_resposta || 0, 10) === 1) {
+        return true;
+    }
+    const disp = item?.disponivel;
+    const dispDefined = disp !== null && disp !== undefined && disp !== '';
+    const precoRaw = item?.preco_fornecedor;
+    const precoDefined = precoRaw !== null && precoRaw !== undefined && precoRaw !== '';
+
+    if (dispDefined) {
+        const d = parseInt(disp, 10);
+        if (d === 0) {
+            return false;
+        }
+        if (d === 1) {
+            return !precoDefined || Number.isNaN(parseFloat(precoRaw));
+        }
+        return true;
+    }
+
+    if (precoDefined) {
+        return false;
+    }
+    return true;
+}
+
+function contarItensSemRespostaFornecedor(pedido) {
+    const itens = pedido?.itens || [];
+    return itens.filter(itemSemRespostaFornecedor).length;
+}
+
 function escapeHtml(s) {
     if (s === null || s === undefined) return '';
     const d = document.createElement('div');
@@ -898,13 +930,24 @@ function renderizarPedidos() {
     
     container.innerHTML = pedidosFiltrados.map(pedido => {
         const valorTotalPedido = calcularValorTotalPedido(pedido);
+        const qtdSemResposta = contarItensSemRespostaFornecedor(pedido);
+        const alertaItensSemResposta = (qtdSemResposta > 0 && pedidoFornecedorPodeResponder(pedido.status))
+            ? `
+            <div class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-start gap-2" role="alert">
+                <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+                <div class="small">
+                    Este pedido tem <strong>${qtdSemResposta}</strong> item(ns) sem sua resposta.
+                    Use <strong>Responder</strong> para informar preço e disponibilidade.
+                </div>
+            </div>`
+            : '';
         return `
         <div class="pedido-card">
             <div class="pedido-header">
                 <div class="pedido-numero">${pedido.numero}</div>
                 <span class="pedido-status status-${pedido.status}">${pedido.status}</span>
             </div>
-            
+            ${alertaItensSemResposta}
             <div class="pedido-info">
                 <div class="info-item">
                     <span class="info-label">Cliente</span>
@@ -1007,10 +1050,20 @@ function aplicarFiltros() {
 function visualizarPedido(pedidoId) {
     const pedido = pedidosData.find(p => p.id === pedidoId);
     if (!pedido) return;
-    
+
     pedidoAtual = pedido;
     const valorTotalDetalhes = calcularValorTotalPedido(pedido);
-    
+    const qtdSemRespostaDetalhes = contarItensSemRespostaFornecedor(pedido);
+    const alertaItensSemRespostaDetalhes = (qtdSemRespostaDetalhes > 0 && pedidoFornecedorPodeResponder(pedido.status))
+        ? `
+        <div class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-start gap-2" role="alert">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+            <div class="small mb-0">
+                <strong>${qtdSemRespostaDetalhes}</strong> item(ns) sem sua resposta. Clique em <strong>Responder com Preços</strong> para concluir.
+            </div>
+        </div>`
+        : '';
+
     const content = document.getElementById('modal-pedido-content');
     content.innerHTML = `
         <div class="row mb-4">
@@ -1033,17 +1086,19 @@ function visualizarPedido(pedidoId) {
         
         <div class="row mb-4">
             <div class="col-md-6">
-                <strong>Status:</strong> 
+                <strong>Status:</strong>
                 <span class="pedido-status status-${pedido.status}">${pedido.status}</span>
             </div>
             <div class="col-md-6">
-                <strong>Prioridade:</strong> 
+                <strong>Prioridade:</strong>
                 <span class="badge ${getPrioridadeClass(pedido.prioridade)}">
                     ${getPrioridadeText(pedido.prioridade)}
                 </span>
             </div>
         </div>
-        
+
+        ${alertaItensSemRespostaDetalhes}
+
         ${pedido.observacoes ? `
         <div class="row mb-4">
             <div class="col-12">

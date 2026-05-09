@@ -10,11 +10,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once '../../config/config.php';
 require_once '../../config/conexao.php';
+require_once '../../config/session.php';
 require_once '../../models/Configuracao.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'OPTIONS' && !isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Não autorizado']);
+    exit;
+}
 
 try {
     $pdo = Conexao::getInstance()->getPdo();
-    $configuracao = new Configuracao($pdo);
+    $configuracao = new Configuracao();
     
     $method = $_SERVER['REQUEST_METHOD'];
     $action = $_GET['action'] ?? '';
@@ -46,6 +53,14 @@ try {
                     
                 case 'buscar_agrupadas':
                     $resultado = $configuracao->buscarAgrupadasPorCategoria();
+                    foreach ($resultado as $cat => $lista) {
+                        foreach ($lista as $i => $row) {
+                            if (($row['chave'] ?? '') === 'smtp_password' && !empty($row['valor'])) {
+                                $resultado[$cat][$i]['valor'] = '';
+                                $resultado[$cat][$i]['_senha_definida'] = true;
+                            }
+                        }
+                    }
                     echo json_encode(['success' => true, 'data' => $resultado]);
                     break;
                     
@@ -73,8 +88,41 @@ try {
                             break;
                         }
                         
-                        $configuracao->atualizarConfiguracoes($dados['configuracoes']);
+                        $lista = $dados['configuracoes'];
+                        // Não sobrescrever senha SMTP se o campo veio em branco (mantém a atual no banco)
+                        if (isset($lista['smtp_password']) && trim((string)$lista['smtp_password']) === '') {
+                            unset($lista['smtp_password']);
+                        }
+                        
+                        $configuracao->atualizarConfiguracoes($lista);
                         echo json_encode(['success' => true, 'message' => 'Configurações atualizadas com sucesso']);
+                        break;
+
+                    case 'testar_smtp':
+                        $emailTeste = isset($dados['email_teste']) ? trim((string)$dados['email_teste']) : '';
+                        if ($emailTeste === '' || filter_var($emailTeste, FILTER_VALIDATE_EMAIL) === false) {
+                            echo json_encode(['success' => false, 'error' => 'Informe um e-mail válido para o teste']);
+                            break;
+                        }
+                        $vendorAutoload = realpath(__DIR__ . '/../../vendor/autoload.php');
+                        if (!$vendorAutoload || !is_readable($vendorAutoload)) {
+                            echo json_encode(['success' => false, 'error' => 'Composer (vendor) não encontrado no servidor']);
+                            break;
+                        }
+                        require_once __DIR__ . '/../utils/EmailUtils.php';
+                        $html = '<p>Este é um e-mail de teste do sistema <strong>Grupo Sorrisos</strong>.</p><p>Se você recebeu esta mensagem, o SMTP está configurado corretamente.</p>';
+                        $texto = "E-mail de teste Grupo Sorrisos.\nSe você recebeu, o SMTP está OK.";
+                        $ok = EmailUtils::enviarEmail(
+                            $emailTeste,
+                            'Teste SMTP',
+                            'Grupo Sorrisos — Teste de SMTP',
+                            $html,
+                            $texto
+                        );
+                        echo json_encode([
+                            'success' => $ok,
+                            'message' => $ok ? 'E-mail de teste enviado. Verifique a caixa de entrada (e spam).' : 'Falha ao enviar. Verifique host, porta, usuário, senha e os logs do servidor.'
+                        ]);
                         break;
                         
                     case 'definir_valor':

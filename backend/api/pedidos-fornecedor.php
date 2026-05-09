@@ -278,6 +278,12 @@ function obterItensPedido($pdo, $pedido_id) {
     $selectNovoPosResposta = in_array('novo_pos_resposta', $colunasItens, true)
         ? "pi.novo_pos_resposta"
         : "0 as novo_pos_resposta";
+    $selectDisponivel = in_array('disponivel', $colunasItens, true)
+        ? "pi.disponivel"
+        : "NULL as disponivel";
+    $selectQtdDisp = in_array('quantidade_disponivel', $colunasItens, true)
+        ? "pi.quantidade_disponivel"
+        : "NULL as quantidade_disponivel";
 
     // Buscar itens na tabela tbl_itens_pedido_compra
     $sql = "SELECT 
@@ -287,6 +293,8 @@ function obterItensPedido($pdo, $pedido_id) {
                 pi.preco_fornecedor,
                 pi.observacoes,
                 {$selectNovoPosResposta},
+                {$selectDisponivel},
+                {$selectQtdDisp},
                 pi.unidade_medida,
                 cm.nome as nome_material,
                 cm.codigo as codigo_material,
@@ -306,6 +314,21 @@ function obterItensPedido($pdo, $pedido_id) {
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $rawObs = $row['observacoes'] ?? '';
         list($obsSolic, $obsForn) = splitObservacoesItemPedido($rawObs);
+        $precoFornecedorVal = $row['preco_fornecedor'];
+        $precoFornecedorJson = ($precoFornecedorVal !== null && $precoFornecedorVal !== '')
+            ? floatval($precoFornecedorVal)
+            : null;
+
+        $dispRaw = $row['disponivel'] ?? null;
+        $disponivelJson = ($dispRaw !== null && $dispRaw !== '')
+            ? intval($dispRaw)
+            : null;
+
+        $qtdDispRaw = $row['quantidade_disponivel'] ?? null;
+        $quantidadeDisponivelJson = ($qtdDispRaw !== null && $qtdDispRaw !== '')
+            ? floatval($qtdDispRaw)
+            : null;
+
         $itens[] = [
             'id' => $row['id_item'],
             'nome' => $row['nome_material'] ?: 'Material não encontrado',
@@ -313,7 +336,9 @@ function obterItensPedido($pdo, $pedido_id) {
             'quantidade' => floatval($row['quantidade'] ?: 0),
             'unidade' => $row['unidade_medida_sigla'] ?: ($row['unidade_medida'] ?: 'un'),
             'preco_unitario' => floatval($row['preco_unitario'] ?: 0),
-            'preco_fornecedor' => $row['preco_fornecedor'] ? floatval($row['preco_fornecedor']) : null,
+            'preco_fornecedor' => $precoFornecedorJson,
+            'disponivel' => $disponivelJson,
+            'quantidade_disponivel' => $quantidadeDisponivelJson,
             'categoria' => $row['nome_categoria'] ?: 'Sem categoria',
             'observacoes' => $rawObs,
             'observacoes_solicitacao' => $obsSolic,

@@ -68,9 +68,8 @@ class Configuracao extends BaseModel {
         
         try {
             foreach ($configuracoes as $chave => $valor) {
-                $sql = "UPDATE {$this->table} SET valor = ?, data_atualizacao = CURRENT_TIMESTAMP WHERE chave = ?";
-                $stmt = $this->pdo->prepare($sql);
-                $stmt->execute([$valor, $chave]);
+                // INSERT … ON DUPLICATE KEY — permite novas chaves (ex.: SMTP) sem script manual
+                $this->setValor($chave, $valor);
             }
             
             $this->pdo->commit();

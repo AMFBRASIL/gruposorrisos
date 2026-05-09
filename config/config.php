@@ -8,7 +8,8 @@ define('OPENAI_API_URL', 'https://api.openai.com/v1/chat/completions');
 # PRODUCAO DB
 ###############################################################
 
-define('DB_HOST', getenv('DB_HOST') ?: 'srv1662.hstgr.io');
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+#define('DB_HOST', getenv('DB_HOST') ?: 'srv1662.hstgr.io');
 define('DB_NAME', getenv('DB_NAME') ?: 'u293057343_sorrisos');
 define('DB_USER', getenv('DB_USER') ?: 'u293057343_sorrisos');
 define('DB_PASS', getenv('DB_PASS') ?: 'ean7G#lc7X+');

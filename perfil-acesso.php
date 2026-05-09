@@ -494,12 +494,6 @@ function inicializarBotoesPermissoes() {
     });
 }
 
-// Abrir modal novo perfil
-document.querySelector('.btn.btn-primary.btn-action').addEventListener('click', function() {
-    const modal = new bootstrap.Modal(document.getElementById('modalNovoPerfil'));
-    modal.show();
-});
-
 // Salvar perfil
 async function salvarPerfil(event) {
     event.preventDefault();
@@ -556,23 +550,24 @@ async function salvarPerfil(event) {
         const result = await response.json();
         
         if (result.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso!',
-                text: 'Perfil criado com sucesso!',
-                confirmButtonText: 'OK'
-            });
-            
-            // Fechar modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalNovoPerfil'));
+            const modalEl = document.getElementById('modalNovoPerfil');
+            const modal = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            const aoFecharModal = () => {
+                limparBackdropModal();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'Perfil criado com sucesso!',
+                    confirmButtonText: 'OK'
+                });
+                document.getElementById('formPerfil').reset();
+                atualizarBotaoPermissoes('#tabela-permissoes', document.getElementById('btnAlternarPermissoes'));
+                carregarPerfis();
+            };
+
+            modalEl.addEventListener('hidden.bs.modal', aoFecharModal, { once: true });
             modal.hide();
-            
-            // Limpar formulário
-            document.getElementById('formPerfil').reset();
-            atualizarBotaoPermissoes('#tabela-permissoes', document.getElementById('btnAlternarPermissoes'));
-            
-            // Recarregar lista
-            carregarPerfis();
         } else {
             Swal.fire({
                 icon: 'error',
@@ -635,9 +630,7 @@ async function editarPerfil(id) {
             
             atualizarBotaoPermissoes('#tabela-permissoes-edit', document.getElementById('btnAlternarPermissoesEdit'));
             
-            // Abrir modal
-            const modal = new bootstrap.Modal(document.getElementById('modalEditarPerfil'));
-            modal.show();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarPerfil')).show();
         } else {
             Swal.fire({
                 icon: 'error',
@@ -713,19 +706,22 @@ async function atualizarPerfil(event) {
         const result = await response.json();
         
         if (result.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso!',
-                text: 'Perfil atualizado com sucesso!',
-                confirmButtonText: 'OK'
-            });
-            
-            // Fechar modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarPerfil'));
+            const modalEl = document.getElementById('modalEditarPerfil');
+            const modal = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            const aoFecharModal = () => {
+                limparBackdropModal();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'Perfil atualizado com sucesso!',
+                    confirmButtonText: 'OK'
+                });
+                carregarPerfis();
+            };
+
+            modalEl.addEventListener('hidden.bs.modal', aoFecharModal, { once: true });
             modal.hide();
-            
-            // Recarregar lista
-            carregarPerfis();
         } else {
             Swal.fire({
                 icon: 'error',
@@ -835,8 +831,7 @@ function duplicarSelecionados() {
 }
 
 function abrirModalNovoPerfil() {
-    const modal = new bootstrap.Modal(document.getElementById('modalNovoPerfil'));
-    modal.show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovoPerfil')).show();
 }
 
 function limparBusca() {
@@ -849,6 +844,7 @@ function limparBackdropModal() {
     document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
     document.body.classList.remove('modal-open');
     document.body.style.removeProperty('padding-right');
+    document.body.style.removeProperty('overflow');
 }
 
 ['modalNovoPerfil', 'modalEditarPerfil'].forEach(modalId => {

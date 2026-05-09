@@ -2,9 +2,9 @@
 /**
  * Utilitários para envio de e-mails usando PHPMailer
  * GrupoSorrisos - Sistema de Gestão
+ *
+ * A configuração SMTP vem de tbl_configuracoes (tela configuracoes.php), chaves smtp_*.
  */
-
-require_once __DIR__ . '/../../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -13,21 +13,99 @@ use PHPMailer\PHPMailer\Exception;
  * Classe utilitária para envio de e-mails
  */
 class EmailUtils {
-    
+
     /**
-     * Configurações SMTP padrão
+     * Carrega PHPMailer via Composer quando necessário.
      */
-    private static $smtpConfig = [
-        'host' => 'smtp.hostinger.com',
-        'username' => 'contato@gruposorrisos.com.br',
-        'password' => 'Sorrisos2024###',
-        'secure' => 'ssl',
-        'port' => 465,
-        'from_email' => 'contato@gruposorrisos.com.br',
-        'from_name' => 'Grupo Sorrisos',
-        'reply_to' => 'contato@gruposorrisos.com.br',
-        'reply_to_name' => 'Gestão Estoque Grupo Sorrisos'
-    ];
+    private static function garantirAutoloadPhpmailer() {
+        if (class_exists(PHPMailer::class, false)) {
+            return true;
+        }
+        $autoload = __DIR__ . '/../../vendor/autoload.php';
+        if (!is_readable($autoload)) {
+            return false;
+        }
+        require_once $autoload;
+        return class_exists(PHPMailer::class, false);
+    }
+
+    /**
+     * Lê SMTP em tbl_configuracoes (smtp_ativo=1 e smtp_host preenchido).
+     *
+     * @return array<string,mixed>|null
+     */
+    private static function obterConfigSmtp() {
+        try {
+            require_once __DIR__ . '/../../config/conexao.php';
+            require_once __DIR__ . '/../../models/Configuracao.php';
+
+            $model = new Configuracao();
+            $ativo = $model->getValor('smtp_ativo', '0');
+            if ($ativo !== '1' && strtolower((string)$ativo) !== 'true') {
+                error_log('EmailUtils: SMTP desativado nas configurações (smtp_ativo).');
+                return null;
+            }
+
+            $host = trim((string)$model->getValor('smtp_host', ''));
+            if ($host === '') {
+                error_log('EmailUtils: smtp_host vazio — configure em Configurações.');
+                return null;
+            }
+
+            $port = (int)$model->getValor('smtp_port', '587');
+            if ($port <= 0 || $port > 65535) {
+                $port = 587;
+            }
+
+            $secure = strtolower(trim((string)$model->getValor('smtp_secure', 'tls')));
+            $username = trim((string)$model->getValor('smtp_username', ''));
+            $password = (string)$model->getValor('smtp_password', '');
+
+            $fromEmail = trim((string)$model->getValor('smtp_from_email', ''));
+            $fromName = trim((string)$model->getValor('smtp_from_name', 'Grupo Sorrisos'));
+            $replyTo = trim((string)$model->getValor('smtp_reply_to', ''));
+            $replyToName = trim((string)$model->getValor('smtp_reply_to_name', ''));
+
+            $timeout = (int)$model->getValor('smtp_timeout', '15');
+            if ($timeout <= 0) {
+                $timeout = 15;
+            }
+            if ($timeout > 120) {
+                $timeout = 120;
+            }
+
+            if ($fromEmail === '' && filter_var($username, FILTER_VALIDATE_EMAIL)) {
+                $fromEmail = $username;
+            }
+            if ($fromEmail === '' || filter_var($fromEmail, FILTER_VALIDATE_EMAIL) === false) {
+                error_log('EmailUtils: smtp_from_email inválido ou vazio.');
+                return null;
+            }
+
+            if ($replyTo === '') {
+                $replyTo = $fromEmail;
+            }
+            if ($replyToName === '') {
+                $replyToName = $fromName;
+            }
+
+            return [
+                'host' => $host,
+                'port' => $port,
+                'secure' => $secure,
+                'username' => $username,
+                'password' => $password,
+                'from_email' => $fromEmail,
+                'from_name' => $fromName,
+                'reply_to' => $replyTo,
+                'reply_to_name' => $replyToName,
+                'timeout' => $timeout,
+            ];
+        } catch (Throwable $e) {
+            error_log('EmailUtils obterConfigSmtp: ' . $e->getMessage());
+            return null;
+        }
+    }
     
     /**
      * Envia e-mail usando PHPMailer com SMTP
@@ -44,6 +122,16 @@ class EmailUtils {
         error_log("=== INÍCIO ENVIO EMAIL UTILS ===");
         error_log("Para: {$toEmail} ({$toName})");
         error_log("Assunto: {$subject}");
+
+        if (!self::garantirAutoloadPhpmailer()) {
+            error_log('EmailUtils: vendor/autoload não encontrado.');
+            return false;
+        }
+
+        $smtp = self::obterConfigSmtp();
+        if (!$smtp) {
+            return false;
+        }
         
         $mail = null;
         try {
@@ -51,14 +139,21 @@ class EmailUtils {
             
             // Configurações do servidor SMTP
             $mail->isSMTP();
-            $mail->Host = self::$smtpConfig['host'];
-            $mail->SMTPAuth = true;
-            $mail->Username = self::$smtpConfig['username'];
-            $mail->Password = self::$smtpConfig['password'];
-            $mail->SMTPSecure = self::$smtpConfig['secure'];
-            $mail->Port = self::$smtpConfig['port'];
-            // Evita travar a requisição HTTP por minutos em hospedagens que bloqueiam SMTP ou demoram na conexão
-            $mail->Timeout = 15;
+            $mail->Host = $smtp['host'];
+            $mail->SMTPAuth = ($smtp['username'] !== '' || $smtp['password'] !== '');
+            $mail->Username = $smtp['username'];
+            $mail->Password = $smtp['password'];
+            $mail->Port = $smtp['port'];
+            $mail->Timeout = $smtp['timeout'];
+
+            $sec = $smtp['secure'];
+            if ($sec === 'none' || $sec === '') {
+                $mail->SMTPSecure = '';
+                $mail->SMTPAutoTLS = false;
+            } else {
+                $mail->SMTPSecure = $sec;
+                $mail->SMTPAutoTLS = true;
+            }
             
             // Configurações de charset UTF-8
             $mail->CharSet = 'UTF-8';
@@ -71,9 +166,9 @@ class EmailUtils {
             };
             
             // Remetente e destinatário
-            $mail->setFrom(self::$smtpConfig['from_email'], self::$smtpConfig['from_name']);
+            $mail->setFrom($smtp['from_email'], $smtp['from_name']);
             $mail->addAddress($toEmail, $toName);
-            $mail->addReplyTo(self::$smtpConfig['reply_to'], self::$smtpConfig['reply_to_name']);
+            $mail->addReplyTo($smtp['reply_to'], $smtp['reply_to_name']);
             
             // Conteúdo do e-mail
             $mail->isHTML(true);
