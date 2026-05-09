@@ -22,7 +22,7 @@ define('DB_PASS', getenv('DB_PASS') ?: 'ean7G#lc7X+');
 
 // Application Settings
 define('APP_NAME', 'Grupo Sorrisos - Estoque');
-define('APP_VERSION', '1.0.0');
+define('APP_VERSION', '2.0.0');
 
 // AI Analysis Settings
 define('AI_MODEL', 'o4-mini-2025-04-16');
