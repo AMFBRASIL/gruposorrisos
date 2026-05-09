@@ -525,6 +525,7 @@ class PedidoCompra extends BaseModel {
                     'em_analise',
                     'pendente',
                     'aguardando_aprovacao',
+                    'aprovado',
                     'aprovado_cotacao',
                     'enviar_para_faturamento',
                     'enviar_faturamento',
@@ -544,6 +545,7 @@ class PedidoCompra extends BaseModel {
                 COUNT(CASE WHEN status = 'aprovado_cotacao' THEN 1 END) as aprovado_cotacao,
                 COUNT(CASE WHEN status IN ('enviar_para_faturamento', 'enviar_faturamento') THEN 1 END) as enviar_faturamento_total,
                 COUNT(CASE WHEN status = 'aprovado_para_faturar' THEN 1 END) as aprovado_para_faturar,
+                COUNT(CASE WHEN status = 'faturado' THEN 1 END) as qtd_faturado,
                 COUNT(CASE WHEN status = 'parcialmente_recebido' THEN 1 END) as parcialmente_recebido,
                 COUNT(CASE WHEN status = 'recebido' THEN 1 END) as recebidos,
                 COUNT(CASE WHEN status = 'cancelado' THEN 1 END) as cancelados,
@@ -559,7 +561,30 @@ class PedidoCompra extends BaseModel {
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetch();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($result === false) {
+            return [
+                'total_pedidos' => 0,
+                'indicador_pedidos_pendentes' => 0,
+                'fases_pedidos_compra' => [
+                    'em_analise' => 0,
+                    'pendente' => 0,
+                    'aprovado' => 0,
+                    'envio_faturamento' => 0,
+                    'em_faturamento' => 0,
+                ],
+            ];
+        }
+
+        $result['fases_pedidos_compra'] = [
+            'em_analise' => (int) ($result['em_analise'] ?? 0) + (int) ($result['aguardando_aprovacao'] ?? 0),
+            'pendente' => (int) ($result['pendentes'] ?? 0),
+            'aprovado' => (int) ($result['aprovado_cotacao'] ?? 0) + (int) ($result['aprovados'] ?? 0),
+            'envio_faturamento' => (int) ($result['enviar_faturamento_total'] ?? 0),
+            'em_faturamento' => (int) ($result['aprovado_para_faturar'] ?? 0) + (int) ($result['qtd_faturado'] ?? 0),
+        ];
+
+        return $result;
     }
     
     /**

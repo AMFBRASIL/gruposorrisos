@@ -369,15 +369,57 @@ async function carregarDadosEstoque() {
 }
 
 /**
- * Contagem do card "Pedidos Pendentes" — usa indicador_pedidos_pendentes da API
- * (fluxo até faturamento; exclui em trânsito, entregue, recebido, cancelado).
+ * Total “em aberto” até faturamento (mesmo critério do backend — indicador_pedidos_pendentes).
  */
 function extrairIndicadorPedidosPendentes(stats) {
     const n = parseInt((stats || {}).indicador_pedidos_pendentes, 10);
     return Number.isNaN(n) || n < 0 ? 0 : n;
 }
 
-// Carregar pedidos pendentes
+function obterFasesPedidosDashboard(stats) {
+    const s = stats || {};
+    if (s.fases_pedidos_compra && typeof s.fases_pedidos_compra === 'object') {
+        return s.fases_pedidos_compra;
+    }
+    return {
+        em_analise: (parseInt(s.em_analise, 10) || 0) + (parseInt(s.aguardando_aprovacao, 10) || 0),
+        pendente: parseInt(s.pendentes, 10) || 0,
+        aprovado: (parseInt(s.aprovado_cotacao, 10) || 0) + (parseInt(s.aprovados, 10) || 0),
+        envio_faturamento: parseInt(s.enviar_faturamento_total, 10) || 0,
+        em_faturamento: (parseInt(s.aprovado_para_faturar, 10) || 0) + (parseInt(s.qtd_faturado, 10) || 0)
+    };
+}
+
+function definirTextoSeguro(id, valor) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(Math.max(0, parseInt(valor, 10) || 0));
+}
+
+/** Atualiza card de fases + total em aberto no dashboard */
+function aplicarEstatisticasPedidosDashboard(stats) {
+    const fases = obterFasesPedidosDashboard(stats);
+    definirTextoSeguro('dash-ped-fase-em-analise', fases.em_analise);
+    definirTextoSeguro('dash-ped-fase-pendente', fases.pendente);
+    definirTextoSeguro('dash-ped-fase-aprovado', fases.aprovado);
+    definirTextoSeguro('dash-ped-fase-envio-faturamento', fases.envio_faturamento);
+    definirTextoSeguro('dash-ped-fase-em-faturamento', fases.em_faturamento);
+    definirTextoSeguro('pedidos-pendentes', extrairIndicadorPedidosPendentes(stats));
+}
+
+function zerarDashboardPedidosCompra() {
+    aplicarEstatisticasPedidosDashboard({
+        indicador_pedidos_pendentes: 0,
+        fases_pedidos_compra: {
+            em_analise: 0,
+            pendente: 0,
+            aprovado: 0,
+            envio_faturamento: 0,
+            em_faturamento: 0
+        }
+    });
+}
+
+// Carregar pedidos (fases + total em aberto)
 async function carregarPedidosPendentes() {
     try {
         const params = new URLSearchParams({ action: 'stats' });
@@ -389,16 +431,15 @@ async function carregarPedidosPendentes() {
         });
         if (response.ok) {
             const data = await response.json();
-            if (data.success) {
-                const pedidosPendentes = extrairIndicadorPedidosPendentes(data.stats);
-                const el = document.getElementById('pedidos-pendentes');
-                if (el) el.textContent = pedidosPendentes;
+            if (data.success && data.stats) {
+                aplicarEstatisticasPedidosDashboard(data.stats);
+                return;
             }
         }
+        zerarDashboardPedidosCompra();
     } catch (error) {
         console.error('❌ Erro ao carregar pedidos pendentes:', error);
-        const el = document.getElementById('pedidos-pendentes');
-        if (el) el.textContent = '0';
+        zerarDashboardPedidosCompra();
     }
 }
 
