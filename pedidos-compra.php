@@ -759,7 +759,17 @@ $menuActive = 'pedidos_compra';
                             </div>
                             <div class="card-body">
                                 <div id="nf-status-container">
-                                    <p class="text-muted mb-2">Nota Fiscal enviada pelo fornecedor</p>
+                                    <p class="text-muted mb-3 small">Registro do último envio da Nota Fiscal pelo fornecedor.</p>
+                                    <dl class="row small mb-3 g-2" id="nf-detalhes-lista">
+                                        <dt class="col-sm-4 text-muted">Enviado em</dt>
+                                        <dd class="col-sm-8 mb-1" id="view-nf-data-envio">—</dd>
+                                        <dt class="col-sm-4 text-muted">Enviado por</dt>
+                                        <dd class="col-sm-8 mb-1" id="view-nf-enviado-por">—</dd>
+                                        <dt class="col-sm-4 text-muted">Nome do arquivo</dt>
+                                        <dd class="col-sm-8 mb-1 text-break" id="view-nf-nome-arquivo">—</dd>
+                                        <dt class="col-sm-4 text-muted">Tamanho</dt>
+                                        <dd class="col-sm-8 mb-0" id="view-nf-tamanho">—</dd>
+                                    </dl>
                                     <button type="button" class="btn btn-primary btn-sm" id="btn-visualizar-nf" onclick="visualizarNFPedido()">
                                         <i class="bi bi-eye me-2"></i>Visualizar Nota Fiscal
                                     </button>
@@ -871,7 +881,7 @@ $menuActive = 'pedidos_compra';
                         <i class="bi bi-check-circle me-2"></i>Aprovar (Gestor)
                     </button>
                     
-                    <!-- Botão Aprovar Cotação (Pendente → Aprovado Cotação) -->
+                    <!-- Botão Aprovar Cotação (Pendente → Cotação Aprovada) -->
                     <button type="button" class="btn btn-info d-none" id="btn-aprovar-cotacao">
                         <i class="bi bi-clipboard-check me-2"></i>Aprovar Cotação (Compras)
                     </button>

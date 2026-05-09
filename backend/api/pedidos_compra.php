@@ -37,10 +37,12 @@ try {
         require_once __DIR__ . '/../../config/conexao.php';
         require_once __DIR__ . '/../../config/session.php';
         require_once __DIR__ . '/../../models/PedidoCompra.php';
+        require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
     } else {
         require_once '../../config/conexao.php';
         require_once '../../config/session.php';
         require_once '../../models/PedidoCompra.php';
+        require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
     }
 } catch (Exception $e) {
     http_response_code(500);
@@ -69,7 +71,8 @@ if ($method === 'POST') {
 
 try {
     $pedidoCompra = new PedidoCompra();
-    
+    garantirMetadadosNotaFiscalPedido(Conexao::getInstance()->getPdo());
+
     switch ($method) {
         case 'GET':
             switch ($action) {
@@ -112,7 +115,8 @@ try {
                     break;
                     
                 case 'stats':
-                    $stats = $pedidoCompra->getEstatisticas();
+                    $fidStats = isset($_GET['filial_id']) ? (int) $_GET['filial_id'] : 0;
+                    $stats = $pedidoCompra->getEstatisticas($fidStats > 0 ? $fidStats : null);
                     echo json_encode(['success' => true, 'stats' => $stats]);
                     break;
                     

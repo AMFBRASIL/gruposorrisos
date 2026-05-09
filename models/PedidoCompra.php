@@ -62,11 +62,13 @@ class PedidoCompra extends BaseModel {
                        f.razao_social as nome_fornecedor,
                        fil.nome_filial,
                        fil.cnpj as cnpj_filial,
-                       u.nome_completo as nome_usuario
+                       u.nome_completo as nome_usuario,
+                       u_nf.nome_completo AS nf_usuario_nome
                 FROM {$this->table} pc
                 LEFT JOIN tbl_fornecedores f ON pc.id_fornecedor = f.id_fornecedor
                 LEFT JOIN tbl_filiais fil ON pc.id_filial = fil.id_filial
                 LEFT JOIN tbl_usuarios u ON pc.id_usuario_solicitante = u.id_usuario
+                LEFT JOIN tbl_usuarios u_nf ON u_nf.id_usuario = pc.nf_id_usuario_envio
                 WHERE pc.id_pedido = ?";
         
         $stmt = $this->pdo->prepare($sql);
@@ -513,10 +515,22 @@ class PedidoCompra extends BaseModel {
     
     /**
      * Buscar estatísticas
+     *
+     * @param int|null $idFilial Se informado, restringe contagens à filial (alinhado ao seletor do dashboard).
      */
-    public function getEstatisticas() {
+    public function getEstatisticas(?int $idFilial = null) {
         $sql = "SELECT 
                 COUNT(*) as total_pedidos,
+                COUNT(CASE WHEN status IN (
+                    'em_analise',
+                    'pendente',
+                    'aguardando_aprovacao',
+                    'aprovado_cotacao',
+                    'enviar_para_faturamento',
+                    'enviar_faturamento',
+                    'aprovado_para_faturar',
+                    'faturado'
+                ) THEN 1 END) as indicador_pedidos_pendentes,
                 COUNT(CASE WHEN status = 'em_analise' THEN 1 END) as em_analise,
                 COUNT(CASE WHEN status = 'pendente' THEN 1 END) as pendentes,
                 COUNT(CASE WHEN status = 'aprovado' THEN 1 END) as aprovados,
@@ -527,6 +541,9 @@ class PedidoCompra extends BaseModel {
                 COUNT(CASE WHEN status = 'urgente' THEN 1 END) as urgentes,
                 COUNT(CASE WHEN status = 'em_transito' THEN 1 END) as em_transito,
                 COUNT(CASE WHEN status = 'aguardando_aprovacao' THEN 1 END) as aguardando_aprovacao,
+                COUNT(CASE WHEN status = 'aprovado_cotacao' THEN 1 END) as aprovado_cotacao,
+                COUNT(CASE WHEN status IN ('enviar_para_faturamento', 'enviar_faturamento') THEN 1 END) as enviar_faturamento_total,
+                COUNT(CASE WHEN status = 'aprovado_para_faturar' THEN 1 END) as aprovado_para_faturar,
                 COUNT(CASE WHEN status = 'parcialmente_recebido' THEN 1 END) as parcialmente_recebido,
                 COUNT(CASE WHEN status = 'recebido' THEN 1 END) as recebidos,
                 COUNT(CASE WHEN status = 'cancelado' THEN 1 END) as cancelados,
@@ -534,8 +551,14 @@ class PedidoCompra extends BaseModel {
                 COUNT(CASE WHEN DATE(data_criacao) = CURDATE() THEN 1 END) as hoje
                 FROM {$this->table}";
         
+        $params = [];
+        if ($idFilial !== null && $idFilial > 0) {
+            $sql .= ' WHERE id_filial = ?';
+            $params[] = $idFilial;
+        }
+        
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute();
+        $stmt->execute($params);
         return $stmt->fetch();
     }
     
@@ -831,7 +854,7 @@ class PedidoCompra extends BaseModel {
         $fluxoPermitido = [
             'em_analise' => ['pendente', 'cancelado'], // Gestor pode aprovar para Pendente
             'pendente' => ['aprovado_cotacao', 'cancelado'], // Setor de compras pode aprovar para Aprovado Cotação
-            'aprovado_cotacao' => ['enviar_para_faturamento', 'pendente', 'cancelado'], // Fornecedor faz cotação
+            'aprovado_cotacao' => ['enviar_para_faturamento', 'pendente', 'cancelado', 'em_transito'], // Compras já aprovou cotação; fornecedor pode seguir para enviar cotação ao fluxo OU aprovar faturamento → em trânsito
             'enviar_para_faturamento' => ['aprovado_para_faturar', 'aprovado_cotacao', 'cancelado'], // Setor de compras avalia
             'aprovado_para_faturar' => ['em_transito', 'enviar_para_faturamento', 'cancelado'], // Fornecedor pode enviar
             'em_transito' => ['entregue', 'aprovado_para_faturar', 'cancelado'], // Pode voltar, finalizar ou cancelar

@@ -27,6 +27,23 @@ if (!$controllerAcesso->verificarAcessoPagina()) {
 // Registrar acesso à página
 $controllerAcesso->registrarAcessoPagina();
 
+$razaoSocialFornecedorSessao = '';
+try {
+    require_once __DIR__ . '/config/conexao.php';
+    $pdoCtx = Conexao::getInstance()->getPdo();
+    $stFn = $pdoCtx->prepare('SELECT COALESCE(NULLIF(TRIM(f.razao_social), \'\'), NULLIF(TRIM(f.nome_fantasia), \'\'), \'\') AS nome_fornecedor
+        FROM tbl_usuarios u
+        LEFT JOIN tbl_fornecedores f ON f.id_fornecedor = u.id_fornecedor
+        WHERE u.id_usuario = ? LIMIT 1');
+    $stFn->execute([(int) ($_SESSION['usuario_id'] ?? 0)]);
+    $rowFn = $stFn->fetch(PDO::FETCH_ASSOC);
+    if ($rowFn && !empty($rowFn['nome_fornecedor'])) {
+        $razaoSocialFornecedorSessao = $rowFn['nome_fornecedor'];
+    }
+} catch (Throwable $e) {
+    // mantém vazio
+}
+
 $menuActive = 'pedidos_fornecedores';
 ?>
 <!DOCTYPE html>
@@ -205,6 +222,80 @@ $menuActive = 'pedidos_fornecedores';
             color: #2d3748;
         }
         
+        /* Modal Aprovar Faturamento — largura extra em telas grandes */
+        #modalAprovarFaturamento .modal-dialog {
+            max-width: min(1320px, calc(100vw - 2rem));
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (max-width: 575.98px) {
+            #modalAprovarFaturamento .modal-dialog {
+                max-width: calc(100vw - 1rem);
+            }
+        }
+
+        /* Modal Aprovar Faturamento — resumo */
+        #modalAprovarFaturamento .aprovar-fat-resumo {
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+            border: 1px solid rgba(102, 126, 234, 0.25);
+            border-radius: 14px;
+            padding: 1rem 1.25rem;
+        }
+        #modalAprovarFaturamento .aprovar-fat-resumo dl {
+            margin-bottom: 0;
+        }
+        #modalAprovarFaturamento .aprovar-fat-resumo dt {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+        #modalAprovarFaturamento .aprovar-fat-resumo dd {
+            font-size: 0.92rem;
+            color: #1e293b;
+            margin-bottom: 0.75rem;
+            word-break: break-word;
+        }
+        #modalAprovarFaturamento .aprovar-fat-resumo dd:last-child {
+            margin-bottom: 0;
+        }
+        #modalAprovarFaturamento .aprovar-fat-resumo .aprovar-fat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            flex-shrink: 0;
+        }
+        #modalAprovarFaturamento .aprovar-fat-form-card {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            padding: 1rem 1.15rem;
+        }
+        #modalAprovarFaturamento .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border-bottom: none;
+            border-radius: 0;
+        }
+        #modalAprovarFaturamento .modal-header .btn-close {
+            filter: invert(1);
+        }
+        #modalAprovarFaturamento .modal-content {
+            border: none;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
         .pedido-actions {
             display: flex;
             gap: 0.5rem;
@@ -550,6 +641,105 @@ $menuActive = 'pedidos_fornecedores';
     </div>
 </div>
 
+<!-- Modal Aprovar Faturamento (fornecedor → Em trânsito + e-mail compras) -->
+<div class="modal fade" id="modalAprovarFaturamento" tabindex="-1" aria-labelledby="modalAprovarFaturamentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="modalAprovarFaturamentoLabel">
+                    <i class="bi bi-check2-circle"></i>
+                    <span>Aprovar Faturamento</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body bg-light-subtle">
+                <div class="alert alert-primary border-0 d-flex gap-2 mb-3 py-2 px-3" role="alert" style="background: rgba(102, 126, 234, 0.12); color: #3730a3;">
+                    <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
+                    <div class="small mb-0">
+                        Ao confirmar, o pedido passa para <strong>Em trânsito</strong>, as informações abaixo ficam registradas no histórico e o setor de <strong>compras</strong> recebe um e-mail com seus detalhes. A Nota Fiscal neste passo é <strong>opcional</strong>.
+                    </div>
+                </div>
+
+                <div class="aprovar-fat-resumo mb-3">
+                    <div class="d-flex gap-3 align-items-start">
+                        <div class="aprovar-fat-icon d-none d-sm-flex">
+                            <i class="bi bi-person-badge"></i>
+                        </div>
+                        <div class="flex-grow-1 min-w-0">
+                            <p class="small fw-semibold text-secondary mb-2 text-uppercase" style="letter-spacing: 0.06em;">Resumo do envio</p>
+                            <dl class="row small g-2 mb-0">
+                                <div class="col-sm-6">
+                                    <dt>Pedido</dt>
+                                    <dd id="aprovar-fat-pedido-numero" class="fw-semibold">—</dd>
+                                </div>
+                                <div class="col-sm-6">
+                                    <dt>Cliente (comprador)</dt>
+                                    <dd id="aprovar-fat-pedido-cliente">—</dd>
+                                </div>
+                                <div class="col-sm-6">
+                                    <dt>Enviado por</dt>
+                                    <dd>
+                                        <span id="aprovar-fat-usuario-nome"><?php echo htmlspecialchars($_SESSION['usuario_nome'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></span>
+                                        <?php if (!empty($_SESSION['usuario_email'])): ?>
+                                            <br><span class="text-muted" id="aprovar-fat-usuario-email"><?php echo htmlspecialchars($_SESSION['usuario_email'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                        <?php else: ?>
+                                            <span id="aprovar-fat-usuario-email" class="d-none"></span>
+                                        <?php endif; ?>
+                                    </dd>
+                                </div>
+                                <div class="col-sm-6">
+                                    <dt>Fornecedor (empresa)</dt>
+                                    <dd id="aprovar-fat-fornecedor-razao"><?php echo htmlspecialchars($razaoSocialFornecedorSessao !== '' ? $razaoSocialFornecedorSessao : '—', ENT_QUOTES, 'UTF-8'); ?></dd>
+                                </div>
+                                <div class="col-12">
+                                    <dt>Data e hora deste envio</dt>
+                                    <dd class="mb-0">
+                                        <span id="aprovar-fat-data-hora" class="fw-medium text-primary">—</span>
+                                        <span class="text-muted small d-block mt-1">Referência do momento em que você abriu esta janela; o servidor registra o horário oficial ao confirmar.</span>
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="aprovar-fat-form-card mb-3">
+                    <label class="form-label fw-semibold" for="detalhes-aprovacao-faturamento">
+                        Detalhes da aprovação <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control" id="detalhes-aprovacao-faturamento" rows="5" maxlength="4000"
+                              placeholder="Ex.: prazo de emissão da NF, transportadora, número do pedido interno, volumes, observações fiscais ou comerciais acordadas..."></textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <small class="text-muted">Máximo 4.000 caracteres. Este texto é salvo em <strong>observações do fornecedor</strong> e no <strong>histórico do pedido</strong>.</small>
+                        <small class="text-muted"><span id="aprovar-fat-char-count">0</span>/4000</small>
+                    </div>
+                </div>
+
+                <div class="aprovar-fat-form-card mb-0">
+                    <label class="form-label fw-semibold d-flex align-items-center gap-2" for="input-nota-fiscal-aprovacao">
+                        <i class="bi bi-file-earmark-pdf text-danger"></i>
+                        Nota Fiscal <span class="badge bg-secondary-subtle text-secondary-emphasis border fw-normal">opcional</span>
+                    </label>
+                    <input type="file" class="form-control" id="input-nota-fiscal-aprovacao" accept=".pdf,.jpg,.jpeg,.png,.gif">
+                    <small class="text-muted">PDF, JPG, PNG ou GIF — até 10 MB. Se anexar, a NF ficará vinculada ao pedido com data de envio e responsável.</small>
+                    <div id="aprovar-fat-nf-preview" class="small text-success mt-2 d-none"></div>
+                </div>
+
+                <div id="aprovar-fat-progress" class="progress d-none mt-3 mb-0">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="aprovar-fat-message" class="alert d-none mt-3 mb-0"></div>
+            </div>
+            <div class="modal-footer bg-white border-top">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success px-4" id="btn-confirmar-aprovacao-faturamento" onclick="confirmarAprovacaoFaturamento()">
+                    <i class="bi bi-check-lg me-1"></i>Confirmar e enviar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Upload Nota Fiscal -->
 <div class="modal fade" id="modalUploadNF" tabindex="-1">
     <div class="modal-dialog">
@@ -585,9 +775,6 @@ $menuActive = 'pedidos_fornecedores';
                     <i class="bi bi-upload me-2"></i>Enviar Nota Fiscal
                 </button>
             </div>
-        </div>
-    </div>
-</div>
         </div>
     </div>
 </div>
@@ -812,6 +999,100 @@ function escapeHtml(s) {
     return d.innerHTML;
 }
 
+function extrairNomeArquivoDaUrlNfFornecedor(url) {
+    if (!url || typeof url !== 'string') return '';
+    try {
+        const semQuery = url.split('?')[0];
+        const partes = semQuery.replace(/\\/g, '/').split('/');
+        return decodeURIComponent(partes.pop() || '');
+    } catch (e) {
+        return '';
+    }
+}
+
+function formatarTamanhoBytesNfFornecedor(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return '—';
+    if (n === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    let v = n;
+    while (v >= 1024 && i < units.length - 1) {
+        v /= 1024;
+        i++;
+    }
+    const decimals = v >= 10 || i === 0 ? 0 : 1;
+    return `${v.toFixed(decimals)} ${units[i]}`;
+}
+
+function formatarDataHoraEnvioNfFornecedor(val) {
+    if (!val) return '';
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+/** Card de NF no detalhe do pedido: metadados do último envio + envio/substituição quando permitido */
+function montarHtmlSecaoNotaFiscalDetalhesFornecedor(pedido) {
+    const podeEnviar = ['em_transito', 'entregue'].includes(pedido.status);
+    const urlNF = pedido.url_nota_fiscal;
+    const temNf = urlNF != null && String(urlNF).trim() !== '';
+    if (!podeEnviar && !temNf) return '';
+
+    let corpoMeta = '';
+    if (temNf) {
+        const nomeArq = String(pedido.nf_nome_arquivo_original || '').trim()
+            || extrairNomeArquivoDaUrlNfFornecedor(String(urlNF));
+        const dataFmt = formatarDataHoraEnvioNfFornecedor(pedido.nf_data_envio);
+        const por = String(pedido.nf_usuario_nome || '').trim();
+        const tamFmt = formatarTamanhoBytesNfFornecedor(pedido.nf_tamanho_bytes);
+        corpoMeta = `
+                        <p class="text-muted small mb-2">Registro do último envio:</p>
+                        <dl class="row small mb-3 g-2">
+                            <dt class="col-sm-4 text-muted">Enviado em</dt>
+                            <dd class="col-sm-8 mb-1">${escapeHtml(dataFmt || '—')}</dd>
+                            <dt class="col-sm-4 text-muted">Enviado por</dt>
+                            <dd class="col-sm-8 mb-1">${escapeHtml(por || '—')}</dd>
+                            <dt class="col-sm-4 text-muted">Nome do arquivo</dt>
+                            <dd class="col-sm-8 mb-1 text-break">${escapeHtml(nomeArq || '—')}</dd>
+                            <dt class="col-sm-4 text-muted">Tamanho</dt>
+                            <dd class="col-sm-8 mb-0">${escapeHtml(tamFmt)}</dd>
+                        </dl>
+                        <button type="button" class="btn btn-outline-primary btn-sm me-2 mb-2" onclick="visualizarNFDoPedido(${pedido.id})">
+                            <i class="bi bi-eye me-1"></i>Visualizar NF
+                        </button>`;
+    } else {
+        corpoMeta = '<p class="text-muted small mb-2">Nenhuma nota fiscal foi enviada ainda.</p>';
+    }
+
+    const botoesUpload = podeEnviar
+        ? `<button type="button" class="btn btn-primary btn-sm" onclick="abrirModalUploadNF(${pedido.id})">
+                            <i class="bi bi-upload me-2"></i>${temNf ? 'Substituir Nota Fiscal' : 'Enviar Nota Fiscal'}
+                        </button>`
+        : '';
+
+    return `
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-file-earmark-pdf me-2"></i>Nota Fiscal</h6>
+                    </div>
+                    <div class="card-body">
+                        ${corpoMeta}
+                        ${botoesUpload}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+}
+
 // Funções de prioridade
 function getPrioridadeClass(prioridade) {
     const prioridadeMap = {
@@ -1004,8 +1285,13 @@ function renderizarPedidos() {
                         <i class="bi bi-reply me-2"></i>Responder
                     </button>
                 ` : ''}
-                ${(['aprovado_para_faturar', 'em_transito', 'entregue', 'aprovado_cotacao'].includes(pedido.status)) ? `
-                    <button class="btn btn-info btn-action" onclick="abrirModalUploadNF(${pedido.id})">
+                ${(['aprovado_cotacao', 'aprovado_para_faturar'].includes(pedido.status)) ? `
+                    <button class="btn btn-success btn-action" onclick="abrirModalAprovarFaturamento(${pedido.id})">
+                        <i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento
+                    </button>
+                ` : ''}
+                ${(['em_transito', 'entregue'].includes(pedido.status)) ? `
+                    <button class="btn btn-outline-info btn-action" onclick="abrirModalUploadNF(${pedido.id})">
                         <i class="bi bi-file-earmark-pdf me-2"></i>Enviar NF
                     </button>
                 ` : ''}
@@ -1185,25 +1471,24 @@ function visualizarPedido(pedidoId) {
             </div>
         </div>
         
-        ${(['aprovado_para_faturar', 'em_transito', 'entregue', 'aprovado_cotacao'].includes(pedido.status)) ? `
+        ${(['aprovado_cotacao', 'aprovado_para_faturar'].includes(pedido.status)) ? `
         <div class="row mt-4">
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-file-earmark-pdf me-2"></i>Nota Fiscal</h6>
+                <div class="card border-success">
+                    <div class="card-header bg-success-subtle">
+                        <h6 class="mb-0"><i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento</h6>
                     </div>
                     <div class="card-body">
-                        <div id="nf-status-${pedido.id}">
-                            <p class="text-muted">Nenhuma Nota Fiscal enviada ainda.</p>
-                            <button class="btn btn-primary btn-sm" onclick="abrirModalUploadNF(${pedido.id})">
-                                <i class="bi bi-upload me-2"></i>Enviar Nota Fiscal
-                            </button>
-                        </div>
+                        <p class="text-muted small mb-2">Compras já aprovou a cotação; confirme o faturamento e anexe a NF se quiser. O pedido passará para <strong>Em trânsito</strong> e o compras será notificado por e-mail.</p>
+                        <button class="btn btn-success btn-sm" onclick="abrirModalAprovarFaturamento(${pedido.id})">
+                            <i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
         ` : ''}
+        ${montarHtmlSecaoNotaFiscalDetalhesFornecedor(pedido)}
     `;
     
     // Mostrar/ocultar botão "Responder com Preços" baseado no status
@@ -2835,7 +3120,176 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnExportarCsvResposta) {
         btnExportarCsvResposta.addEventListener('click', exportarItensRespostaFornecedor);
     }
+
+    const modalAprovFat = document.getElementById('modalAprovarFaturamento');
+    if (modalAprovFat) {
+        modalAprovFat.addEventListener('shown.bs.modal', function () {
+            const elDh = document.getElementById('aprovar-fat-data-hora');
+            if (elDh && typeof formatarDataHoraReferenciaAprovacaoFat === 'function') {
+                elDh.textContent = formatarDataHoraReferenciaAprovacaoFat(new Date());
+            }
+        });
+    }
+
+    const taAprovFat = document.getElementById('detalhes-aprovacao-faturamento');
+    if (taAprovFat) {
+        taAprovFat.addEventListener('input', atualizarContadorDetalhesAprovacaoFat);
+    }
+
+    const inputNfAprov = document.getElementById('input-nota-fiscal-aprovacao');
+    const nfPrevEl = document.getElementById('aprovar-fat-nf-preview');
+    if (inputNfAprov && nfPrevEl) {
+        inputNfAprov.addEventListener('change', function () {
+            const f = inputNfAprov.files?.[0];
+            if (!f) {
+                nfPrevEl.classList.add('d-none');
+                nfPrevEl.textContent = '';
+                return;
+            }
+            const kb = f.size / 1024;
+            const tam = kb >= 1024 ? (kb / 1024).toFixed(2) + ' MB' : kb.toFixed(1) + ' KB';
+            nfPrevEl.innerHTML = '<i class="bi bi-paperclip me-1"></i><strong>' + escapeHtml(f.name) + '</strong> <span class="text-muted">(' + tam + ')</span>';
+            nfPrevEl.classList.remove('d-none');
+        });
+    }
 });
+
+// ===== APROVAR FATURAMENTO (→ Em trânsito + e-mail compras) =====
+let pedidoIdAprovacaoFat = null;
+
+function formatarDataHoraReferenciaAprovacaoFat(d) {
+    return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+function atualizarContadorDetalhesAprovacaoFat() {
+    const ta = document.getElementById('detalhes-aprovacao-faturamento');
+    const ctr = document.getElementById('aprovar-fat-char-count');
+    if (!ta || !ctr) return;
+    ctr.textContent = String((ta.value || '').length);
+}
+
+function abrirModalAprovarFaturamento(pedidoId) {
+    pedidoIdAprovacaoFat = pedidoId;
+    const ta = document.getElementById('detalhes-aprovacao-faturamento');
+    const file = document.getElementById('input-nota-fiscal-aprovacao');
+    const msg = document.getElementById('aprovar-fat-message');
+    const prog = document.getElementById('aprovar-fat-progress');
+    const nfPrev = document.getElementById('aprovar-fat-nf-preview');
+
+    const pedido = (typeof pedidosData !== 'undefined' && pedidosData && pedidosData.length)
+        ? pedidosData.find(p => Number(p.id) === Number(pedidoId))
+        : null;
+
+    const elNum = document.getElementById('aprovar-fat-pedido-numero');
+    const elCli = document.getElementById('aprovar-fat-pedido-cliente');
+    const elDh = document.getElementById('aprovar-fat-data-hora');
+    if (elNum) elNum.textContent = pedido?.numero ? String(pedido.numero) : ('#' + pedidoId);
+    if (elCli) elCli.textContent = pedido?.cliente ? String(pedido.cliente) : '—';
+    if (elDh) elDh.textContent = formatarDataHoraReferenciaAprovacaoFat(new Date());
+
+    if (ta) ta.value = '';
+    if (file) file.value = '';
+    if (nfPrev) {
+        nfPrev.textContent = '';
+        nfPrev.classList.add('d-none');
+    }
+    atualizarContadorDetalhesAprovacaoFat();
+
+    if (msg) {
+        msg.classList.add('d-none');
+        msg.textContent = '';
+    }
+    if (prog) prog.classList.add('d-none');
+    const btn = document.getElementById('btn-confirmar-aprovacao-faturamento');
+    if (btn) btn.disabled = false;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAprovarFaturamento')).show();
+}
+
+async function confirmarAprovacaoFaturamento() {
+    const detalhes = (document.getElementById('detalhes-aprovacao-faturamento')?.value || '').trim();
+    if (!pedidoIdAprovacaoFat) {
+        Swal.fire('Erro', 'Pedido não identificado.', 'error');
+        return;
+    }
+    if (!detalhes) {
+        Swal.fire('Atenção', 'Informe os detalhes da aprovação do faturamento.', 'warning');
+        return;
+    }
+
+    const fileInput = document.getElementById('input-nota-fiscal-aprovacao');
+    const nf = fileInput?.files?.[0];
+    if (nf) {
+        if (nf.size > 10 * 1024 * 1024) {
+            Swal.fire('Erro', 'Arquivo muito grande. Tamanho máximo: 10MB', 'error');
+            return;
+        }
+        const ext = nf.name.split('.').pop().toLowerCase();
+        if (!['pdf', 'jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+            Swal.fire('Erro', 'Tipo de arquivo não permitido para a NF.', 'error');
+            return;
+        }
+    }
+
+    const formData = new FormData();
+    formData.append('action', 'aprovar_faturamento');
+    formData.append('pedido_id', String(pedidoIdAprovacaoFat));
+    formData.append('detalhes_aprovacao', detalhes);
+    if (nf) {
+        formData.append('nota_fiscal', nf);
+    }
+
+    const btn = document.getElementById('btn-confirmar-aprovacao-faturamento');
+    const msgEl = document.getElementById('aprovar-fat-message');
+    if (btn) btn.disabled = true;
+    if (msgEl) {
+        msgEl.classList.add('d-none');
+    }
+
+    try {
+        const res = await fetch('backend/api/pedidos-fornecedor.php', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || data.message || ('Erro HTTP ' + res.status));
+        }
+
+        const modalEl = document.getElementById('modalAprovarFaturamento');
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+
+        let texto = data.message || 'Pedido atualizado para Em trânsito.';
+        if (data.email_enviado === false) {
+            texto += ' Não foi possível enviar e-mail ao setor de compras (confira SMTP nas configurações e se há usuários com e-mail na tela Pedidos de Compra).';
+        }
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Concluído',
+            text: texto,
+            confirmButtonText: 'OK'
+        });
+        await carregarPedidos();
+    } catch (err) {
+        if (msgEl) {
+            msgEl.className = 'alert alert-danger';
+            msgEl.textContent = err.message || String(err);
+            msgEl.classList.remove('d-none');
+        } else {
+            Swal.fire('Erro', err.message || String(err), 'error');
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
 
 // ===== FUNÇÕES DE UPLOAD DE NOTA FISCAL =====
 let pedidoIdNF = null;
@@ -2976,9 +3430,14 @@ async function uploadNotaFiscal() {
 }
 
 // Visualizar Nota Fiscal
+function visualizarNFDoPedido(pedidoId) {
+    pedidoIdNF = pedidoId;
+    visualizarNF();
+}
+
 async function visualizarNF() {
     if (!pedidoIdNF) return;
-    
+
     try {
         const response = await fetch(`backend/api/get-nota-fiscal.php?pedido_id=${pedidoIdNF}`);
         const data = await response.json();

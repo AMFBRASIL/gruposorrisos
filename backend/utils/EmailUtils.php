@@ -535,6 +535,101 @@ class EmailUtils {
         
         return self::enviarEmail($fornecedor['email'], $fornecedor['razao_social'], $subject, $htmlBody, $textBody);
     }
+
+    /**
+     * Notifica o setor de compras quando o fornecedor aprova o faturamento e o pedido vai para Em trânsito.
+     *
+     * @param array{
+     *   numero_pedido?: string,
+     *   id_pedido?: int,
+     *   nome_filial?: string,
+     *   nome_fornecedor?: string,
+     *   detalhes?: string,
+     *   url_nota_fiscal?: string|null,
+     *   destinatarios?: array<int, array{email: string, nome?: string}>
+     * } $ctx
+     */
+    public static function enviarEmailComprasPedidoEmTransito(array $ctx): bool {
+        $destinatarios = $ctx['destinatarios'] ?? [];
+        if ($destinatarios === []) {
+            error_log('EmailUtils::enviarEmailComprasPedidoEmTransito: lista de destinatários vazia');
+            return false;
+        }
+
+        $numero = htmlspecialchars((string)($ctx['numero_pedido'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $idPedido = (int)($ctx['id_pedido'] ?? 0);
+        $filial = htmlspecialchars((string)($ctx['nome_filial'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $fornecedor = htmlspecialchars((string)($ctx['nome_fornecedor'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $detalhesTxt = trim((string)($ctx['detalhes'] ?? ''));
+        $detalhesHtml = nl2br(htmlspecialchars($detalhesTxt, ENT_QUOTES, 'UTF-8'));
+        $urlNf = isset($ctx['url_nota_fiscal']) ? trim((string)$ctx['url_nota_fiscal']) : '';
+
+        $base = self::resolverUrlBaseSistemaEmail();
+        $linkPedidos = htmlspecialchars($base . '/pedidos-compra.php', ENT_QUOTES, 'UTF-8');
+
+        $nfHtml = $urlNf !== ''
+            ? '<p><strong>Nota fiscal:</strong> <a href="' . htmlspecialchars($urlNf, ENT_QUOTES, 'UTF-8') . '">Abrir arquivo</a></p>'
+            : '<p><strong>Nota fiscal:</strong> não foi anexada neste envio (opcional).</p>';
+
+        $subject = "Pedido {$numero} — Fornecedor aprovou faturamento (Em trânsito)";
+
+        $htmlBody = "
+        <!DOCTYPE html>
+        <html lang=\"pt-BR\">
+        <head><meta charset=\"UTF-8\"><title>{$subject}</title></head>
+        <body style=\"font-family:Segoe UI,Tahoma,sans-serif;line-height:1.6;color:#111827;background:#f9fafb;padding:24px;\">
+            <div style=\"max-width:640px;margin:0 auto;background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb;\">
+                <h2 style=\"margin:0 0 12px;color:#059669;\">Aprovação de faturamento</h2>
+                <p style=\"margin:0 0 16px;color:#374151;\">O fornecedor confirmou a aprovação do faturamento e o pedido foi atualizado para <strong>Em trânsito</strong>.</p>
+                <table style=\"width:100%;border-collapse:collapse;margin-bottom:16px;font-size:14px;\">
+                    <tr><td style=\"padding:6px 0;color:#6b7280;\">Pedido</td><td style=\"padding:6px 0;\"><strong>{$numero}</strong> (ID {$idPedido})</td></tr>
+                    <tr><td style=\"padding:6px 0;color:#6b7280;\">Clínica / filial</td><td style=\"padding:6px 0;\">{$filial}</td></tr>
+                    <tr><td style=\"padding:6px 0;color:#6b7280;\">Fornecedor</td><td style=\"padding:6px 0;\">{$fornecedor}</td></tr>
+                </table>
+                <div style=\"background:#f3f4f6;border-radius:8px;padding:14px;margin-bottom:16px;\">
+                    <div style=\"font-weight:600;margin-bottom:8px;color:#374151;\">Detalhes informados pelo fornecedor</div>
+                    <div style=\"font-size:14px;\">{$detalhesHtml}</div>
+                </div>
+                {$nfHtml}
+                <p style=\"margin-top:20px;font-size:14px;\"><a href=\"{$linkPedidos}\" style=\"color:#2563eb;\">Abrir tela de Pedidos de Compra</a></p>
+                <p style=\"font-size:12px;color:#9ca3af;margin-top:24px;\">Mensagem automática do sistema Grupo Sorrisos.</p>
+            </div>
+        </body>
+        </html>";
+
+        $textBody = "Pedido {$numero} (ID {$idPedido})\n";
+        $textBody .= "Clínica: {$filial}\nFornecedor: {$fornecedor}\n\n";
+        $textBody .= "Detalhes:\n{$detalhesTxt}\n\n";
+        $textBody .= ($urlNf !== '' ? "NF: {$urlNf}\n" : "NF não anexada neste envio.\n");
+        $textBody .= "\nAcompanhe em: {$base}/pedidos-compra.php\n";
+
+        $algumOk = false;
+        foreach ($destinatarios as $d) {
+            $email = trim((string)($d['email'] ?? ''));
+            $nome = trim((string)($d['nome'] ?? 'Setor de compras'));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            if (self::enviarEmail($email, $nome, $subject, $htmlBody, $textBody)) {
+                $algumOk = true;
+            }
+        }
+
+        return $algumOk;
+    }
+
+    /**
+     * URL base do sistema para links em e-mails (remove sufixo /backend/api/...).
+     */
+    private static function resolverUrlBaseSistemaEmail(): string {
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        $dir = dirname($script);
+        $dir = preg_replace('#/backend/api$#', '', $dir);
+        $dir = preg_replace('#\\\\backend\\\\api$#', '', $dir);
+        return rtrim($protocol . '://' . $host . $dir, '/');
+    }
     
     /**
      * Envia email de boas-vindas para novo usuário

@@ -7,6 +7,7 @@ ini_set('log_errors', 1);
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../config/conexao.php';
+require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
 
 // Verificar se o helper existe antes de incluir
 $helperPath = __DIR__ . '/../../helpers/S3Uploader.php';
@@ -88,7 +89,7 @@ try {
     
     // Verificar se o status permite upload de NF
     // Permitir upload quando: aprovado_para_faturar, em_transito, entregue
-    $statusPermitidos = ['aprovado_para_faturar', 'em_transito', 'entregue', 'aprovado_cotacao'];
+    $statusPermitidos = ['aprovado_cotacao', 'aprovado_para_faturar', 'em_transito', 'entregue'];
     if (!in_array($pedido['status'], $statusPermitidos)) {
         throw new Exception('Status do pedido não permite upload de Nota Fiscal. Status atual: ' . $pedido['status']);
     }
@@ -132,8 +133,22 @@ try {
         }
     }
     
-    $stmt = $pdo->prepare("UPDATE tbl_pedidos_compra SET url_nota_fiscal = ? WHERE id_pedido = ?");
-    $stmt->execute([$urlNotaFiscal, $pedidoId]);
+    $bytes = isset($result['size_bytes']) ? (int) $result['size_bytes'] : (int) $file['size'];
+    if ($bytes <= 0 && !empty($result['path']) && is_readable($result['path'])) {
+        $sz = @filesize($result['path']);
+        if ($sz !== false) {
+            $bytes = (int) $sz;
+        }
+    }
+
+    salvarMetadadosEnvioNotaFiscalPedido(
+        $pdo,
+        (int) $pedidoId,
+        $urlNotaFiscal,
+        $file['name'],
+        obterIdUsuarioSessaoParaMetadadosNf(),
+        $bytes > 0 ? $bytes : null
+    );
     
     echo json_encode([
         'success' => true,

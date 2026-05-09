@@ -834,7 +834,8 @@ async function carregarEstatisticas() {
             const stats = data.stats;
             
             document.getElementById('total-pedidos').textContent = stats.total_pedidos || 0;
-            document.getElementById('pedidos-pendentes').textContent = stats.pendentes || 0;
+            document.getElementById('pedidos-pendentes').textContent =
+                parseInt(stats.indicador_pedidos_pendentes, 10) || 0;
             document.getElementById('em-producao').textContent = stats.em_producao || 0;
             document.getElementById('valor-total').textContent = formatarMoeda(stats.valor_total || 0);
             document.getElementById('texto-total').textContent = `${stats.total_pedidos || 0} pedidos cadastrados`;
@@ -1007,7 +1008,10 @@ function getStatusBadge(status) {
         'urgente': { class: 'badge-warning', text: 'Urgente' },
         'em_transito': { class: 'badge-info', text: 'Em Trânsito' },
         'aguardando_aprovacao': { class: 'badge-secondary', text: 'Aguardando Aprovação' },
-        'parcialmente_recebido': { class: 'badge-warning', text: 'Parcialmente Recebido' }
+        'parcialmente_recebido': { class: 'badge-warning', text: 'Parcialmente Recebido' },
+        'aprovado_cotacao': { class: 'badge-success', text: 'Cotação Aprovada' },
+        'enviar_para_faturamento': { class: 'badge-primary', text: 'Enviar para Faturamento' },
+        'aprovado_para_faturar': { class: 'badge-success', text: 'Aprovado para Faturar' }
     };
     
     const statusInfo = statusMap[status.toLowerCase()] || { class: 'badge-secondary', text: status };
@@ -2019,14 +2023,8 @@ async function visualizarPedido(id) {
             const pedido = data.pedido;
             atualizarAvisoItensPendentesRespostaCompra('view', pedido.itens || []);
             
-            // Debug: verificar campos do pedido
-            console.log('📦 Dados completos do pedido:', pedido);
-            console.log('📄 URL Nota Fiscal:', pedido.url_nota_fiscal);
-            console.log('🔑 Chaves do objeto pedido:', Object.keys(pedido));
-            
             // Definir window.pedidoAtual para o chat
             window.pedidoAtual = pedido;
-            console.log('window.pedidoAtual definido:', window.pedidoAtual);
             
             // Verificar se o modal existe e está acessível
             const modalElement = document.getElementById('modalVisualizarPedido');
@@ -2245,45 +2243,23 @@ async function visualizarPedido(id) {
                 }
             }
             
-            // Nota Fiscal
-            console.log('📄 Verificando Nota Fiscal:', {
-                url_nota_fiscal: pedido.url_nota_fiscal,
-                tipo: typeof pedido.url_nota_fiscal,
-                existe: 'url_nota_fiscal' in pedido,
-                pedido_completo: pedido
-            });
-            
+            // Nota Fiscal (metadados do último envio + visualização)
             const cardNotaFiscal = document.getElementById('card-nota-fiscal');
-            console.log('🔍 Card NF encontrado:', cardNotaFiscal);
-            
             if (cardNotaFiscal) {
-                // Verificar se existe url_nota_fiscal (pode ser null, undefined, ou string vazia)
                 const urlNF = pedido.url_nota_fiscal;
                 const temNF = urlNF !== null && urlNF !== undefined && String(urlNF).trim() !== '';
-                
-                console.log('📋 Status da NF:', {
-                    urlNF: urlNF,
-                    temNF: temNF,
-                    tipo: typeof urlNF
-                });
-                
+
                 if (temNF) {
-                    console.log('✅ NF encontrada, exibindo card');
                     cardNotaFiscal.style.display = 'block';
-                    // Armazenar URL da NF no botão para uso posterior
+                    preencherDetalhesNfPedidoCompra(pedido);
                     const btnVisualizarNF = document.getElementById('btn-visualizar-nf');
                     if (btnVisualizarNF) {
                         btnVisualizarNF.setAttribute('data-nf-url', String(urlNF).trim());
-                        console.log('✅ URL da NF armazenada:', String(urlNF).trim());
-                    } else {
-                        console.error('❌ Botão btn-visualizar-nf não encontrado');
                     }
                 } else {
-                    console.log('⚠️ NF não encontrada ou vazia, ocultando card');
+                    limparDetalhesNfPedidoCompra();
                     cardNotaFiscal.style.display = 'none';
                 }
-            } else {
-                console.error('❌ Card card-nota-fiscal não encontrado no DOM');
             }
             
             // Histórico
@@ -2386,6 +2362,36 @@ function configurarStatusPedido(statusBadge, statusText, statusCard, statusAtivo
                 bgColor: 'rgba(234, 179, 8, 0.1)',
                 borderColor: 'rgba(234, 179, 8, 0.2)',
                 textColor: '#d97706'
+            };
+            break;
+        case 'aprovado_cotacao':
+            statusConfig = {
+                icon: 'bi-clipboard-check',
+                text: 'Cotação Aprovada',
+                color: 'success',
+                bgColor: 'rgba(34, 197, 94, 0.1)',
+                borderColor: 'rgba(34, 197, 94, 0.2)',
+                textColor: '#16a34a'
+            };
+            break;
+        case 'enviar_para_faturamento':
+            statusConfig = {
+                icon: 'bi-file-earmark-arrow-up',
+                text: 'Enviar para Faturamento',
+                color: 'primary',
+                bgColor: 'rgba(59, 130, 246, 0.1)',
+                borderColor: 'rgba(59, 130, 246, 0.2)',
+                textColor: '#2563eb'
+            };
+            break;
+        case 'aprovado_para_faturar':
+            statusConfig = {
+                icon: 'bi-cash-coin',
+                text: 'Aprovado para Faturar',
+                color: 'success',
+                bgColor: 'rgba(34, 197, 94, 0.1)',
+                borderColor: 'rgba(34, 197, 94, 0.2)',
+                textColor: '#15803d'
             };
             break;
         case 'aprovado':
@@ -3384,7 +3390,7 @@ function configurarBotoesAcao(status) {
                 break;
                 
             case 'pendente':
-                // Setor de compras pode aprovar para Aprovado Cotação
+                // Setor de compras pode aprovar para Cotação Aprovada
                 document.getElementById('btn-aprovar-cotacao')?.classList.remove('d-none');
                 document.getElementById('btn-cancelar')?.classList.remove('d-none');
                 document.getElementById('btn-voltar-status')?.classList.remove('d-none');
@@ -3454,7 +3460,7 @@ async function atualizarStatusPedido(novoStatus, observacao = null) {
         const statusNomes = {
             'em_analise': 'Em Análise',
             'pendente': 'Pendente',
-            'aprovado_cotacao': 'Aprovado Cotação',
+            'aprovado_cotacao': 'Cotação Aprovada',
             'enviar_para_faturamento': 'Enviar para Faturamento',
             'aprovado_para_faturar': 'Aprovado para Faturar',
             'em_transito': 'Em Trânsito',
@@ -3598,7 +3604,7 @@ async function mostrarOpcoesVoltarStatus() {
         const opcoesVolta = {
             'pendente': [{ valor: 'em_analise', nome: 'Em Análise' }],
             'aprovado_cotacao': [{ valor: 'pendente', nome: 'Pendente' }],
-            'enviar_para_faturamento': [{ valor: 'aprovado_cotacao', nome: 'Aprovado Cotação' }],
+            'enviar_para_faturamento': [{ valor: 'aprovado_cotacao', nome: 'Cotação Aprovada' }],
             'aprovado_para_faturar': [{ valor: 'enviar_para_faturamento', nome: 'Enviar para Faturamento' }],
             'em_transito': [{ valor: 'aprovado_para_faturar', nome: 'Aprovado para Faturar' }],
             'entregue': [{ valor: 'em_transito', nome: 'Em Trânsito' }]
@@ -3712,7 +3718,7 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
     const fluxoStatus = [
         { key: 'em_analise', nome: 'Em Análise', icon: '📋' },
         { key: 'pendente', nome: 'Pendente', icon: '⏳' },
-        { key: 'aprovado_cotacao', nome: 'Aprovado Cotação', icon: '✅' },
+        { key: 'aprovado_cotacao', nome: 'Cotação Aprovada', icon: '✅' },
         { key: 'enviar_para_faturamento', nome: 'Enviar para Faturamento', icon: '📄' },
         { key: 'aprovado_para_faturar', nome: 'Aprovado p/ Faturar', icon: '💰' },
         { key: 'em_transito', nome: 'Em Trânsito', icon: '🚚' },
@@ -3811,7 +3817,7 @@ function getStatusNome(status) {
     const nomes = {
         'em_analise': 'Em Análise',
         'pendente': 'Pendente',
-        'aprovado_cotacao': 'Aprovado Cotação',
+        'aprovado_cotacao': 'Cotação Aprovada',
         'enviar_para_faturamento': 'Enviar para Faturamento',
         'aprovado_para_faturar': 'Aprovado para Faturar',
         'em_transito': 'Em Trânsito',
@@ -3828,7 +3834,7 @@ function renderizarFluxoStatusBloqueio(historico, statusAtual, containerId) {
     const fluxoStatus = [
         { key: 'em_analise', nome: 'Em Análise' },
         { key: 'pendente', nome: 'Pendente' },
-        { key: 'aprovado_cotacao', nome: 'Aprovado Cotação' },
+        { key: 'aprovado_cotacao', nome: 'Cotação Aprovada' },
         { key: 'enviar_para_faturamento', nome: 'Enviar para Faturamento' },
         { key: 'aprovado_para_faturar', nome: 'Aprovado para Faturar' },
         { key: 'em_transito', nome: 'Em Trânsito' },
@@ -3960,7 +3966,7 @@ function renderizarTimelineStatus(historico, containerId, isCompleta = false) {
     const statusNomes = {
         'em_analise': 'Em Análise',
         'pendente': 'Pendente',
-        'aprovado_cotacao': 'Aprovado Cotação',
+        'aprovado_cotacao': 'Cotação Aprovada',
         'enviar_para_faturamento': 'Enviar para Faturamento',
         'aprovado_para_faturar': 'Aprovado para Faturar',
         'em_transito': 'Em Trânsito',
@@ -4078,6 +4084,65 @@ function formatarDataHora(dataString) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+
+function extrairNomeArquivoDaUrlNfCompra(url) {
+    if (!url || typeof url !== 'string') return '';
+    try {
+        const semQuery = url.split('?')[0];
+        const partes = semQuery.replace(/\\/g, '/').split('/');
+        return decodeURIComponent(partes.pop() || '');
+    } catch (e) {
+        return '';
+    }
+}
+
+function formatarTamanhoBytesNfCompra(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return '—';
+    if (n === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    let v = n;
+    while (v >= 1024 && i < units.length - 1) {
+        v /= 1024;
+        i++;
+    }
+    const decimals = v >= 10 || i === 0 ? 0 : 1;
+    return `${v.toFixed(decimals)} ${units[i]}`;
+}
+
+function formatarDataEnvioNfCompra(val) {
+    if (!val) return '—';
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) return '—';
+    return formatarDataHora(val);
+}
+
+function limparDetalhesNfPedidoCompra() {
+    ['view-nf-data-envio', 'view-nf-enviado-por', 'view-nf-nome-arquivo', 'view-nf-tamanho'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+    });
+}
+
+function preencherDetalhesNfPedidoCompra(pedido) {
+    const urlNF = pedido.url_nota_fiscal;
+    const urlStr = urlNF != null ? String(urlNF).trim() : '';
+    const elData = document.getElementById('view-nf-data-envio');
+    const elPor = document.getElementById('view-nf-enviado-por');
+    const elNome = document.getElementById('view-nf-nome-arquivo');
+    const elTam = document.getElementById('view-nf-tamanho');
+    if (!elData || !elPor || !elNome || !elTam) return;
+
+    elData.textContent = formatarDataEnvioNfCompra(pedido.nf_data_envio);
+    const por = (pedido.nf_usuario_nome || '').toString().trim();
+    elPor.textContent = por || '—';
+
+    const rawNome = (pedido.nf_nome_arquivo_original || '').toString().trim();
+    elNome.textContent = rawNome || extrairNomeArquivoDaUrlNfCompra(urlStr) || '—';
+
+    elTam.textContent = formatarTamanhoBytesNfCompra(pedido.nf_tamanho_bytes);
 }
 
 /**

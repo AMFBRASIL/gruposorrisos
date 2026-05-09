@@ -12,6 +12,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 require_once '../../config/config.php';
 require_once '../../config/database.php';
 require_once '../../config/session.php';
+require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
 
 /** Separador entre observação do solicitante e do fornecedor no campo `observacoes` do item */
 if (!defined('OBS_ITEM_SEP_FORNECEDOR')) {
@@ -79,6 +80,8 @@ function garantirColunasPedidoFornecedor(PDO $pdo): void {
     if (!in_array('data_resposta_novo_item', $colunasItens, true)) {
         $pdo->exec("ALTER TABLE tbl_itens_pedido_compra ADD COLUMN data_resposta_novo_item DATETIME NULL AFTER novo_pos_resposta");
     }
+
+    garantirMetadadosNotaFiscalPedido($pdo);
 }
 
 function obterColunasItensPedido(PDO $pdo): array {
@@ -126,16 +129,7 @@ try {
     $database = new Database();
     $pdo = $database->getConnection();
     garantirColunasPedidoFornecedor($pdo);
-    
-    // Obter dados da requisição
-    $input = json_decode(file_get_contents('php://input'), true);
-    if (!is_array($input)) {
-        $input = [];
-    }
-    $action = $input['action'] ?? '';
-    
-    // Verificar se o usuário logado é realmente um fornecedor válido
-    // O id_perfil já foi verificado na sessão, agora só precisamos verificar se está vinculado a um fornecedor
+
     $stmt = $pdo->prepare("
         SELECT u.id_usuario, u.id_perfil, u.id_fornecedor, f.razao_social
         FROM tbl_usuarios u
@@ -144,15 +138,33 @@ try {
     ");
     $stmt->execute([$_SESSION['usuario_id']]);
     $usuario = $stmt->fetch();
-    
+
     if (!$usuario || !$usuario['id_fornecedor']) {
         http_response_code(403);
         echo json_encode(['error' => 'Usuário não é fornecedor válido ou não está vinculado a um fornecedor']);
         exit();
     }
-    
-    $fornecedor_id = $usuario['id_fornecedor'];
-    
+
+    $fornecedor_id = (int)$usuario['id_fornecedor'];
+
+    // Multipart (aprovação + NF opcional) — não usar JSON body
+    if (isset($_POST['action']) && $_POST['action'] === 'aprovar_faturamento') {
+        require_once __DIR__ . '/../../models/PedidoCompra.php';
+        require_once __DIR__ . '/../utils/EmailUtils.php';
+        $resultado = aprovarFaturamentoFornecedorMultipart($pdo, $fornecedor_id, $usuario);
+        if (empty($resultado['success'])) {
+            http_response_code(400);
+        }
+        echo json_encode($resultado);
+        exit;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        $input = [];
+    }
+    $action = $input['action'] ?? '';
+
     switch ($action) {
         case 'listar_pedidos':
             $pedidos = listarPedidosFornecedor($pdo, $fornecedor_id);
@@ -172,7 +184,14 @@ try {
             
         case 'get_pedido':
             $pedido_id = $input['pedido_id'] ?? 0;
-            $stmt = $pdo->prepare("SELECT id_pedido, url_nota_fiscal, status FROM tbl_pedidos_compra WHERE id_pedido = ? AND id_fornecedor = ?");
+            $stmt = $pdo->prepare("
+                SELECT p.id_pedido, p.url_nota_fiscal, p.status,
+                       p.nf_nome_arquivo_original, p.nf_data_envio, p.nf_id_usuario_envio,
+                       p.nf_tamanho_bytes, un.nome_completo AS nf_usuario_nome
+                FROM tbl_pedidos_compra p
+                LEFT JOIN tbl_usuarios un ON un.id_usuario = p.nf_id_usuario_envio
+                WHERE p.id_pedido = ? AND p.id_fornecedor = ?
+            ");
             $stmt->execute([$pedido_id, $fornecedor_id]);
             $pedido = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($pedido) {
@@ -209,6 +228,12 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                     p.valor_total,
                     p.observacoes,
                     p.observacoes_fornecedor,
+                    p.url_nota_fiscal,
+                    p.nf_nome_arquivo_original,
+                    p.nf_data_envio,
+                    p.nf_id_usuario_envio,
+                    p.nf_tamanho_bytes,
+                    un.nome_completo AS nf_usuario_nome,
                     COALESCE(NULLIF(f.razao_social, ''), f.nome_filial) as cliente,
                     f.cnpj as cliente_cnpj,
                     u.nome_completo as solicitante,
@@ -216,12 +241,16 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                 FROM tbl_pedidos_compra p
                 LEFT JOIN tbl_filiais f ON p.id_filial = f.id_filial
                 LEFT JOIN tbl_usuarios u ON p.id_usuario_solicitante = u.id_usuario
+                LEFT JOIN tbl_usuarios un ON un.id_usuario = p.nf_id_usuario_envio
                 LEFT JOIN tbl_itens_pedido_compra pi ON p.id_pedido = pi.id_pedido 
                     AND (pi.ativo = 1 OR pi.ativo IS NULL)
                 WHERE p.id_fornecedor = ? 
                 AND (p.ativo = 1 OR p.ativo IS NULL)
                 GROUP BY p.id_pedido, p.numero_pedido, p.data_criacao, p.data_solicitacao, 
-                         p.status, p.valor_total, p.observacoes, p.observacoes_fornecedor, f.razao_social, f.nome_filial, f.cnpj, u.nome_completo
+                         p.status, p.valor_total, p.observacoes, p.observacoes_fornecedor,
+                         p.url_nota_fiscal, p.nf_nome_arquivo_original, p.nf_data_envio,
+                         p.nf_id_usuario_envio, p.nf_tamanho_bytes,
+                         f.razao_social, f.nome_filial, f.cnpj, u.nome_completo, un.nome_completo
                 ORDER BY COALESCE(p.data_criacao, p.data_solicitacao) DESC";
         
         error_log("Buscando pedidos para fornecedor ID: {$fornecedor_id}");
@@ -252,6 +281,12 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                 'observacoes' => $row['observacoes'] ?: '',
                 'observacoes_fornecedor' => $row['observacoes_fornecedor'] ?: '',
                 'total_itens' => intval($row['total_itens'] ?: 0),
+                'url_nota_fiscal' => $row['url_nota_fiscal'] ?? '',
+                'nf_nome_arquivo_original' => $row['nf_nome_arquivo_original'] ?? '',
+                'nf_data_envio' => $row['nf_data_envio'] ?? '',
+                'nf_id_usuario_envio' => isset($row['nf_id_usuario_envio']) ? (int)$row['nf_id_usuario_envio'] : null,
+                'nf_tamanho_bytes' => isset($row['nf_tamanho_bytes']) ? (int)$row['nf_tamanho_bytes'] : null,
+                'nf_usuario_nome' => $row['nf_usuario_nome'] ?? '',
                 'itens' => $itens
             ];
         }
@@ -399,15 +434,21 @@ function responderPedido($pdo, $input, $fornecedor_id) {
     
     try {
         $pdo->beginTransaction();
-        
-        // Atualizar status do pedido para 'pendente' após resposta do fornecedor
+
+        // Após resposta: manter em aprovado_cotacao quando compras já liberou essa etapa,
+        // para o fornecedor seguir com "Aprovar Faturamento"; caso contrário volta para pendente (fluxo anterior).
+        $statusAposResposta = 'pendente';
+        if (strtolower((string)($pedido['status'] ?? '')) === 'aprovado_cotacao') {
+            $statusAposResposta = 'aprovado_cotacao';
+        }
+
         $sql = "UPDATE tbl_pedidos_compra 
-                SET status = 'pendente', 
+                SET status = ?, 
                     data_atualizacao = NOW()
                 WHERE id_pedido = ?";
-        
+
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$pedido_id]);
+        $stmt->execute([$statusAposResposta, $pedido_id]);
         
         // Atualizar campos específicos do fornecedor (campos separados)
         try {
@@ -559,10 +600,12 @@ function obterDetalhesPedido($pdo, $pedido_id, $fornecedor_id) {
                 f.endereco as endereco_filial,
                 f.telefone as telefone_filial,
                 u.nome_completo as solicitante,
-                u.email as email_solicitante
+                u.email as email_solicitante,
+                u_nf.nome_completo AS nf_usuario_nome
             FROM tbl_pedidos_compra p
             LEFT JOIN tbl_filiais f ON p.id_filial = f.id_filial
             LEFT JOIN tbl_usuarios u ON p.id_usuario_solicitante = u.id_usuario
+            LEFT JOIN tbl_usuarios u_nf ON u_nf.id_usuario = p.nf_id_usuario_envio
             WHERE p.id_pedido = ? AND p.id_fornecedor = ? AND (p.ativo = 1 OR p.ativo IS NULL)";
     
     $stmt = $pdo->prepare($sql);
@@ -582,5 +625,218 @@ function obterDetalhesPedido($pdo, $pedido_id, $fornecedor_id) {
     $pedido['itens'] = obterItensPedido($pdo, $pedido_id);
     
     return $pedido;
+}
+
+/**
+ * E-mails do solicitante + usuários com acesso à tela de pedidos de compra (mesma filial).
+ *
+ * @return array<int, array{email: string, nome: string}>
+ */
+function coletarEmailsNotificacaoCompras(PDO $pdo, int $idFilial, int $idSolicitante): array {
+    $map = [];
+
+    if ($idSolicitante > 0) {
+        try {
+            $st = $pdo->prepare("
+                SELECT email, nome_completo
+                FROM tbl_usuarios
+                WHERE id_usuario = ? AND ativo = 1 AND email IS NOT NULL AND TRIM(email) <> ''
+                LIMIT 1
+            ");
+            $st->execute([$idSolicitante]);
+            $u = $st->fetch(PDO::FETCH_ASSOC);
+            if ($u && filter_var($u['email'], FILTER_VALIDATE_EMAIL)) {
+                $map[strtolower(trim($u['email']))] = [
+                    'email' => trim($u['email']),
+                    'nome' => $u['nome_completo'] ?? 'Compras',
+                ];
+            }
+        } catch (Throwable $e) {
+            error_log('coletarEmailsNotificacaoCompras solicitante: ' . $e->getMessage());
+        }
+    }
+
+    try {
+        $sql = "
+            SELECT DISTINCT u.email, u.nome_completo
+            FROM tbl_usuarios u
+            INNER JOIN tbl_perfil_paginas pp ON pp.id_perfil = u.id_perfil
+            INNER JOIN tbl_paginas pg ON pg.id_pagina = pp.id_pagina
+            WHERE u.ativo = 1
+              AND u.email IS NOT NULL AND TRIM(u.email) <> ''
+              AND COALESCE(pp.ativo, 1) = 1
+              AND COALESCE(pg.ativo, 1) = 1
+              AND COALESCE(pp.permissao_visualizar, 0) = 1
+              AND (
+                  LOWER(TRIM(pg.nome_pagina)) = 'pedidos-compra.php'
+                  OR LOWER(TRIM(pg.nome_pagina)) LIKE '%pedidos-compra.php%'
+                  OR LOWER(pg.nome_pagina) LIKE '%pedido%compra%'
+              )
+              AND (? = 0 OR u.id_filial IS NULL OR u.id_filial = ?)
+        ";
+        $st = $pdo->prepare($sql);
+        $st->execute([$idFilial, $idFilial]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $u) {
+            if (!filter_var($u['email'], FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $map[strtolower(trim($u['email']))] = [
+                'email' => trim($u['email']),
+                'nome' => $u['nome_completo'] ?? 'Compras',
+            ];
+        }
+    } catch (Throwable $e) {
+        error_log('coletarEmailsNotificacaoCompras perfil/paginas: ' . $e->getMessage());
+    }
+
+    return array_values($map);
+}
+
+/**
+ * Fornecedor aprova faturamento: opcional NF, status → em_transito, e-mail ao setor de compras.
+ *
+ * @param array{id_usuario:int, razao_social?:string|null} $usuarioRow
+ * @return array{success: bool, message?: string, error?: string, email_enviado?: bool}
+ */
+function aprovarFaturamentoFornecedorMultipart(PDO $pdo, int $fornecedor_id, array $usuarioRow): array {
+    $pedidoId = (int)($_POST['pedido_id'] ?? 0);
+    $detalhes = trim((string)($_POST['detalhes_aprovacao'] ?? ''));
+
+    if ($pedidoId <= 0) {
+        return ['success' => false, 'error' => 'Pedido inválido'];
+    }
+    if ($detalhes === '') {
+        return ['success' => false, 'error' => 'Informe os detalhes da aprovação do faturamento.'];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT p.*,
+               fn.razao_social AS nome_fornecedor,
+               COALESCE(fil.nome_filial, fil.razao_social, '') AS nome_filial
+        FROM tbl_pedidos_compra p
+        LEFT JOIN tbl_fornecedores fn ON fn.id_fornecedor = p.id_fornecedor
+        LEFT JOIN tbl_filiais fil ON fil.id_filial = p.id_filial
+        WHERE p.id_pedido = ? AND p.id_fornecedor = ?
+          AND (p.ativo = 1 OR p.ativo IS NULL)
+    ");
+    $stmt->execute([$pedidoId, $fornecedor_id]);
+    $pedidoRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$pedidoRow) {
+        return ['success' => false, 'error' => 'Pedido não encontrado ou não pertence ao fornecedor'];
+    }
+
+    $statusAtual = strtolower((string)($pedidoRow['status'] ?? ''));
+    $statusPermitemAprovacaoFat = ['aprovado_cotacao', 'aprovado_para_faturar'];
+    if (!in_array($statusAtual, $statusPermitemAprovacaoFat, true)) {
+        return [
+            'success' => false,
+            'error' => 'Este pedido não está disponível para aprovação de faturamento (requer Cotação aprovada ou Aprovado para faturar). Status atual: ' . ($pedidoRow['status'] ?? ''),
+        ];
+    }
+
+    $urlNf = null;
+
+    if (!empty($_FILES['nota_fiscal']['tmp_name']) && (int)($_FILES['nota_fiscal']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        $helperPath = __DIR__ . '/../../helpers/S3Uploader.php';
+        if (!is_readable($helperPath)) {
+            return ['success' => false, 'error' => 'Upload indisponível (configuração do sistema).'];
+        }
+        require_once $helperPath;
+
+        $file = $_FILES['nota_fiscal'];
+        $allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'gif'];
+        if (!S3Uploader::validateFileType($file['name'], $allowedTypes)) {
+            return ['success' => false, 'error' => 'Tipo de arquivo não permitido para a NF.'];
+        }
+        if (!S3Uploader::validateFileSize($file['size'], 10)) {
+            return ['success' => false, 'error' => 'Arquivo da NF muito grande (máx. 10MB).'];
+        }
+
+        $uploader = new S3Uploader();
+        $up = $uploader->uploadFile(
+            $file['tmp_name'],
+            $file['name'],
+            'notas-fiscais/pedido-' . $pedidoId
+        );
+        if (empty($up['success'])) {
+            return ['success' => false, 'error' => $up['error'] ?? 'Erro ao enviar a Nota Fiscal'];
+        }
+        $urlNf = $up['url'] ?? null;
+
+        if (!empty($pedidoRow['url_nota_fiscal'])) {
+            $oldPath = ltrim((string)$pedidoRow['url_nota_fiscal'], '/');
+            $oldFullPath = __DIR__ . '/../../' . $oldPath;
+            if (file_exists($oldFullPath) && is_file($oldFullPath)) {
+                @unlink($oldFullPath);
+            }
+        }
+
+        $bytes = isset($up['size_bytes']) ? (int) $up['size_bytes'] : (int) $file['size'];
+        if ($bytes <= 0 && !empty($up['path']) && is_readable($up['path'])) {
+            $sz = @filesize($up['path']);
+            if ($sz !== false) {
+                $bytes = (int) $sz;
+            }
+        }
+
+        salvarMetadadosEnvioNotaFiscalPedido(
+            $pdo,
+            $pedidoId,
+            (string) $urlNf,
+            $file['name'],
+            obterIdUsuarioSessaoParaMetadadosNf(),
+            $bytes > 0 ? $bytes : null
+        );
+    }
+
+    $nomeFornecedor = $pedidoRow['nome_fornecedor'] ?? ($usuarioRow['razao_social'] ?? 'Fornecedor');
+    $obsHist = "[Fornecedor] Aprovação de faturamento — pedido em trânsito.\n\n" . $detalhes;
+    if ($urlNf) {
+        $obsHist .= "\n\nNota fiscal anexada: " . $urlNf;
+    }
+
+    try {
+        $pedidoModel = new PedidoCompra();
+        $pedidoModel->atualizarStatus($pedidoId, 'em_transito', $obsHist);
+    } catch (Throwable $e) {
+        error_log('aprovarFaturamentoFornecedorMultipart atualizarStatus: ' . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+
+    $obsFornAtual = trim((string)($pedidoRow['observacoes_fornecedor'] ?? ''));
+    $bloco = "\n\n[" . date('d/m/Y H:i') . "] Aprovação de faturamento (Em trânsito):\n" . $detalhes;
+    if ($urlNf) {
+        $bloco .= "\nNF anexada.";
+    }
+    $novaObsForn = trim($obsFornAtual . $bloco);
+    try {
+        $stObs = $pdo->prepare('UPDATE tbl_pedidos_compra SET observacoes_fornecedor = ?, data_atualizacao = NOW() WHERE id_pedido = ?');
+        $stObs->execute([$novaObsForn, $pedidoId]);
+    } catch (Throwable $e) {
+        error_log('aprovarFaturamentoFornecedorMultipart observacoes_fornecedor: ' . $e->getMessage());
+    }
+
+    $destinatarios = coletarEmailsNotificacaoCompras(
+        $pdo,
+        (int)($pedidoRow['id_filial'] ?? 0),
+        (int)($pedidoRow['id_usuario_solicitante'] ?? 0)
+    );
+
+    $emailEnviado = EmailUtils::enviarEmailComprasPedidoEmTransito([
+        'numero_pedido' => $pedidoRow['numero_pedido'] ?? ('#' . $pedidoId),
+        'id_pedido' => $pedidoId,
+        'nome_filial' => $pedidoRow['nome_filial'] ?? '',
+        'nome_fornecedor' => $nomeFornecedor,
+        'detalhes' => $detalhes,
+        'url_nota_fiscal' => $urlNf,
+        'destinatarios' => $destinatarios,
+    ]);
+
+    return [
+        'success' => true,
+        'message' => 'Faturamento aprovado. O pedido foi atualizado para Em trânsito.',
+        'email_enviado' => $emailEnviado,
+    ];
 }
 ?>

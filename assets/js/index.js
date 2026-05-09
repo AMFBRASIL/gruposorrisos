@@ -368,20 +368,37 @@ async function carregarDadosEstoque() {
     }
 }
 
+/**
+ * Contagem do card "Pedidos Pendentes" — usa indicador_pedidos_pendentes da API
+ * (fluxo até faturamento; exclui em trânsito, entregue, recebido, cancelado).
+ */
+function extrairIndicadorPedidosPendentes(stats) {
+    const n = parseInt((stats || {}).indicador_pedidos_pendentes, 10);
+    return Number.isNaN(n) || n < 0 ? 0 : n;
+}
+
 // Carregar pedidos pendentes
 async function carregarPedidosPendentes() {
     try {
-        const response = await fetch('backend/api/pedidos_compra.php?action=stats');
+        const params = new URLSearchParams({ action: 'stats' });
+        if (filialSelecionada && Number(filialSelecionada) > 0) {
+            params.append('filial_id', String(filialSelecionada));
+        }
+        const response = await fetch(`backend/api/pedidos_compra.php?${params}`, {
+            credentials: 'same-origin'
+        });
         if (response.ok) {
             const data = await response.json();
             if (data.success) {
-                const pedidosPendentes = data.stats.pedidos_pendentes || 0;
-                document.getElementById('pedidos-pendentes').textContent = pedidosPendentes;
+                const pedidosPendentes = extrairIndicadorPedidosPendentes(data.stats);
+                const el = document.getElementById('pedidos-pendentes');
+                if (el) el.textContent = pedidosPendentes;
             }
         }
     } catch (error) {
         console.error('❌ Erro ao carregar pedidos pendentes:', error);
-        document.getElementById('pedidos-pendentes').textContent = '0';
+        const el = document.getElementById('pedidos-pendentes');
+        if (el) el.textContent = '0';
     }
 }
 

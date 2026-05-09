@@ -113,7 +113,7 @@ $user = getCurrentUser();
                                     <h3 class="card-text text-warning" id="pedidos-pendentes">0</h3>
                                 </div>
                             </div>
-                            <small class="text-muted">Aguardando aprovação ou processamento</small>
+                            <small class="text-muted">Pedidos em aberto no fluxo (novo, cotação, faturamento…). Com uma clínica selecionada acima, a contagem é só dela.</small>
                             <div class="mt-3">
                                 <button class="btn btn-warning btn-sm w-100" onclick="window.location.href='pedidos-compra.php'">
                                     <i class="bi bi-eye me-1"></i>Ver Pedidos

@@ -62,13 +62,19 @@ class S3Uploader {
             $url = '/uploads/' . $folder . '/' . $uniqueName;
             // Remover barras duplicadas
             $url = preg_replace('#/+#', '/', $url);
+
+            $sizeBytes = @filesize($destination);
+            if ($sizeBytes === false) {
+                $sizeBytes = 0;
+            }
             
             return [
                 'success' => true,
                 'url' => $url,
                 'key' => $folder . '/' . $uniqueName,
                 'fileName' => $uniqueName,
-                'path' => $destination
+                'path' => $destination,
+                'size_bytes' => (int) $sizeBytes
             ];
         }
         
