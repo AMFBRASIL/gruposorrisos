@@ -2,6 +2,7 @@
 let paginaAtual = 1;
 let movimentacaoParaExcluir = null;
 let confirmModal;
+let modalAguardeLista;
 let materiais = [];
 let materiaisMovimentacao = [];
 let materialCounter = 0;
@@ -9,6 +10,10 @@ let materialCounter = 0;
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    const elAguarde = document.getElementById('modalAguardeLista');
+    if (elAguarde) {
+        modalAguardeLista = new bootstrap.Modal(elAguarde, { backdrop: 'static', keyboard: false });
+    }
     
     // Carregar dados iniciais
     carregarEstatisticas();
@@ -18,11 +23,12 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarClientes();
     carregarMovimentacoes();
     
-    // Event listeners
-    document.getElementById('busca').addEventListener('input', debounce(carregarMovimentacoes, 500));
-    document.getElementById('filtro-tipo').addEventListener('change', carregarMovimentacoes);
-    document.getElementById('data-inicio').addEventListener('change', carregarMovimentacoes);
-    document.getElementById('data-fim').addEventListener('change', carregarMovimentacoes);
+    // Event listeners (sempre página 1 ao filtrar — não passar o objeto Event como page)
+    const recarregarLista = () => carregarMovimentacoes(1);
+    document.getElementById('busca').addEventListener('input', debounce(recarregarLista, 500));
+    document.getElementById('filtro-tipo').addEventListener('change', recarregarLista);
+    document.getElementById('data-inicio').addEventListener('change', recarregarLista);
+    document.getElementById('data-fim').addEventListener('change', recarregarLista);
     
     // Event listeners para o modal
     document.getElementById('tipo_movimentacao').addEventListener('change', toggleCamposMovimentacao);
@@ -294,7 +300,30 @@ function toggleCamposBrinde() {
     }
 }
 
-async function carregarMovimentacoes(page = 1) {
+function abrirModalAguardeLista() {
+    if (modalAguardeLista) {
+        modalAguardeLista.show();
+    }
+}
+
+function fecharModalAguardeLista() {
+    if (modalAguardeLista) {
+        modalAguardeLista.hide();
+    }
+}
+
+/** Paginação: exibe modal «Aguarde» enquanto carrega. */
+function carregarMovimentacoesPagina(page) {
+    carregarMovimentacoes(page, true);
+    return false;
+}
+
+async function carregarMovimentacoes(page = 1, exibirAguarde = false) {
+    const pagina = parseInt(page, 10);
+    page = Number.isFinite(pagina) && pagina >= 1 ? pagina : 1;
+    if (exibirAguarde) {
+        abrirModalAguardeLista();
+    }
     try {
         paginaAtual = page;
         const busca = document.getElementById('busca').value;
@@ -323,6 +352,10 @@ async function carregarMovimentacoes(page = 1) {
         console.error('Erro ao carregar movimentações:', error);
         renderizarTabela([]);
         mostrarErro('Erro ao carregar movimentações');
+    } finally {
+        if (exibirAguarde) {
+            fecharModalAguardeLista();
+        }
     }
 }
 
@@ -404,7 +437,7 @@ function renderizarPaginacao(data) {
     // Botão anterior
     html += `
         <li class="page-item ${data.pagina_atual <= 1 ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="carregarMovimentacoes(${data.pagina_atual - 1})">Anterior</a>
+            <a class="page-link" href="#" onclick="return carregarMovimentacoesPagina(${data.pagina_atual - 1})">Anterior</a>
         </li>
     `;
     
@@ -412,7 +445,7 @@ function renderizarPaginacao(data) {
     for (let i = Math.max(1, data.pagina_atual - 2); i <= Math.min(data.paginas, data.pagina_atual + 2); i++) {
         html += `
             <li class="page-item ${i === data.pagina_atual ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="carregarMovimentacoes(${i})">${i}</a>
+                <a class="page-link" href="#" onclick="return carregarMovimentacoesPagina(${i})">${i}</a>
             </li>
         `;
     }
@@ -420,7 +453,7 @@ function renderizarPaginacao(data) {
     // Botão próximo
     html += `
         <li class="page-item ${data.pagina_atual >= data.paginas ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="carregarMovimentacoes(${data.pagina_atual + 1})">Próximo</a>
+            <a class="page-link" href="#" onclick="return carregarMovimentacoesPagina(${data.pagina_atual + 1})">Próximo</a>
         </li>
     `;
     

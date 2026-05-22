@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once '../../config/config.php';
 require_once '../../config/conexao.php';
 require_once '../../config/session.php';
+require_once '../../config/filiais_usuario.php';
 
 try {
     $pdo = Conexao::getInstance()->getPdo();
@@ -120,12 +121,13 @@ function listarFiliais() {
         $params[] = $tipo;
     }
 
-    // Regra do dashboard:
-    // - usuário com filial definida: só enxerga a própria filial no seletor;
-    // - usuário sem filial definida: enxerga todas.
-    if ($isSelector && !empty($filialUsuarioId)) {
-        $where[] = "id_filial = ?";
-        $params[] = (int)$filialUsuarioId;
+    // Seletor do dashboard: mesma regra de filiais_usuario.php
+    if ($isSelector && !isAdmin()) {
+        $filialUsuarioId = (int) (getCurrentUserFilialId() ?? 0);
+        if ($filialUsuarioId > 0) {
+            $where[] = "id_filial = ?";
+            $params[] = $filialUsuarioId;
+        }
     }
     
     $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';

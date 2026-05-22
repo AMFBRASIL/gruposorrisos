@@ -56,29 +56,8 @@ try {
                 error_log("Nenhum histórico encontrado para pedido ID: {$pedido_id}");
             }
             
-            // Mapear nomes dos status (todos os possíveis)
-            $status_map = [
-                'em_analise' => 'Em Análise',
-                'pendente' => 'Pendente',
-                'aprovado_cotacao' => 'Aprovado para Cotação',
-                'aprovado' => 'Aprovado',
-                'enviar_para_faturamento' => 'Enviar para Faturamento',
-                'enviar_faturamento' => 'Enviar para Faturamento', // Compatibilidade
-                'aprovado_para_faturar' => 'Aprovado para Faturar',
-                'faturado' => 'Faturado',
-                'em_producao' => 'Em Produção',
-                'em_transito' => 'Em Trânsito',
-                'enviado' => 'Enviado',
-                'entregue' => 'Entregue',
-                'recebido' => 'Recebido',
-                'rejeitado' => 'Rejeitado',
-                'em_entrega' => 'Em Entrega',
-                'atrasado' => 'Atrasado',
-                'urgente' => 'Urgente',
-                'aguardando_aprovacao' => 'Aguardando Aprovação',
-                'parcialmente_recebido' => 'Parcialmente Recebido',
-                'cancelado' => 'Cancelado'
-            ];
+            require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+            $status_map = fluxoPedidoStatusLabels();
             
             // Formatar histórico
             $historico_formatado = [];

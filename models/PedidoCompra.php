@@ -1,5 +1,6 @@
 <?php
 require_once 'BaseModel.php';
+require_once __DIR__ . '/../backend/helpers/fluxo_pedido_compra.php';
 
 class PedidoCompra extends BaseModel {
     protected $table = 'tbl_pedidos_compra';
@@ -189,7 +190,7 @@ class PedidoCompra extends BaseModel {
                 'id_filial' => $dados['id_filial'],
                 'data_pedido' => date('Y-m-d'),
                 'data_entrega_prevista' => $this->validarData($dados['data_entrega_prevista']),
-                'status' => $dados['status'] ?? 'em_analise',
+                'status' => $dados['status'] ?? fluxoPedidoStatusIniciaisCriacao(),
                 'valor_total' => $dados['valor_total'],
                 'observacoes' => $dados['observacoes'],
                 'id_usuario_solicitante' => $dados['id_usuario_solicitante']
@@ -521,33 +522,23 @@ class PedidoCompra extends BaseModel {
     public function getEstatisticas(?int $idFilial = null) {
         $sql = "SELECT 
                 COUNT(*) as total_pedidos,
+                COUNT(CASE WHEN status NOT IN ('finalizado', 'cancelado', 'recebido') THEN 1 END) as indicador_pedidos_pendentes,
                 COUNT(CASE WHEN status IN (
-                    'em_analise',
-                    'pendente',
-                    'aguardando_aprovacao',
-                    'aprovado',
-                    'aprovado_cotacao',
-                    'enviar_para_faturamento',
-                    'enviar_faturamento',
-                    'aprovado_para_faturar',
-                    'faturado'
-                ) THEN 1 END) as indicador_pedidos_pendentes,
-                COUNT(CASE WHEN status = 'em_analise' THEN 1 END) as em_analise,
-                COUNT(CASE WHEN status = 'pendente' THEN 1 END) as pendentes,
-                COUNT(CASE WHEN status = 'aprovado' THEN 1 END) as aprovados,
-                COUNT(CASE WHEN status = 'em_producao' THEN 1 END) as em_producao,
-                COUNT(CASE WHEN status = 'enviado' THEN 1 END) as enviados,
-                COUNT(CASE WHEN status = 'entregue' THEN 1 END) as entregues,
-                COUNT(CASE WHEN status = 'atrasado' THEN 1 END) as atrasados,
-                COUNT(CASE WHEN status = 'urgente' THEN 1 END) as urgentes,
-                COUNT(CASE WHEN status = 'em_transito' THEN 1 END) as em_transito,
-                COUNT(CASE WHEN status = 'aguardando_aprovacao' THEN 1 END) as aguardando_aprovacao,
-                COUNT(CASE WHEN status = 'aprovado_cotacao' THEN 1 END) as aprovado_cotacao,
-                COUNT(CASE WHEN status IN ('enviar_para_faturamento', 'enviar_faturamento') THEN 1 END) as enviar_faturamento_total,
-                COUNT(CASE WHEN status = 'aprovado_para_faturar' THEN 1 END) as aprovado_para_faturar,
-                COUNT(CASE WHEN status = 'faturado' THEN 1 END) as qtd_faturado,
-                COUNT(CASE WHEN status = 'parcialmente_recebido' THEN 1 END) as parcialmente_recebido,
-                COUNT(CASE WHEN status = 'recebido' THEN 1 END) as recebidos,
+                    'aguardando_cotacao', 'em_analise', 'pendente', 'aguardando_aprovacao', 'rascunho'
+                ) THEN 1 END) as fase_aguardando_cotacao,
+                COUNT(CASE WHEN status IN ('em_cotacao', 'aprovado_cotacao') THEN 1 END) as fase_em_cotacao,
+                COUNT(CASE WHEN status IN (
+                    'aguardando_aprovacao_socio', 'aprovado_socio'
+                ) THEN 1 END) as fase_aprovacao_socio,
+                COUNT(CASE WHEN status IN (
+                    'aguardando_faturamento', 'enviar_para_faturamento', 'enviar_faturamento'
+                ) THEN 1 END) as fase_aguardando_faturamento,
+                COUNT(CASE WHEN status IN (
+                    'em_faturamento', 'aprovado_para_faturar', 'faturado', 'em_transito',
+                    'em_producao', 'enviado', 'aprovado'
+                ) THEN 1 END) as fase_em_faturamento,
+                COUNT(CASE WHEN status IN ('em_conferencia', 'entregue', 'parcialmente_recebido') THEN 1 END) as em_conferencia,
+                COUNT(CASE WHEN status IN ('finalizado', 'recebido') THEN 1 END) as finalizados,
                 COUNT(CASE WHEN status = 'cancelado' THEN 1 END) as cancelados,
                 SUM(valor_total) as valor_total,
                 COUNT(CASE WHEN DATE(data_criacao) = CURDATE() THEN 1 END) as hoje
@@ -577,11 +568,11 @@ class PedidoCompra extends BaseModel {
         }
 
         $result['fases_pedidos_compra'] = [
-            'em_analise' => (int) ($result['em_analise'] ?? 0) + (int) ($result['aguardando_aprovacao'] ?? 0),
-            'pendente' => (int) ($result['pendentes'] ?? 0),
-            'aprovado' => (int) ($result['aprovado_cotacao'] ?? 0) + (int) ($result['aprovados'] ?? 0),
-            'envio_faturamento' => (int) ($result['enviar_faturamento_total'] ?? 0),
-            'em_faturamento' => (int) ($result['aprovado_para_faturar'] ?? 0) + (int) ($result['qtd_faturado'] ?? 0),
+            'em_analise' => (int) ($result['fase_aguardando_cotacao'] ?? 0),
+            'pendente' => (int) ($result['fase_em_cotacao'] ?? 0),
+            'aprovado' => (int) ($result['fase_aprovacao_socio'] ?? 0),
+            'envio_faturamento' => (int) ($result['fase_aguardando_faturamento'] ?? 0),
+            'em_faturamento' => (int) ($result['fase_em_faturamento'] ?? 0),
         ];
 
         return $result;
@@ -591,24 +582,17 @@ class PedidoCompra extends BaseModel {
      * Obter status disponíveis
      */
     public function getStatusDisponiveis() {
-        return [
-            'em_analise' => 'Em Análise',
-            'pendente' => 'Pendente',
-            'aprovado_cotacao' => 'Aprovado Cotação',
-            'enviar_para_faturamento' => 'Enviar para Faturamento',
-            'aprovado_para_faturar' => 'Aprovado para Faturar',
-            'aprovado' => 'Aprovado',
-            'em_producao' => 'Em Produção',
-            'enviado' => 'Enviado',
-            'entregue' => 'Entregue',
-            'atrasado' => 'Atrasado',
-            'urgente' => 'Urgente',
-            'em_transito' => 'Em Trânsito',
-            'aguardando_aprovacao' => 'Aguardando Aprovação',
-            'parcialmente_recebido' => 'Parcialmente Recebido',
-            'recebido' => 'Recebido',
-            'cancelado' => 'Cancelado'
-        ];
+        return fluxoPedidoStatusLabels();
+    }
+
+    /** Normaliza status legado para o fluxo atual */
+    public function normalizarStatus($status) {
+        return fluxoPedidoNormalizarStatus($status);
+    }
+
+    /** Etapas ordenadas para exibição do stepper */
+    public function getEtapasFluxoPedido() {
+        return fluxoPedidoEtapasOrdenadas();
     }
     
     /**
@@ -654,27 +638,21 @@ class PedidoCompra extends BaseModel {
         try {
             $this->pdo->beginTransaction();
             
-            // Mapear status antigos para novos (compatibilidade)
-            $mapeamentoStatus = [
-                'enviar_faturamento' => 'enviar_para_faturamento'
-            ];
-            if (isset($mapeamentoStatus[$novoStatus])) {
-                $novoStatus = $mapeamentoStatus[$novoStatus];
-            }
+            $novoStatus = fluxoPedidoNormalizarStatus($novoStatus);
             
-            // Verificar se o status é válido
-            $statusValidos = array_keys($this->getStatusDisponiveis());
-            if (!in_array($novoStatus, $statusValidos)) {
+            $statusValidos = [
+                'aguardando_cotacao', 'em_cotacao', 'aguardando_aprovacao_socio', 'aprovado_socio',
+                'aguardando_faturamento', 'em_faturamento', 'em_conferencia', 'finalizado', 'cancelado'
+            ];
+            if (!in_array($novoStatus, $statusValidos, true)) {
                 throw new Exception('Status inválido: ' . $novoStatus);
             }
             
-            // Buscar status atual do pedido
             $pedidoAtual = $this->findById($idPedido);
             if (!$pedidoAtual) {
                 throw new Exception('Pedido não encontrado');
             }
             
-            // Validar transição de status
             $validacao = $this->validarTransicaoStatus($pedidoAtual['status'], $novoStatus);
             if (!$validacao['valido']) {
                 throw new Exception($validacao['erro']);
@@ -712,8 +690,7 @@ class PedidoCompra extends BaseModel {
             // Registrar histórico
             $this->registrarHistoricoStatus($idPedido, $novoStatus, $observacao);
             
-            // Se status for 'recebido', dar entrada no estoque
-            if ($novoStatus === 'recebido') {
+            if ($novoStatus === fluxoPedidoStatusComEntradaEstoque()) {
                 $this->processarEntradaEstoque($idPedido);
             }
             
@@ -803,7 +780,7 @@ class PedidoCompra extends BaseModel {
                                 observacoes, data_movimentacao, id_usuario, id_pedido_compra)
                                VALUES (?, ?, ?, 'entrada', ?, ?, NOW(), ?, ?)";
             
-            $observacoes = "Entrada automática - Pedido #{$pedido['numero_pedido']} recebido";
+            $observacoes = "Entrada automática - Pedido #{$pedido['numero_pedido']} finalizado";
             $idUsuario = $_SESSION['usuario_id'] ?? null;
             
             $stmt = $this->pdo->prepare($sqlMovimentacao);
@@ -852,53 +829,27 @@ class PedidoCompra extends BaseModel {
      * Validar transição de status conforme fluxo de negócio
      */
     public function validarTransicaoStatus($statusAtual, $novoStatus, $perfilUsuario = null) {
-        // Mapear status antigos para novos (compatibilidade)
-        $mapeamentoStatus = [
-            'enviar_faturamento' => 'enviar_para_faturamento'
-        ];
-        if (isset($mapeamentoStatus[$statusAtual])) {
-            $statusAtual = $mapeamentoStatus[$statusAtual];
-        }
-        if (isset($mapeamentoStatus[$novoStatus])) {
-            $novoStatus = $mapeamentoStatus[$novoStatus];
-        }
+        $statusAtual = fluxoPedidoNormalizarStatus($statusAtual);
+        $novoStatus = fluxoPedidoNormalizarStatus($novoStatus);
         
-        // Status finais que não permitem transições
-        $statusFinais = ['recebido', 'cancelado'];
-        
-        // Se o status atual é final, não permite transições
-        if (in_array($statusAtual, $statusFinais)) {
+        if (in_array($statusAtual, fluxoPedidoStatusFinais(), true)) {
             return ['valido' => false, 'erro' => 'Pedido já está em status final e não pode ser alterado'];
         }
         
-        // Se o novo status é cancelado, sempre permitir (exceto se já estiver cancelado)
         if ($novoStatus === 'cancelado') {
-            return ['valido' => true];
+            return $statusAtual === 'cancelado'
+                ? ['valido' => false, 'erro' => 'Pedido já está cancelado']
+                : ['valido' => true];
         }
         
-        $fluxoPermitido = [
-            'em_analise' => ['pendente', 'cancelado'], // Gestor pode aprovar para Pendente
-            'pendente' => ['aprovado_cotacao', 'cancelado'], // Setor de compras pode aprovar para Aprovado Cotação
-            'aprovado_cotacao' => ['enviar_para_faturamento', 'pendente', 'cancelado', 'em_transito'], // Compras já aprovou cotação; fornecedor pode seguir para enviar cotação ao fluxo OU aprovar faturamento → em trânsito
-            'enviar_para_faturamento' => ['aprovado_para_faturar', 'aprovado_cotacao', 'cancelado'], // Setor de compras avalia
-            'aprovado_para_faturar' => ['em_transito', 'enviar_para_faturamento', 'cancelado'], // Fornecedor pode enviar
-            'em_transito' => ['entregue', 'aprovado_para_faturar', 'cancelado'], // Pode voltar, finalizar ou cancelar
-            'entregue' => ['recebido', 'cancelado'], // Finalização ou cancelamento
-            'rascunho' => ['em_analise', 'cancelado'], // Rascunho pode ir para análise ou cancelar
-            'aguardando_aprovacao' => ['aprovado_cotacao', 'pendente', 'cancelado'] // Aguardando aprovação
-        ];
+        $fluxoPermitido = fluxoPedidoTransicoesPermitidas();
         
-        // Verificar se a transição é permitida
         if (!isset($fluxoPermitido[$statusAtual])) {
-            // Se o status não está no fluxo, mas não é final, permitir apenas cancelamento
-            if ($novoStatus === 'cancelado') {
-                return ['valido' => true];
-            }
             return ['valido' => false, 'erro' => 'Status atual inválido ou transição não permitida: ' . $statusAtual . ' -> ' . $novoStatus];
         }
         
-        if (!in_array($novoStatus, $fluxoPermitido[$statusAtual])) {
-            return ['valido' => false, 'erro' => 'Transição não permitida no fluxo de negócio: ' . $statusAtual . ' -> ' . $novoStatus];
+        if (!in_array($novoStatus, $fluxoPermitido[$statusAtual], true)) {
+            return ['valido' => false, 'erro' => 'Transição não permitida no fluxo de negócio: ' . fluxoPedidoLabelStatus($statusAtual) . ' → ' . fluxoPedidoLabelStatus($novoStatus)];
         }
         
         return ['valido' => true];
@@ -908,31 +859,31 @@ class PedidoCompra extends BaseModel {
      * Obter próximos status possíveis para um pedido
      */
     public function getProximosStatusPossiveis($statusAtual, $perfilUsuario = null) {
-        $fluxo = [
-            'em_analise' => ['pendente' => 'Aprovar (Gestor)'],
-            'pendente' => ['aprovado_cotacao' => 'Aprovar Cotação (Compras)'],
-            'aprovado_cotacao' => ['enviar_para_faturamento' => 'Enviar Cotação (Fornecedor)'],
-            'enviar_para_faturamento' => ['aprovado_para_faturar' => 'Aprovar Faturamento (Compras)'],
-            'aprovado_para_faturar' => ['em_transito' => 'Enviar Pedido (Fornecedor)'],
-            'em_transito' => ['entregue' => 'Marcar como Entregue'],
-            'entregue' => ['recebido' => 'Confirmar Recebimento']
+        $statusAtual = fluxoPedidoNormalizarStatus($statusAtual);
+        $acoes = [
+            'aguardando_cotacao' => ['em_cotacao' => 'Iniciar Cotação (Compras)'],
+            'em_cotacao' => ['aguardando_aprovacao_socio' => 'Enviar para Aprovação do Sócio (Compras)'],
+            'aguardando_aprovacao_socio' => ['aprovado_socio' => 'Aprovar (Sócio)'],
+            'aprovado_socio' => ['aguardando_faturamento' => 'Aguardando Faturamento'],
+            'aguardando_faturamento' => ['em_faturamento' => 'Encaminhar para Faturamento (Compras)'],
+            'em_faturamento' => ['em_conferencia' => 'Confirmar Recebimento (Clínica)'],
+            'em_conferencia' => ['finalizado' => 'Finalizar e Dar Entrada no Estoque'],
         ];
         
-        $statusDisponiveis = $this->getStatusDisponiveis();
+        $labels = fluxoPedidoStatusLabels();
         $proximos = [];
         
-        if (isset($fluxo[$statusAtual])) {
-            foreach ($fluxo[$statusAtual] as $status => $acao) {
+        if (isset($acoes[$statusAtual])) {
+            foreach ($acoes[$statusAtual] as $status => $acao) {
                 $proximos[] = [
                     'status' => $status,
-                    'nome' => $statusDisponiveis[$status] ?? $status,
+                    'nome' => $labels[$status] ?? $status,
                     'acao' => $acao
                 ];
             }
         }
         
-        // Sempre permitir cancelar (exceto se já cancelado ou recebido)
-        if (!in_array($statusAtual, ['cancelado', 'recebido'])) {
+        if (!in_array($statusAtual, fluxoPedidoStatusFinais(), true)) {
             $proximos[] = [
                 'status' => 'cancelado',
                 'nome' => 'Cancelado',
@@ -1011,13 +962,11 @@ class PedidoCompra extends BaseModel {
     }
     
     /**
-     * Buscar filiais
+     * Buscar filiais permitidas ao usuário logado
      */
     public function buscarFiliais() {
-        $sql = "SELECT id_filial, nome_filial FROM tbl_filiais WHERE filial_ativa = 1 ORDER BY nome_filial";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute();
-        return $stmt->fetchAll();
+        require_once __DIR__ . '/../config/filiais_usuario.php';
+        return obterFiliaisPermitidasUsuario($this->pdo);
     }
     
     /**
@@ -1069,6 +1018,300 @@ class PedidoCompra extends BaseModel {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$id]);
         return $stmt->fetch();
+    }
+
+    /**
+     * Verifica se uma tabela existe no schema atual
+     */
+    private function tabelaExiste($nomeTabela) {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = DATABASE() AND table_name = ?
+            ");
+            $stmt->execute([$nomeTabela]);
+            return ((int) $stmt->fetchColumn()) > 0;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Monta uma prévia detalhada do que será revertido para um pedido de compra.
+     * NÃO altera nenhum dado, apenas devolve as informações para confirmação.
+     */
+    public function getPreviaReversao($idPedido) {
+        $pedido = $this->findByIdWithRelations($idPedido);
+        if (!$pedido) {
+            throw new Exception('Pedido não encontrado.');
+        }
+
+        $itens = $this->buscarItens($idPedido);
+
+        // Histórico de status
+        $historico = [];
+        if ($this->tabelaExiste('tbl_historico_status_pedidos')) {
+            $sqlHist = "SELECT h.id_historico, h.status, h.observacao, h.data_alteracao,
+                               u.nome_completo AS nome_usuario
+                        FROM tbl_historico_status_pedidos h
+                        LEFT JOIN tbl_usuarios u ON u.id_usuario = h.id_usuario
+                        WHERE h.id_pedido = ?
+                        ORDER BY h.data_alteracao ASC, h.id_historico ASC";
+            $stmtHist = $this->pdo->prepare($sqlHist);
+            $stmtHist->execute([$idPedido]);
+            $historico = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Movimentações de estoque geradas a partir deste pedido
+        $movimentacoes = [];
+        $impactoEstoque = [];
+        if ($this->tabelaExiste('tbl_movimentacoes_estoque')) {
+            $sqlMov = "SELECT m.id_movimentacao, m.id_estoque, m.id_catalogo, m.id_filial,
+                              m.tipo_movimentacao, m.quantidade, m.data_movimentacao,
+                              m.observacoes,
+                              cm.codigo AS codigo_material,
+                              cm.nome AS nome_material,
+                              fil.nome_filial,
+                              ef.estoque_atual AS estoque_atual_hoje
+                       FROM tbl_movimentacoes_estoque m
+                       LEFT JOIN tbl_catalogo_materiais cm ON cm.id_catalogo = m.id_catalogo
+                       LEFT JOIN tbl_filiais fil ON fil.id_filial = m.id_filial
+                       LEFT JOIN tbl_estoque_filiais ef ON ef.id_estoque = m.id_estoque
+                       WHERE m.id_pedido_compra = ?
+                       ORDER BY m.data_movimentacao ASC, m.id_movimentacao ASC";
+            $stmtMov = $this->pdo->prepare($sqlMov);
+            $stmtMov->execute([$idPedido]);
+            $movimentacoes = $stmtMov->fetchAll(PDO::FETCH_ASSOC);
+
+            // Agrega impacto no estoque por (id_estoque)
+            foreach ($movimentacoes as $mov) {
+                $chave = (string) ($mov['id_estoque'] ?? '');
+                if ($chave === '') {
+                    continue;
+                }
+                if (!isset($impactoEstoque[$chave])) {
+                    $impactoEstoque[$chave] = [
+                        'id_estoque' => (int) $mov['id_estoque'],
+                        'id_catalogo' => (int) ($mov['id_catalogo'] ?? 0),
+                        'id_filial' => (int) ($mov['id_filial'] ?? 0),
+                        'nome_filial' => $mov['nome_filial'] ?? null,
+                        'codigo_material' => $mov['codigo_material'] ?? null,
+                        'nome_material' => $mov['nome_material'] ?? null,
+                        'estoque_atual_hoje' => $mov['estoque_atual_hoje'] !== null
+                            ? (float) $mov['estoque_atual_hoje']
+                            : null,
+                        'quantidade_a_estornar' => 0.0,
+                    ];
+                }
+                $tipo = strtolower((string) ($mov['tipo_movimentacao'] ?? ''));
+                $qtd = (float) ($mov['quantidade'] ?? 0);
+                if ($tipo === 'entrada') {
+                    $impactoEstoque[$chave]['quantidade_a_estornar'] += $qtd;
+                } elseif ($tipo === 'saida') {
+                    $impactoEstoque[$chave]['quantidade_a_estornar'] -= $qtd;
+                }
+            }
+        }
+
+        // Mensagens de chat
+        $totalMensagens = 0;
+        if ($this->tabelaExiste('tbl_chat_pedidos')) {
+            $stmtChat = $this->pdo->prepare("SELECT COUNT(*) FROM tbl_chat_pedidos WHERE id_pedido = ?");
+            $stmtChat->execute([$idPedido]);
+            $totalMensagens = (int) $stmtChat->fetchColumn();
+        }
+
+        return [
+            'pedido' => [
+                'id_pedido' => (int) $pedido['id_pedido'],
+                'numero_pedido' => $pedido['numero_pedido'] ?? null,
+                'status' => $pedido['status'] ?? null,
+                'nome_fornecedor' => $pedido['nome_fornecedor'] ?? null,
+                'nome_filial' => $pedido['nome_filial'] ?? null,
+                'nome_usuario' => $pedido['nome_usuario'] ?? null,
+                'data_pedido' => $pedido['data_pedido'] ?? ($pedido['data_solicitacao'] ?? null),
+                'data_entrega_prevista' => $pedido['data_entrega_prevista'] ?? null,
+                'valor_total' => isset($pedido['valor_total']) ? (float) $pedido['valor_total'] : 0,
+                'observacoes' => $pedido['observacoes'] ?? null,
+                'tem_nota_fiscal' => !empty($pedido['url_nota_fiscal']),
+                'nf_nome_arquivo_original' => $pedido['nf_nome_arquivo_original'] ?? null,
+            ],
+            'itens' => array_map(function ($i) {
+                return [
+                    'id_item' => (int) ($i['id_item'] ?? 0),
+                    'codigo_material' => $i['codigo_material'] ?? null,
+                    'nome_material' => $i['nome_material'] ?? null,
+                    'unidade_medida' => $i['unidade_medida'] ?? null,
+                    'quantidade' => (float) ($i['quantidade'] ?? 0),
+                    'preco_unitario' => (float) ($i['preco_unitario'] ?? 0),
+                    'valor_total' => (float) ($i['valor_total'] ?? 0),
+                ];
+            }, $itens),
+            'historico_status' => array_map(function ($h) {
+                return [
+                    'status' => $h['status'] ?? null,
+                    'observacao' => $h['observacao'] ?? null,
+                    'data_alteracao' => $h['data_alteracao'] ?? null,
+                    'nome_usuario' => $h['nome_usuario'] ?? null,
+                ];
+            }, $historico),
+            'movimentacoes_estoque' => array_map(function ($m) {
+                return [
+                    'id_movimentacao' => (int) ($m['id_movimentacao'] ?? 0),
+                    'tipo_movimentacao' => $m['tipo_movimentacao'] ?? null,
+                    'quantidade' => (float) ($m['quantidade'] ?? 0),
+                    'data_movimentacao' => $m['data_movimentacao'] ?? null,
+                    'codigo_material' => $m['codigo_material'] ?? null,
+                    'nome_material' => $m['nome_material'] ?? null,
+                    'nome_filial' => $m['nome_filial'] ?? null,
+                    'observacoes' => $m['observacoes'] ?? null,
+                ];
+            }, $movimentacoes),
+            'impacto_estoque' => array_values($impactoEstoque),
+            'resumo' => [
+                'qtd_itens' => count($itens),
+                'qtd_movimentacoes' => count($movimentacoes),
+                'qtd_historico_status' => count($historico),
+                'qtd_mensagens_chat' => $totalMensagens,
+            ],
+        ];
+    }
+
+    /**
+     * Reverte por completo um pedido de compra:
+     *  - Estorna o estoque referente a cada movimentação gerada pelo pedido;
+     *  - Apaga as movimentações de estoque vinculadas ao pedido;
+     *  - Apaga o histórico de status do pedido;
+     *  - Apaga as mensagens de chat do pedido;
+     *  - Apaga os itens do pedido;
+     *  - Apaga o pedido em si.
+     *
+     * Tudo dentro de uma transação para garantir atomicidade.
+     */
+    public function reverterPedido($idPedido, $observacao = null, $idUsuario = null) {
+        $pedido = $this->findById($idPedido);
+        if (!$pedido) {
+            throw new Exception('Pedido não encontrado.');
+        }
+
+        $resumo = [
+            'movimentacoes_revertidas' => 0,
+            'estoques_ajustados' => 0,
+            'historico_apagado' => 0,
+            'mensagens_apagadas' => 0,
+            'itens_apagados' => 0,
+        ];
+
+        try {
+            $this->pdo->beginTransaction();
+
+            // 1. Estornar movimentações de estoque deste pedido
+            if ($this->tabelaExiste('tbl_movimentacoes_estoque')) {
+                $stmtMov = $this->pdo->prepare("
+                    SELECT id_movimentacao, id_estoque, id_catalogo, id_filial,
+                           tipo_movimentacao, quantidade
+                    FROM tbl_movimentacoes_estoque
+                    WHERE id_pedido_compra = ?
+                    ORDER BY data_movimentacao DESC, id_movimentacao DESC
+                ");
+                $stmtMov->execute([$idPedido]);
+                $movs = $stmtMov->fetchAll(PDO::FETCH_ASSOC);
+
+                $estoquesAjustados = [];
+                foreach ($movs as $mov) {
+                    $idEstoque = isset($mov['id_estoque']) ? (int) $mov['id_estoque'] : 0;
+                    $tipo = strtolower((string) ($mov['tipo_movimentacao'] ?? ''));
+                    $qtd = (float) ($mov['quantidade'] ?? 0);
+
+                    if ($idEstoque > 0 && $qtd != 0) {
+                        if ($tipo === 'entrada') {
+                            $stmtAjuste = $this->pdo->prepare("
+                                UPDATE tbl_estoque_filiais
+                                SET estoque_atual = GREATEST(estoque_atual - ?, 0)
+                                WHERE id_estoque = ?
+                            ");
+                            $stmtAjuste->execute([$qtd, $idEstoque]);
+                            $estoquesAjustados[$idEstoque] = true;
+                        } elseif ($tipo === 'saida') {
+                            $stmtAjuste = $this->pdo->prepare("
+                                UPDATE tbl_estoque_filiais
+                                SET estoque_atual = estoque_atual + ?
+                                WHERE id_estoque = ?
+                            ");
+                            $stmtAjuste->execute([$qtd, $idEstoque]);
+                            $estoquesAjustados[$idEstoque] = true;
+                        }
+                    }
+                    $resumo['movimentacoes_revertidas']++;
+                }
+                $resumo['estoques_ajustados'] = count($estoquesAjustados);
+
+                $stmtDelMov = $this->pdo->prepare("
+                    DELETE FROM tbl_movimentacoes_estoque WHERE id_pedido_compra = ?
+                ");
+                $stmtDelMov->execute([$idPedido]);
+            }
+
+            // 2. Apagar histórico de status
+            if ($this->tabelaExiste('tbl_historico_status_pedidos')) {
+                $stmtDelHist = $this->pdo->prepare("
+                    DELETE FROM tbl_historico_status_pedidos WHERE id_pedido = ?
+                ");
+                $stmtDelHist->execute([$idPedido]);
+                $resumo['historico_apagado'] = $stmtDelHist->rowCount();
+            }
+
+            // 3. Apagar mensagens de chat
+            if ($this->tabelaExiste('tbl_chat_pedidos')) {
+                $stmtDelChat = $this->pdo->prepare("
+                    DELETE FROM tbl_chat_pedidos WHERE id_pedido = ?
+                ");
+                $stmtDelChat->execute([$idPedido]);
+                $resumo['mensagens_apagadas'] = $stmtDelChat->rowCount();
+            }
+
+            // 4. Apagar itens do pedido
+            $stmtDelItens = $this->pdo->prepare("
+                DELETE FROM tbl_itens_pedido_compra WHERE id_pedido = ?
+            ");
+            $stmtDelItens->execute([$idPedido]);
+            $resumo['itens_apagados'] = $stmtDelItens->rowCount();
+
+            // 5. Apagar o pedido em si
+            $stmtDelPedido = $this->pdo->prepare("
+                DELETE FROM {$this->table} WHERE {$this->primaryKey} = ?
+            ");
+            $stmtDelPedido->execute([$idPedido]);
+
+            $this->pdo->commit();
+
+            // Log opcional para auditoria
+            try {
+                error_log(sprintf(
+                    'REVERSAO_PEDIDO_COMPRA pedido=%d numero=%s usuario=%s obs=%s resumo=%s',
+                    $idPedido,
+                    $pedido['numero_pedido'] ?? '',
+                    (string) ($idUsuario ?? ''),
+                    (string) ($observacao ?? ''),
+                    json_encode($resumo, JSON_UNESCAPED_UNICODE)
+                ));
+            } catch (Throwable $e) {
+                // ignorar falhas de log
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Pedido revertido com sucesso.',
+                'resumo' => $resumo,
+                'pedido' => [
+                    'id_pedido' => (int) $idPedido,
+                    'numero_pedido' => $pedido['numero_pedido'] ?? null,
+                ],
+            ];
+        } catch (Exception $e) {
+            try { $this->pdo->rollBack(); } catch (Exception $r) { /* ignore */ }
+            throw $e;
+        }
     }
 }
 ?>

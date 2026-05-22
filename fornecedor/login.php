@@ -22,7 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Buscar fornecedor por email
             $fornecedor = $fornecedorModel->buscarPorEmail($email);
             
-            if ($fornecedor && password_verify($senha, $fornecedor['senha'])) {
+            if ($fornecedor && (int) ($fornecedor['ativo'] ?? 0) !== 1) {
+                $error = 'Fornecedor inativo. Entre em contato com o setor de compras.';
+            } elseif ($fornecedor && password_verify($senha, $fornecedor['senha'])) {
                 // Login bem-sucedido
                 $_SESSION['fornecedor_id'] = $fornecedor['id_fornecedor'];
                 $_SESSION['fornecedor_nome'] = $fornecedor['razao_social'];

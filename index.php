@@ -157,36 +157,36 @@ $user = getCurrentUser();
                                 <div class="col">
                                     <div class="fase-item text-center h-100">
                                         <div class="fase-val text-info" id="dash-ped-fase-em-analise">0</div>
-                                        <div class="fase-nome">Em análise</div>
-                                        <div class="fase-hint">Novo pedido / aguardando aprovação interna</div>
+                                        <div class="fase-nome">Aguardando cotação</div>
+                                        <div class="fase-hint">Auxiliar/ASB montou o pedido</div>
                                     </div>
                                 </div>
                                 <div class="col">
                                     <div class="fase-item text-center h-100">
                                         <div class="fase-val text-secondary" id="dash-ped-fase-pendente">0</div>
-                                        <div class="fase-nome">Pendente</div>
-                                        <div class="fase-hint">Aguardando resposta do fornecedor</div>
+                                        <div class="fase-nome">Em cotação</div>
+                                        <div class="fase-hint">Compras e fornecedor negociam preços</div>
                                     </div>
                                 </div>
                                 <div class="col">
                                     <div class="fase-item text-center h-100">
                                         <div class="fase-val text-success" id="dash-ped-fase-aprovado">0</div>
-                                        <div class="fase-nome">Aprovado</div>
-                                        <div class="fase-hint">Cotação aprovada pelo compras</div>
+                                        <div class="fase-nome">Aprovação sócio</div>
+                                        <div class="fase-hint">Aguardando ou aprovado pelo sócio</div>
                                     </div>
                                 </div>
                                 <div class="col">
                                     <div class="fase-item text-center h-100">
                                         <div class="fase-val text-primary" id="dash-ped-fase-envio-faturamento">0</div>
                                         <div class="fase-nome">Envio p/ faturamento</div>
-                                        <div class="fase-hint">Liberado para faturar</div>
+                                        <div class="fase-hint">Compras encaminha após sócio</div>
                                     </div>
                                 </div>
                                 <div class="col">
                                     <div class="fase-item text-center h-100">
                                         <div class="fase-val text-danger" id="dash-ped-fase-em-faturamento">0</div>
                                         <div class="fase-nome">Em faturamento</div>
-                                        <div class="fase-hint">Aprovado p/ faturar / faturado</div>
+                                        <div class="fase-hint">Fornecedor / NF em faturamento</div>
                                     </div>
                                 </div>
                             </div>

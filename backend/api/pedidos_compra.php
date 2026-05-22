@@ -38,11 +38,15 @@ try {
         require_once __DIR__ . '/../../config/session.php';
         require_once __DIR__ . '/../../models/PedidoCompra.php';
         require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
+        require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+        require_once __DIR__ . '/../../config/filiais_usuario.php';
     } else {
         require_once '../../config/conexao.php';
         require_once '../../config/session.php';
         require_once '../../models/PedidoCompra.php';
         require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
+        require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+        require_once __DIR__ . '/../../config/filiais_usuario.php';
     }
 } catch (Exception $e) {
     http_response_code(500);
@@ -141,6 +145,11 @@ try {
                         echo json_encode(['success' => false, 'error' => 'ID da filial e fornecedor são obrigatórios']);
                         break;
                     }
+                    if (!usuarioPodeAcessarFilial((int) $idFilial)) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => 'Sem permissão para esta clínica']);
+                        break;
+                    }
                     
                     $resultado = $pedidoCompra->buscarMateriaisEstoqueBaixo($idFilial, $idFornecedor, $filtroEstoque, (int)$limite);
                     echo json_encode([
@@ -181,11 +190,40 @@ try {
                         echo json_encode(['success' => false, 'error' => 'Busca, filial e fornecedor são obrigatórios']);
                         break;
                     }
+                    if (!usuarioPodeAcessarFilial((int) $idFilial)) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => 'Sem permissão para esta clínica']);
+                        break;
+                    }
                     
                     $materiais = $pedidoCompra->pesquisarMaterial($busca, $idFilial, $idFornecedor);
                     echo json_encode(['success' => true, 'data' => $materiais]);
                     break;
-                    
+
+                case 'previa-reversao':
+                    // Apenas administradores podem solicitar a prévia de reversão
+                    if (!isAdmin()) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => 'Acesso negado. Apenas administradores podem reverter pedidos.']);
+                        break;
+                    }
+
+                    $id = $_GET['id'] ?? null;
+                    if (!$id) {
+                        http_response_code(400);
+                        echo json_encode(['success' => false, 'error' => 'ID não fornecido']);
+                        break;
+                    }
+
+                    try {
+                        $previa = $pedidoCompra->getPreviaReversao((int) $id);
+                        echo json_encode(['success' => true, 'previa' => $previa]);
+                    } catch (Exception $e) {
+                        http_response_code(404);
+                        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                    }
+                    break;
+
                 default:
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Ação não especificada']);
@@ -204,11 +242,21 @@ try {
                         break;
                     }
 
-                    
+                    $idFilialPedido = (int) ($input['id_filial'] ?? getCurrentUserFilialId() ?? 0);
+                    if ($idFilialPedido <= 0) {
+                        http_response_code(400);
+                        echo json_encode(['success' => false, 'error' => 'Selecione uma clínica para o pedido']);
+                        break;
+                    }
+                    if (!usuarioPodeAcessarFilial($idFilialPedido)) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => 'Sem permissão para criar pedido nesta clínica']);
+                        break;
+                    }
                     
                     $dados = [
                         'id_fornecedor' => $input['id_fornecedor'] ?? null,
-                        'id_filial' => $input['id_filial'] ?? getCurrentUserFilialId(),
+                        'id_filial' => $idFilialPedido,
                         'data_entrega_prevista' => validarData($input['data_entrega_prevista'] ?? null),
                         'prioridade' => $input['prioridade'] ?? 'padrao',
                         'prazo_entrega' => $input['prazo_entrega'] ?? 8,
@@ -228,6 +276,37 @@ try {
                     echo json_encode(['success' => true, 'message' => 'Pedido criado com sucesso', 'data' => $resultado]);
                     break;
                     
+                case 'reverter':
+                    // Apenas administradores podem reverter pedidos
+                    if (!isAdmin()) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => 'Acesso negado. Apenas administradores podem reverter pedidos.']);
+                        break;
+                    }
+
+                    try {
+                        if (!isset($input) || !is_array($input)) {
+                            $input = json_decode(file_get_contents('php://input'), true) ?: [];
+                        }
+
+                        $idPedido = $input['id_pedido'] ?? ($_GET['id'] ?? null);
+                        $observacao = isset($input['observacao']) ? trim((string) $input['observacao']) : null;
+
+                        if (!$idPedido) {
+                            http_response_code(400);
+                            echo json_encode(['success' => false, 'error' => 'ID do pedido é obrigatório']);
+                            break;
+                        }
+
+                        $idUsuario = $_SESSION['usuario_id'] ?? null;
+                        $resultado = $pedidoCompra->reverterPedido((int) $idPedido, $observacao, $idUsuario);
+                        echo json_encode($resultado);
+                    } catch (Exception $e) {
+                        http_response_code(500);
+                        echo json_encode(['success' => false, 'error' => 'Erro ao reverter pedido: ' . $e->getMessage()]);
+                    }
+                    break;
+
                 case 'atualizar_status':
                     try {
                         $input = json_decode(file_get_contents('php://input'), true);
@@ -295,24 +374,23 @@ try {
                         break;
                     }
                     
-                    $statusBloqueadosEdicao = [
-                        'enviar_para_faturamento',
-                        'aprovado_para_faturar',
-                        'enviado',
-                        'em_transito',
-                        'entregue',
-                        'recebido',
-                        'cancelado'
-                    ];
-                    if (in_array(strtolower($pedidoAtual['status'] ?? ''), $statusBloqueadosEdicao)) {
+                    $statusAtualNorm = fluxoPedidoNormalizarStatus($pedidoAtual['status'] ?? '');
+                    if (!in_array($statusAtualNorm, ['aguardando_cotacao', 'em_cotacao'], true)) {
                         http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'Este pedido já foi enviado para faturamento e não pode mais ser editado']);
+                        echo json_encode(['success' => false, 'error' => 'Este pedido não pode mais ser editado na fase atual do fluxo']);
+                        break;
+                    }
+
+                    $idFilialEdicao = (int) ($input['id_filial'] ?? $pedidoAtual['id_filial'] ?? 0);
+                    if ($idFilialEdicao > 0 && !usuarioPodeAcessarFilial($idFilialEdicao)) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => 'Sem permissão para esta clínica']);
                         break;
                     }
                     
                     $dados = [
                         'id_fornecedor' => $input['id_fornecedor'] ?? null,
-                        'id_filial' => $input['id_filial'] ?? getCurrentUserFilialId(),
+                        'id_filial' => $idFilialEdicao > 0 ? $idFilialEdicao : (int) ($pedidoAtual['id_filial'] ?? 0),
                         'data_entrega_prevista' => validarData($input['data_entrega_prevista'] ?? null),
                         'prioridade' => $input['prioridade'] ?? 'padrao',
                         'prazo_entrega' => $input['prazo_entrega'] ?? 8,
@@ -509,17 +587,18 @@ try {
             }
 
             $statusBloqueadosExclusao = [
-                'enviar_para_faturamento',
-                'aprovado_para_faturar',
-                'enviado',
-                'em_transito',
-                'entregue',
-                'recebido',
+                'aguardando_aprovacao_socio',
+                'aprovado_socio',
+                'aguardando_faturamento',
+                'em_faturamento',
+                'em_conferencia',
+                'finalizado',
                 'cancelado'
             ];
-            if (in_array(strtolower($pedidoAtual['status'] ?? ''), $statusBloqueadosExclusao)) {
+            $statusAtualNorm = fluxoPedidoNormalizarStatus($pedidoAtual['status'] ?? '');
+            if (in_array($statusAtualNorm, $statusBloqueadosExclusao, true)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Este pedido já foi enviado para faturamento e não pode mais ser excluído']);
+                echo json_encode(['success' => false, 'error' => 'Este pedido não pode mais ser excluído na fase atual do fluxo']);
                 break;
             }
             

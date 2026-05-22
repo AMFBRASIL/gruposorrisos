@@ -30,8 +30,8 @@ try {
         case 'GET':
             switch ($action) {
                 case 'list':
-                    $page = $_GET['page'] ?? 1;
-                    $limit = $_GET['limit'] ?? 10;
+                    $page = max(1, (int)($_GET['page'] ?? 1));
+                    $limit = max(1, min(100, (int)($_GET['limit'] ?? 10)));
                     $busca = $_GET['busca'] ?? '';
                     $tipo = $_GET['tipo'] ?? '';
                     $data_inicio = $_GET['data_inicio'] ?? '';

@@ -59,17 +59,49 @@ function ocultarModalProcessandoPedido() {
     }, 250);
 }
 
+/** Fluxo oficial de pedidos de compra */
+const FLUXO_PEDIDO_ETAPAS = [
+    { key: 'aguardando_cotacao', nome: 'Aguardando Cotação', icon: '1' },
+    { key: 'em_cotacao', nome: 'Em Cotação', icon: '2' },
+    { key: 'aguardando_aprovacao_socio', nome: 'Aguard. Aprovação Sócio', icon: '3' },
+    { key: 'aprovado_socio', nome: 'Aprovado pelo Sócio', icon: '4' },
+    { key: 'aguardando_faturamento', nome: 'Aguard. Faturamento', icon: '5' },
+    { key: 'em_faturamento', nome: 'Em Faturamento', icon: '6' },
+    { key: 'em_conferencia', nome: 'Em Conferência', icon: '7' },
+    { key: 'finalizado', nome: 'Finalizado', icon: '8' }
+];
+
+const MAPA_STATUS_LEGADO = {
+    em_analise: 'aguardando_cotacao',
+    pendente: 'aguardando_cotacao',
+    aguardando_aprovacao: 'aguardando_cotacao',
+    rascunho: 'aguardando_cotacao',
+    aprovado_cotacao: 'em_cotacao',
+    enviar_para_faturamento: 'aguardando_faturamento',
+    enviar_faturamento: 'aguardando_faturamento',
+    aprovado_para_faturar: 'em_faturamento',
+    faturado: 'em_faturamento',
+    em_transito: 'em_faturamento',
+    enviado: 'em_faturamento',
+    entregue: 'em_conferencia',
+    recebido: 'finalizado',
+    parcialmente_recebido: 'em_conferencia'
+};
+
+function normalizarStatusPedido(status) {
+    const s = (status || '').toLowerCase();
+    return MAPA_STATUS_LEGADO[s] || s;
+}
+
 function pedidoPodeSerEditado(status) {
-    const statusBloqueados = [
-        'enviar_para_faturamento',
-        'aprovado_para_faturar',
-        'enviado',
-        'em_transito',
-        'entregue',
-        'recebido',
-        'cancelado'
-    ];
-    return !statusBloqueados.includes((status || '').toLowerCase());
+    const s = normalizarStatusPedido(status);
+    const editaveis = ['aguardando_cotacao', 'em_cotacao'];
+    return editaveis.includes(s);
+}
+
+/** Admin pode reverter em qualquer status, inclusive recebido (estorna estoque e apaga o pedido). */
+function adminPodeReverterPedido() {
+    return window.usuarioEhAdmin === true;
 }
 
 // Funções de prioridade
@@ -950,6 +982,13 @@ function renderizarTabela(pedidos) {
                     <i class="bi bi-trash"></i>
                 </button>
                 ` : ''}
+                ${adminPodeReverterPedido() ? `
+                <button class="btn btn-sm ${['finalizado', 'recebido'].includes(normalizarStatusPedido(pedido.status)) ? 'btn-outline-danger' : 'btn-outline-dark'} btn-action-simple"
+                        onclick="abrirModalReverterPedido(${pedido.id_pedido})"
+                        title="Reverter pedido e estornar movimentações (Admin)">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                ` : ''}
             </td>
         `;
         tbody.appendChild(row);
@@ -996,25 +1035,27 @@ function getStatusBadge(status) {
     }
     
     const statusMap = {
-        'em_analise': { class: 'badge-info', text: 'Em Análise' },
-        'pendente': { class: 'badge-warning', text: 'Pendente' },
-        'aprovado': { class: 'badge-success', text: 'Aprovado' },
-        'em_producao': { class: 'badge-primary', text: 'Em Produção' },
-        'enviado': { class: 'badge-info', text: 'Enviado' },
-        'recebido': { class: 'badge-success', text: 'Recebido' },
-        'cancelado': { class: 'badge-danger', text: 'Cancelado' },
-        'entregue': { class: 'badge-success', text: 'Entregue' },
-        'atrasado': { class: 'badge-danger', text: 'Atrasado' },
-        'urgente': { class: 'badge-warning', text: 'Urgente' },
-        'em_transito': { class: 'badge-info', text: 'Em Trânsito' },
-        'aguardando_aprovacao': { class: 'badge-secondary', text: 'Aguardando Aprovação' },
-        'parcialmente_recebido': { class: 'badge-warning', text: 'Parcialmente Recebido' },
-        'aprovado_cotacao': { class: 'badge-success', text: 'Cotação Aprovada' },
-        'enviar_para_faturamento': { class: 'badge-primary', text: 'Enviar para Faturamento' },
-        'aprovado_para_faturar': { class: 'badge-success', text: 'Aprovado para Faturar' }
+        aguardando_cotacao: { class: 'badge-secondary', text: 'Aguardando Cotação' },
+        em_cotacao: { class: 'badge-info', text: 'Em Cotação' },
+        aguardando_aprovacao_socio: { class: 'badge-primary', text: 'Aguard. Aprovação Sócio' },
+        aprovado_socio: { class: 'badge-success', text: 'Aprovado pelo Sócio' },
+        aguardando_faturamento: { class: 'badge-warning', text: 'Aguard. Faturamento' },
+        em_faturamento: { class: 'badge-warning', text: 'Em Faturamento' },
+        em_conferencia: { class: 'badge-info', text: 'Em Conferência' },
+        finalizado: { class: 'badge-success', text: 'Finalizado' },
+        cancelado: { class: 'badge-danger', text: 'Cancelado' },
+        em_analise: { class: 'badge-secondary', text: 'Aguardando Cotação' },
+        pendente: { class: 'badge-secondary', text: 'Aguardando Cotação' },
+        aprovado_cotacao: { class: 'badge-info', text: 'Em Cotação' },
+        enviar_para_faturamento: { class: 'badge-warning', text: 'Aguard. Faturamento' },
+        aprovado_para_faturar: { class: 'badge-warning', text: 'Em Faturamento' },
+        em_transito: { class: 'badge-warning', text: 'Em Faturamento' },
+        entregue: { class: 'badge-info', text: 'Em Conferência' },
+        recebido: { class: 'badge-success', text: 'Finalizado' }
     };
     
-    const statusInfo = statusMap[status.toLowerCase()] || { class: 'badge-secondary', text: status };
+    const chave = normalizarStatusPedido(status);
+    const statusInfo = statusMap[chave] || statusMap[status?.toLowerCase()] || { class: 'badge-secondary', text: status };
     return `<span class="badge ${statusInfo.class}">${statusInfo.text}</span>`;
 }
 
@@ -1078,7 +1119,8 @@ function converterMoedaParaNumero(valorFormatado) {
 
 // Verificar se a entrega está atrasada
 function verificarEntregaAtrasada(dataEntrega, status) {
-    if (!dataEntrega || status === 'recebido' || status === 'entregue' || status === 'cancelado') {
+    const statusNorm = normalizarStatusPedido(status);
+    if (!dataEntrega || ['finalizado', 'recebido', 'em_conferencia', 'entregue', 'cancelado'].includes(statusNorm)) {
         return false;
     }
     
@@ -1107,7 +1149,7 @@ function getDataEntregaComIndicador(dataEntrega, status) {
     const entrega = new Date(dataEntrega);
     const diffDias = Math.ceil((entrega - hoje) / (1000 * 60 * 60 * 24));
     
-    if (diffDias <= 3 && diffDias >= 0 && status !== 'recebido' && status !== 'entregue' && status !== 'cancelado') {
+    if (diffDias <= 3 && diffDias >= 0 && !['finalizado', 'recebido', 'em_conferencia', 'entregue', 'cancelado'].includes(statusNorm)) {
         return `<span class="text-warning font-weight-bold">${dataFormatada} <i class="bi bi-clock" title="Entrega próxima"></i></span>`;
     }
     
@@ -1219,6 +1261,15 @@ async function carregarFornecedores() {
     }
 }
 
+/** Preenche clínica única quando o usuário só tem acesso a uma filial */
+function aplicarFilialPadraoModalNovoPedido() {
+    const novoFilial = document.getElementById('novo_id_filial');
+    if (!novoFilial || !Array.isArray(filiais) || filiais.length === 0) return;
+    if (filiais.length === 1) {
+        novoFilial.value = String(filiais[0].id_filial);
+    }
+}
+
 // Carregar filiais
 async function carregarFiliais() {
     try {
@@ -1233,18 +1284,34 @@ async function carregarFiliais() {
         const data = await response.json();
         
         if (data.success) {
-            filiais = data.filiais;
+            filiais = data.filiais || [];
             
-            // Preencher select de filial no modal
             const novoFilial = document.getElementById('novo_id_filial');
-            novoFilial.innerHTML = '<option value="">Selecione uma filial</option>';
+            if (!novoFilial) return;
+
+            novoFilial.innerHTML = '<option value="">Selecione uma Clínica</option>';
             
+            if (filiais.length === 0) {
+                novoFilial.innerHTML = '<option value="">Nenhuma clínica disponível para seu usuário</option>';
+                novoFilial.disabled = true;
+                return;
+            }
+
+            novoFilial.disabled = false;
             filiais.forEach(filial => {
                 const option = document.createElement('option');
                 option.value = filial.id_filial;
                 option.textContent = filial.nome_filial;
                 novoFilial.appendChild(option);
             });
+
+            if (filiais.length === 1) {
+                novoFilial.value = String(filiais[0].id_filial);
+                novoFilial.classList.add('bg-light');
+            } else {
+                novoFilial.classList.remove('bg-light');
+            }
+            aplicarFilialPadraoModalNovoPedido();
         }
     } catch (error) {
         console.error('Erro ao carregar filiais:', error);
@@ -1497,8 +1564,7 @@ function renderizarMateriaisEstoqueBaixo() {
     }
     
     let html = `
-        <div class="table-responsive">
-            <table class="table table-sm table-hover">
+            <table class="table table-sm table-hover mb-0 tabela-materiais-estoque-baixo">
                 <thead class="table-light">
                     <tr>
                         <th>Material</th>
@@ -1570,7 +1636,6 @@ function renderizarMateriaisEstoqueBaixo() {
     html += `
                 </tbody>
             </table>
-        </div>
     `;
     
     container.innerHTML = html;
@@ -1823,7 +1888,8 @@ function abrirModalNovoPedido() {
     itensRemovidosEdicao = new Set();
     configurarBuscaItensPedidoExistente(false);
     document.getElementById('formNovoPedido').reset();
-    document.getElementById('materiais-container').innerHTML = '<div class="text-center text-muted py-4">Selecione uma filial e um fornecedor para carregar os materiais</div>';
+    aplicarFilialPadraoModalNovoPedido();
+    document.getElementById('materiais-container').innerHTML = '<div class="text-center text-muted py-4">Selecione uma clínica e um fornecedor para carregar os materiais</div>';
     document.getElementById('total-pedido-modal').textContent = 'R$ 0,00';
     const totalItensElement = document.getElementById('total-itens-modal');
     const totalQuantidadeElement = document.getElementById('total-quantidade-modal');
@@ -2182,7 +2248,6 @@ async function visualizarPedido(id) {
                             </td>
                             <td class="text-center">
                                 ${formatarMoeda(precoExibir)}
-                                ${(disponivel === 1 && precoFornecedor !== null) ? '<br><small class="text-success">Preço do fornecedor</small>' : ''}
                             </td>
                             <td class="text-center">
                                 <strong class="text-success">${formatarMoeda(valorItem)}</strong>
@@ -2322,6 +2387,7 @@ async function editarPedido(id) {
 
 // Configurar status do pedido com cores apropriadas
 function configurarStatusPedido(statusBadge, statusText, statusCard, statusAtivo, status) {
+    status = normalizarStatusPedido(status);
     console.log('🎨 Iniciando configuração de status:', status);
     
     // Verificar se todos os elementos foram passados corretamente
@@ -2344,6 +2410,86 @@ function configurarStatusPedido(statusBadge, statusText, statusCard, statusAtivo
     };
     
     switch (status) {
+        case 'aguardando_cotacao':
+            statusConfig = {
+                icon: 'bi-clipboard-plus',
+                text: 'Aguardando Cotação',
+                color: 'secondary',
+                bgColor: 'rgba(107, 114, 128, 0.1)',
+                borderColor: 'rgba(107, 114, 128, 0.2)',
+                textColor: '#6b7280'
+            };
+            break;
+        case 'em_cotacao':
+            statusConfig = {
+                icon: 'bi-tags',
+                text: 'Em Cotação',
+                color: 'info',
+                bgColor: 'rgba(6, 182, 212, 0.1)',
+                borderColor: 'rgba(6, 182, 212, 0.2)',
+                textColor: '#0891b2'
+            };
+            break;
+        case 'aguardando_aprovacao_socio':
+            statusConfig = {
+                icon: 'bi-person-check',
+                text: 'Aguard. Aprovação Sócio',
+                color: 'warning',
+                bgColor: 'rgba(234, 179, 8, 0.1)',
+                borderColor: 'rgba(234, 179, 8, 0.2)',
+                textColor: '#d97706'
+            };
+            break;
+        case 'aprovado_socio':
+            statusConfig = {
+                icon: 'bi-check-circle',
+                text: 'Aprovado pelo Sócio',
+                color: 'success',
+                bgColor: 'rgba(34, 197, 94, 0.1)',
+                borderColor: 'rgba(34, 197, 94, 0.2)',
+                textColor: '#16a34a'
+            };
+            break;
+        case 'aguardando_faturamento':
+            statusConfig = {
+                icon: 'bi-hourglass-split',
+                text: 'Aguard. Faturamento',
+                color: 'primary',
+                bgColor: 'rgba(59, 130, 246, 0.1)',
+                borderColor: 'rgba(59, 130, 246, 0.2)',
+                textColor: '#2563eb'
+            };
+            break;
+        case 'em_faturamento':
+            statusConfig = {
+                icon: 'bi-receipt',
+                text: 'Em Faturamento',
+                color: 'primary',
+                bgColor: 'rgba(59, 130, 246, 0.1)',
+                borderColor: 'rgba(59, 130, 246, 0.2)',
+                textColor: '#2563eb'
+            };
+            break;
+        case 'em_conferencia':
+            statusConfig = {
+                icon: 'bi-box-seam',
+                text: 'Em Conferência',
+                color: 'warning',
+                bgColor: 'rgba(234, 179, 8, 0.1)',
+                borderColor: 'rgba(234, 179, 8, 0.2)',
+                textColor: '#d97706'
+            };
+            break;
+        case 'finalizado':
+            statusConfig = {
+                icon: 'bi-check2-all',
+                text: 'Finalizado',
+                color: 'success',
+                bgColor: 'rgba(34, 197, 94, 0.1)',
+                borderColor: 'rgba(34, 197, 94, 0.2)',
+                textColor: '#16a34a'
+            };
+            break;
         case 'em_analise':
             statusConfig = {
                 icon: 'bi-search',
@@ -3363,80 +3509,65 @@ function resetarModalParaCriacao() {
 // Configurar botões de ação baseados no status do pedido
 function configurarBotoesAcao(status) {
     try {
-        console.log('🎛️ Configurando botões de ação para status:', status);
+        const s = normalizarStatusPedido(status);
+        console.log('🎛️ Configurando botões de ação para status:', s);
         
-        // Ocultar todos os botões primeiro
         const botoes = [
-            'btn-aprovar-pendente',
-            'btn-aprovar-cotacao',
-            'btn-aprovar-faturamento',
-            'btn-marcar-entregue',
+            'btn-iniciar-cotacao',
+            'btn-enviar-aprovacao-socio',
+            'btn-aprovar-socio',
+            'btn-encaminhar-faturamento',
             'btn-confirmar-recebimento',
+            'btn-finalizar-pedido',
             'btn-cancelar',
-            'btn-voltar-status'
+            'btn-voltar-status',
+            'btn-reverter-pedido-admin'
         ];
         
         botoes.forEach(id => {
-            const botao = document.getElementById(id);
-            if (botao) botao.classList.add('d-none');
+            document.getElementById(id)?.classList.add('d-none');
         });
         
-        // Mostrar botões baseados no novo fluxo de status
-        switch (status) {
-            case 'em_analise':
-                // Gestor pode aprovar para Pendente
-                document.getElementById('btn-aprovar-pendente')?.classList.remove('d-none');
+        switch (s) {
+            case 'aguardando_cotacao':
+                document.getElementById('btn-iniciar-cotacao')?.classList.remove('d-none');
                 document.getElementById('btn-cancelar')?.classList.remove('d-none');
                 break;
-                
-            case 'pendente':
-                // Setor de compras pode aprovar para Cotação Aprovada
-                document.getElementById('btn-aprovar-cotacao')?.classList.remove('d-none');
+            case 'em_cotacao':
+                document.getElementById('btn-enviar-aprovacao-socio')?.classList.remove('d-none');
                 document.getElementById('btn-cancelar')?.classList.remove('d-none');
                 document.getElementById('btn-voltar-status')?.classList.remove('d-none');
                 break;
-                
-            case 'aprovado_cotacao':
-                // Fornecedor faz cotação (será tratado em pedidos-fornecedores.php)
+            case 'aguardando_aprovacao_socio':
+                document.getElementById('btn-aprovar-socio')?.classList.remove('d-none');
                 document.getElementById('btn-cancelar')?.classList.remove('d-none');
                 document.getElementById('btn-voltar-status')?.classList.remove('d-none');
                 break;
-                
-            case 'enviar_para_faturamento':
-                // Setor de compras avalia e aprova para faturamento
-                document.getElementById('btn-aprovar-faturamento')?.classList.remove('d-none');
+            case 'aprovado_socio':
+            case 'aguardando_faturamento':
+                document.getElementById('btn-encaminhar-faturamento')?.classList.remove('d-none');
                 document.getElementById('btn-cancelar')?.classList.remove('d-none');
                 document.getElementById('btn-voltar-status')?.classList.remove('d-none');
                 break;
-                
-            case 'aprovado_para_faturar':
-                // Fornecedor pode enviar (será tratado em pedidos-fornecedores.php)
-                document.getElementById('btn-cancelar')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
-                break;
-                
-            case 'em_transito':
-                // Pode marcar como entregue
-                document.getElementById('btn-marcar-entregue')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
-                break;
-                
-            case 'entregue':
-                // Pode confirmar recebimento
+            case 'em_faturamento':
                 document.getElementById('btn-confirmar-recebimento')?.classList.remove('d-none');
+                document.getElementById('btn-cancelar')?.classList.remove('d-none');
                 document.getElementById('btn-voltar-status')?.classList.remove('d-none');
                 break;
-                
-            case 'recebido':
-                // Status final - nenhum botão de ação
+            case 'em_conferencia':
+                document.getElementById('btn-finalizar-pedido')?.classList.remove('d-none');
+                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
                 break;
-                
+            case 'finalizado':
             case 'cancelado':
-                // Status final - nenhum botão de ação
                 break;
         }
+
+        if (adminPodeReverterPedido() && !['finalizado', 'cancelado'].includes(s)) {
+            document.getElementById('btn-reverter-pedido-admin')?.classList.remove('d-none');
+        }
         
-        console.log('✅ Botões de ação configurados para status:', status);
+        console.log('✅ Botões de ação configurados para status:', s);
         
     } catch (error) {
         console.error('Erro ao configurar botões de ação:', error);
@@ -3458,8 +3589,16 @@ async function atualizarStatusPedido(novoStatus, observacao = null) {
         
         // Confirmar ação com o usuário
         const statusNomes = {
-            'em_analise': 'Em Análise',
-            'pendente': 'Pendente',
+            'aguardando_cotacao': 'Aguardando Cotação',
+            'em_cotacao': 'Em Cotação',
+            'aguardando_aprovacao_socio': 'Aguard. Aprovação Sócio',
+            'aprovado_socio': 'Aprovado pelo Sócio',
+            'aguardando_faturamento': 'Aguard. Faturamento',
+            'em_faturamento': 'Em Faturamento',
+            'em_conferencia': 'Em Conferência',
+            'finalizado': 'Finalizado',
+            'em_analise': 'Aguardando Cotação',
+            'pendente': 'Aguardando Cotação',
             'aprovado_cotacao': 'Cotação Aprovada',
             'enviar_para_faturamento': 'Enviar para Faturamento',
             'aprovado_para_faturar': 'Aprovado para Faturar',
@@ -3601,16 +3740,17 @@ async function mostrarOpcoesVoltarStatus() {
         const statusAtual = document.getElementById('view_numero_pedido').dataset.statusAtual;
         
         // Definir opções de volta baseadas no status atual
+        const s = normalizarStatusPedido(statusAtual);
         const opcoesVolta = {
-            'pendente': [{ valor: 'em_analise', nome: 'Em Análise' }],
-            'aprovado_cotacao': [{ valor: 'pendente', nome: 'Pendente' }],
-            'enviar_para_faturamento': [{ valor: 'aprovado_cotacao', nome: 'Cotação Aprovada' }],
-            'aprovado_para_faturar': [{ valor: 'enviar_para_faturamento', nome: 'Enviar para Faturamento' }],
-            'em_transito': [{ valor: 'aprovado_para_faturar', nome: 'Aprovado para Faturar' }],
-            'entregue': [{ valor: 'em_transito', nome: 'Em Trânsito' }]
+            em_cotacao: [{ valor: 'aguardando_cotacao', nome: 'Aguardando Cotação' }],
+            aguardando_aprovacao_socio: [{ valor: 'em_cotacao', nome: 'Em Cotação' }],
+            aguardando_faturamento: [{ valor: 'aguardando_aprovacao_socio', nome: 'Aguard. Aprovação Sócio' }],
+            em_faturamento: [{ valor: 'aguardando_faturamento', nome: 'Aguard. Faturamento' }],
+            em_conferencia: [{ valor: 'em_faturamento', nome: 'Em Faturamento' }],
+            finalizado: [{ valor: 'em_conferencia', nome: 'Em Conferência' }]
         };
         
-        const opcoes = opcoesVolta[statusAtual] || [];
+        const opcoes = opcoesVolta[s] || [];
         
         if (opcoes.length === 0) {
             mostrarErro('Não é possível voltar o status deste pedido');
@@ -3714,29 +3854,18 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
     const container = document.getElementById('status-flow');
     if (!container) return;
     
-    // Definir ordem dos status
-    const fluxoStatus = [
-        { key: 'em_analise', nome: 'Em Análise', icon: '📋' },
-        { key: 'pendente', nome: 'Pendente', icon: '⏳' },
-        { key: 'aprovado_cotacao', nome: 'Cotação Aprovada', icon: '✅' },
-        { key: 'enviar_para_faturamento', nome: 'Enviar para Faturamento', icon: '📄' },
-        { key: 'aprovado_para_faturar', nome: 'Aprovado p/ Faturar', icon: '💰' },
-        { key: 'em_transito', nome: 'Em Trânsito', icon: '🚚' },
-        { key: 'entregue', nome: 'Entregue', icon: '📦' }
-    ];
+    const fluxoStatus = FLUXO_PEDIDO_ETAPAS;
+    const statusAtualNorm = normalizarStatusPedido(statusAtual);
     
-    // Criar mapa de histórico por status
     const historicoMap = {};
     historico.forEach(item => {
-        // Usar status_novo (campo retornado pela API) ou status (compatibilidade)
-        const statusKey = item.status_novo || item.status;
+        const statusKey = normalizarStatusPedido(item.status_novo || item.status);
         if (statusKey) {
             historicoMap[statusKey] = item;
         }
     });
     
-    // Encontrar índice do status atual
-    const indiceAtual = fluxoStatus.findIndex(s => s.key === statusAtual);
+    const indiceAtual = fluxoStatus.findIndex(s => s.key === statusAtualNorm);
     
     let html = '';
     
@@ -3746,13 +3875,18 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
         let icone = status.icon;
         let dataTexto = '';
         
-        if (historicoDeste) {
-            // Status já passou
+        const passouEtapa = historicoDeste
+            || (indiceAtual >= 0 && index < indiceAtual)
+            || (status.key === 'aprovado_socio' && ['aguardando_faturamento', 'em_faturamento', 'em_conferencia', 'finalizado'].includes(statusAtualNorm));
+
+        if (passouEtapa && !historicoDeste && status.key === 'aprovado_socio' && statusAtualNorm !== 'aprovado_socio') {
+            classe += ' completed';
+            icone = '✓';
+        } else if (historicoDeste) {
             classe += ' completed';
             icone = '✓';
             dataTexto = `<div class="status-date">${formatarDataHora(historicoDeste.data_alteracao)}</div>`;
-        } else if (status.key === statusAtual) {
-            // Status atual
+        } else if (status.key === statusAtualNorm) {
             classe += ' current';
         } else if (index === indiceAtual + 1) {
             // Próximo status disponível
@@ -3765,9 +3899,9 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
         const onClick = (index === indiceAtual + 1) ? `onclick="alterarStatusPedido('${status.key}', ${pedidoId})"` : '';
         
         html += `
-            <div class="${classe}" ${onClick}>
+            <div class="${classe}" ${onClick} title="${status.nome}">
                 <div class="status-icon">${icone}</div>
-                <div class="flex-grow-1">
+                <div class="status-step-body">
                     <div class="status-text">${status.nome}</div>
                     ${dataTexto}
                 </div>
@@ -3814,45 +3948,40 @@ async function alterarStatusPedido(novoStatus, pedidoId) {
 
 // Obter nome do status
 function getStatusNome(status) {
+    const etapa = FLUXO_PEDIDO_ETAPAS.find(e => e.key === normalizarStatusPedido(status));
+    if (etapa) return etapa.nome;
     const nomes = {
-        'em_analise': 'Em Análise',
-        'pendente': 'Pendente',
-        'aprovado_cotacao': 'Cotação Aprovada',
-        'enviar_para_faturamento': 'Enviar para Faturamento',
-        'aprovado_para_faturar': 'Aprovado para Faturar',
-        'em_transito': 'Em Trânsito',
-        'entregue': 'Entregue',
-        'cancelado': 'Cancelado'
+        aguardando_cotacao: 'Aguardando Cotação',
+        em_cotacao: 'Em Cotação',
+        aguardando_aprovacao_socio: 'Aguard. Aprovação Sócio',
+        aprovado_socio: 'Aprovado pelo Sócio',
+        aguardando_faturamento: 'Aguard. Faturamento',
+        em_faturamento: 'Em Faturamento',
+        em_conferencia: 'Em Conferência',
+        finalizado: 'Finalizado',
+        cancelado: 'Cancelado'
     };
-    return nomes[status] || status;
+    return nomes[normalizarStatusPedido(status)] || status;
 }
 
 function renderizarFluxoStatusBloqueio(historico, statusAtual, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const fluxoStatus = [
-        { key: 'em_analise', nome: 'Em Análise' },
-        { key: 'pendente', nome: 'Pendente' },
-        { key: 'aprovado_cotacao', nome: 'Cotação Aprovada' },
-        { key: 'enviar_para_faturamento', nome: 'Enviar para Faturamento' },
-        { key: 'aprovado_para_faturar', nome: 'Aprovado para Faturar' },
-        { key: 'em_transito', nome: 'Em Trânsito' },
-        { key: 'entregue', nome: 'Entregue' },
-        { key: 'recebido', nome: 'Recebido' }
-    ];
+    const fluxoStatus = FLUXO_PEDIDO_ETAPAS;
+    const statusAtualNorm = normalizarStatusPedido(statusAtual);
 
     const historicoMap = {};
     (historico || []).forEach(item => {
-        const statusKey = item.status_novo || item.status;
+        const statusKey = normalizarStatusPedido(item.status_novo || item.status);
         if (statusKey) historicoMap[statusKey] = item;
     });
 
-    const indiceAtual = fluxoStatus.findIndex(status => status.key === statusAtual);
+    const indiceAtual = fluxoStatus.findIndex(status => status.key === statusAtualNorm);
     container.innerHTML = fluxoStatus.map((status, index) => {
         const historicoStatus = historicoMap[status.key];
         const concluido = historicoStatus || (indiceAtual >= 0 && index < indiceAtual);
-        const atual = status.key === statusAtual;
+        const atual = status.key === statusAtualNorm;
         const badgeClass = atual ? 'bg-warning text-dark' : (concluido ? 'bg-success' : 'bg-secondary');
         const dataStatus = historicoStatus?.data_alteracao ? formatarDataHora(historicoStatus.data_alteracao) : '';
 
@@ -3963,18 +4092,6 @@ function renderizarTimelineStatus(historico, containerId, isCompleta = false) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
-    const statusNomes = {
-        'em_analise': 'Em Análise',
-        'pendente': 'Pendente',
-        'aprovado_cotacao': 'Cotação Aprovada',
-        'enviar_para_faturamento': 'Enviar para Faturamento',
-        'aprovado_para_faturar': 'Aprovado para Faturar',
-        'em_transito': 'Em Trânsito',
-        'entregue': 'Entregue',
-        'recebido': 'Recebido',
-        'cancelado': 'Cancelado'
-    };
-    
     if (!historico || historico.length === 0) {
         container.innerHTML = '<div class="text-muted text-center py-3">Nenhum histórico disponível</div>';
         return;
@@ -3997,7 +4114,7 @@ function renderizarTimelineStatus(historico, containerId, isCompleta = false) {
         
         const dataFormatada = formatarDataHora(item.data_alteracao || item.data_alteracao);
         // Usar status_novo_nome se disponível, senão buscar no mapeamento
-        let statusNome = item.status_novo_nome || statusNomes[statusAtual];
+        let statusNome = item.status_novo_nome || getStatusNome(statusAtual);
         
         // Se ainda não tiver nome, formatar o status (substituir _ por espaços e capitalizar)
         if (!statusNome && statusAtual) {
@@ -4707,13 +4824,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Event listeners para os novos botões do fluxo de status
-    document.getElementById('btn-aprovar-pendente')?.addEventListener('click', () => atualizarStatusPedido('pendente'));
-    document.getElementById('btn-aprovar-cotacao')?.addEventListener('click', () => atualizarStatusPedido('aprovado_cotacao'));
-    document.getElementById('btn-aprovar-faturamento')?.addEventListener('click', () => atualizarStatusPedido('aprovado_para_faturar'));
-    document.getElementById('btn-marcar-transito')?.addEventListener('click', () => atualizarStatusPedido('em_transito'));
-    document.getElementById('btn-marcar-entregue')?.addEventListener('click', () => atualizarStatusPedido('entregue'));
-    document.getElementById('btn-confirmar-recebimento')?.addEventListener('click', () => atualizarStatusPedido('recebido'));
+    document.getElementById('btn-iniciar-cotacao')?.addEventListener('click', () => atualizarStatusPedido('em_cotacao'));
+    document.getElementById('btn-enviar-aprovacao-socio')?.addEventListener('click', () => atualizarStatusPedido('aguardando_aprovacao_socio'));
+    document.getElementById('btn-aprovar-socio')?.addEventListener('click', () => atualizarStatusPedido('aguardando_faturamento'));
+    document.getElementById('btn-encaminhar-faturamento')?.addEventListener('click', () => atualizarStatusPedido('em_faturamento'));
+    document.getElementById('btn-confirmar-recebimento')?.addEventListener('click', () => atualizarStatusPedido('em_conferencia'));
+    document.getElementById('btn-finalizar-pedido')?.addEventListener('click', () => atualizarStatusPedido('finalizado'));
     document.getElementById('btn-cancelar')?.addEventListener('click', () => atualizarStatusPedido('cancelado'));
     document.getElementById('btn-voltar-status')?.addEventListener('click', mostrarOpcoesVoltarStatus);
     
@@ -5262,3 +5378,323 @@ async function visualizarNFPedido() {
         mostrarErro('Erro ao carregar Nota Fiscal: ' + error.message);
     }
 }
+
+// ============================================================
+// REVERSÃO DE PEDIDO DE COMPRA (apenas administradores)
+// ============================================================
+
+let reverterPedidoIdAtual = null;
+let modalReverterPedidoInstance = null;
+
+function formatarNumeroEstoque(valor) {
+    const num = Number(valor || 0);
+    if (Number.isNaN(num)) return '0';
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 3
+    });
+}
+
+function formatarTipoMovimentacao(tipo) {
+    const mapa = {
+        entrada: 'Entrada',
+        saida: 'Saída',
+        ajuste: 'Ajuste',
+        inventario: 'Inventário',
+        transferencia: 'Transferência'
+    };
+    if (!tipo) return '-';
+    const chave = String(tipo).toLowerCase();
+    return mapa[chave] || tipo;
+}
+
+function abrirModalReverterPedidoFromVisualizar() {
+    const modalVisualizar = document.getElementById('modalVisualizarPedido');
+    const idPedido = modalVisualizar?.getAttribute('data-pedido-id');
+    if (!idPedido) {
+        mostrarErro('ID do pedido não encontrado.');
+        return;
+    }
+    const instanciaVisualizar = modalVisualizar
+        ? bootstrap.Modal.getInstance(modalVisualizar)
+        : null;
+    if (instanciaVisualizar) {
+        instanciaVisualizar.hide();
+    }
+    abrirModalReverterPedido(parseInt(idPedido, 10));
+}
+
+function abrirModalReverterPedido(idPedido) {
+    if (!adminPodeReverterPedido()) {
+        mostrarErro('Apenas administradores podem reverter pedidos.');
+        return;
+    }
+
+    reverterPedidoIdAtual = idPedido;
+
+    const modalEl = document.getElementById('modalReverterPedido');
+    if (!modalEl) return;
+
+    document.getElementById('reverter-loading').classList.remove('d-none');
+    document.getElementById('reverter-conteudo').classList.add('d-none');
+    const erroBox = document.getElementById('reverter-erro');
+    erroBox.classList.add('d-none');
+    erroBox.textContent = '';
+
+    const obs = document.getElementById('rev-observacao');
+    if (obs) obs.value = '';
+    const chk = document.getElementById('rev-confirmacao');
+    if (chk) chk.checked = false;
+    const btn = document.getElementById('btn-confirmar-reverter-pedido');
+    if (btn) btn.disabled = true;
+
+    if (!modalReverterPedidoInstance) {
+        modalReverterPedidoInstance = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+    }
+    modalReverterPedidoInstance.show();
+
+    carregarPreviaReversao(idPedido);
+}
+
+async function carregarPreviaReversao(idPedido) {
+    try {
+        const resp = await fetch(`backend/api/pedidos_compra.php?action=previa-reversao&id=${encodeURIComponent(idPedido)}`, {
+            credentials: 'same-origin'
+        });
+        const data = await resp.json();
+
+        if (!data.success) {
+            mostrarErroPreviaReversao(data.error || 'Não foi possível carregar a prévia da reversão.');
+            return;
+        }
+
+        renderizarPreviaReversao(data.previa || {});
+    } catch (error) {
+        console.error('Erro ao carregar prévia da reversão:', error);
+        mostrarErroPreviaReversao('Erro ao carregar prévia da reversão. Verifique sua conexão.');
+    }
+}
+
+function mostrarErroPreviaReversao(mensagem) {
+    document.getElementById('reverter-loading').classList.add('d-none');
+    document.getElementById('reverter-conteudo').classList.add('d-none');
+    const erroBox = document.getElementById('reverter-erro');
+    erroBox.textContent = mensagem;
+    erroBox.classList.remove('d-none');
+}
+
+function renderizarPreviaReversao(previa) {
+    const pedido = previa.pedido || {};
+    const resumo = previa.resumo || {};
+
+    document.getElementById('rev-numero-pedido').textContent = pedido.numero_pedido || '-';
+    document.getElementById('rev-status-atual').innerHTML = getStatusBadge(pedido.status || '');
+    document.getElementById('rev-valor-total').textContent = formatarMoeda(pedido.valor_total || 0);
+    document.getElementById('rev-filial').textContent = pedido.nome_filial || '-';
+    document.getElementById('rev-fornecedor').textContent = pedido.nome_fornecedor || '-';
+    document.getElementById('rev-solicitante').textContent = pedido.nome_usuario || '-';
+    document.getElementById('rev-data-pedido').textContent = formatarData(pedido.data_pedido) || '-';
+    document.getElementById('rev-data-entrega').textContent = formatarData(pedido.data_entrega_prevista) || '-';
+    document.getElementById('rev-tem-nf').innerHTML = pedido.tem_nota_fiscal
+        ? `<span class="badge bg-warning text-dark">Possui NF anexada${pedido.nf_nome_arquivo_original ? ' (' + pedido.nf_nome_arquivo_original + ')' : ''}</span>`
+        : '<span class="badge bg-secondary">Sem NF</span>';
+
+    const alertaRecebido = document.getElementById('rev-alerta-recebido');
+    if (alertaRecebido) {
+        const ehRecebido = ['finalizado', 'recebido', 'em_conferencia'].includes(normalizarStatusPedido(pedido.status));
+        alertaRecebido.classList.toggle('d-none', !ehRecebido);
+        const qtdEl = alertaRecebido.querySelector('.rev-alerta-recebido-qtd');
+        if (qtdEl) {
+            qtdEl.textContent = String(resumo.qtd_movimentacoes || 0);
+        }
+    }
+
+    document.getElementById('rev-qtd-itens').textContent = resumo.qtd_itens || 0;
+    document.getElementById('rev-qtd-movimentacoes').textContent = resumo.qtd_movimentacoes || 0;
+    document.getElementById('rev-qtd-historico').textContent = resumo.qtd_historico_status || 0;
+    document.getElementById('rev-qtd-chat').textContent = resumo.qtd_mensagens_chat || 0;
+
+    // Impacto no estoque
+    const tbodyImpacto = document.getElementById('rev-tbody-impacto');
+    const impacto = previa.impacto_estoque || [];
+    if (!impacto.length) {
+        tbodyImpacto.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhuma movimentação de estoque vinculada a este pedido.</td></tr>';
+    } else {
+        tbodyImpacto.innerHTML = impacto.map(item => {
+            const qtdEstornar = Number(item.quantidade_a_estornar || 0);
+            const estoqueHoje = item.estoque_atual_hoje !== null && item.estoque_atual_hoje !== undefined
+                ? Number(item.estoque_atual_hoje)
+                : null;
+            const estoqueDepois = estoqueHoje !== null ? Math.max(estoqueHoje - qtdEstornar, 0) : null;
+            const sinal = qtdEstornar > 0 ? '-' : (qtdEstornar < 0 ? '+' : '');
+            return `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${item.nome_material || 'Material'}</div>
+                        <small class="text-muted">${item.codigo_material || ''}</small>
+                    </td>
+                    <td>${item.nome_filial || '-'}</td>
+                    <td class="text-center">${estoqueHoje !== null ? formatarNumeroEstoque(estoqueHoje) : '-'}</td>
+                    <td class="text-center text-danger fw-semibold">${sinal}${formatarNumeroEstoque(Math.abs(qtdEstornar))}</td>
+                    <td class="text-center fw-semibold">${estoqueDepois !== null ? formatarNumeroEstoque(estoqueDepois) : '-'}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Movimentações detalhadas
+    const tbodyMov = document.getElementById('rev-tbody-movimentacoes');
+    const movs = previa.movimentacoes_estoque || [];
+    if (!movs.length) {
+        tbodyMov.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhuma movimentação de estoque vinculada a este pedido.</td></tr>';
+    } else {
+        tbodyMov.innerHTML = movs.map(m => `
+            <tr>
+                <td>${formatarDataHora(m.data_movimentacao) || '-'}</td>
+                <td><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">${formatarTipoMovimentacao(m.tipo_movimentacao)}</span></td>
+                <td>
+                    <div class="fw-semibold">${m.nome_material || '-'}</div>
+                    <small class="text-muted">${m.codigo_material || ''}</small>
+                </td>
+                <td class="text-center">${formatarNumeroEstoque(m.quantidade)}</td>
+                <td>${m.nome_filial || '-'}</td>
+                <td><small>${(m.observacoes || '').toString().replace(/</g, '&lt;')}</small></td>
+            </tr>
+        `).join('');
+    }
+
+    // Itens do pedido
+    const tbodyItens = document.getElementById('rev-tbody-itens');
+    const itens = previa.itens || [];
+    if (!itens.length) {
+        tbodyItens.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sem itens.</td></tr>';
+    } else {
+        tbodyItens.innerHTML = itens.map(it => `
+            <tr>
+                <td>
+                    <div class="fw-semibold">${it.nome_material || '-'}</div>
+                    <small class="text-muted">${it.codigo_material || ''}${it.unidade_medida ? ' · ' + it.unidade_medida : ''}</small>
+                </td>
+                <td class="text-center">${formatarNumeroEstoque(it.quantidade)}</td>
+                <td class="text-center">${formatarMoeda(it.preco_unitario)}</td>
+                <td class="text-center">${formatarMoeda(it.valor_total)}</td>
+            </tr>
+        `).join('');
+    }
+
+    // Histórico de status
+    const tbodyHist = document.getElementById('rev-tbody-historico');
+    const hist = previa.historico_status || [];
+    if (!hist.length) {
+        tbodyHist.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sem histórico.</td></tr>';
+    } else {
+        tbodyHist.innerHTML = hist.map(h => `
+            <tr>
+                <td>${formatarDataHora(h.data_alteracao) || '-'}</td>
+                <td>${getStatusBadge(h.status || '')}</td>
+                <td>${h.nome_usuario || '-'}</td>
+                <td><small>${(h.observacao || '').toString().replace(/</g, '&lt;')}</small></td>
+            </tr>
+        `).join('');
+    }
+
+    document.getElementById('reverter-loading').classList.add('d-none');
+    document.getElementById('reverter-conteudo').classList.remove('d-none');
+}
+
+function atualizarBotaoConfirmarReversao() {
+    const chk = document.getElementById('rev-confirmacao');
+    const obs = document.getElementById('rev-observacao');
+    const btn = document.getElementById('btn-confirmar-reverter-pedido');
+    if (!btn) return;
+    const motivo = (obs?.value || '').trim();
+    btn.disabled = !(chk?.checked && motivo.length >= 5);
+}
+
+async function confirmarReversaoPedido() {
+    if (!reverterPedidoIdAtual) return;
+    const obs = document.getElementById('rev-observacao');
+    const motivo = (obs?.value || '').trim();
+
+    if (motivo.length < 5) {
+        mostrarErro('Informe um motivo com pelo menos 5 caracteres.');
+        return;
+    }
+
+    const confirmacao = await Swal.fire({
+        title: 'Tem certeza?',
+        html: 'Esta ação irá <strong>apagar o pedido</strong> e <strong>estornar todas as movimentações</strong> de estoque vinculadas. <br><br>Esta operação é <strong>irreversível</strong>.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sim, reverter agora',
+        cancelButtonText: 'Cancelar'
+    });
+    if (!confirmacao.isConfirmed) return;
+
+    const btn = document.getElementById('btn-confirmar-reverter-pedido');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Revertendo...';
+    }
+
+    try {
+        const resp = await fetch('backend/api/pedidos_compra.php?action=reverter', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'reverter',
+                id_pedido: reverterPedidoIdAtual,
+                observacao: motivo
+            })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            if (modalReverterPedidoInstance) modalReverterPedidoInstance.hide();
+            const resumo = data.resumo || {};
+            Swal.fire({
+                title: 'Pedido revertido',
+                html: `
+                    <div class="text-start">
+                        <p>O pedido <strong>${(data.pedido && data.pedido.numero_pedido) || ''}</strong> foi revertido com sucesso.</p>
+                        <ul class="small mb-0">
+                            <li>Movimentações revertidas: <strong>${resumo.movimentacoes_revertidas || 0}</strong></li>
+                            <li>Saldos de estoque ajustados: <strong>${resumo.estoques_ajustados || 0}</strong></li>
+                            <li>Itens apagados: <strong>${resumo.itens_apagados || 0}</strong></li>
+                            <li>Histórico apagado: <strong>${resumo.historico_apagado || 0}</strong></li>
+                            <li>Mensagens de chat apagadas: <strong>${resumo.mensagens_apagadas || 0}</strong></li>
+                        </ul>
+                    </div>
+                `,
+                icon: 'success',
+                confirmButtonText: 'OK'
+            });
+            reverterPedidoIdAtual = null;
+            carregarPedidos();
+            if (typeof carregarEstatisticas === 'function') carregarEstatisticas();
+        } else {
+            mostrarErro(data.error || 'Erro ao reverter o pedido.');
+        }
+    } catch (error) {
+        console.error('Erro ao reverter pedido:', error);
+        mostrarErro('Erro ao reverter o pedido. Tente novamente.');
+    } finally {
+        if (btn) {
+            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-2"></i>Reverter Pedido Definitivamente';
+            atualizarBotaoConfirmarReversao();
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const btnConfirmar = document.getElementById('btn-confirmar-reverter-pedido');
+    const chk = document.getElementById('rev-confirmacao');
+    const obs = document.getElementById('rev-observacao');
+
+    if (chk) chk.addEventListener('change', atualizarBotaoConfirmarReversao);
+    if (obs) obs.addEventListener('input', atualizarBotaoConfirmarReversao);
+    if (btnConfirmar) btnConfirmar.addEventListener('click', confirmarReversaoPedido);
+});

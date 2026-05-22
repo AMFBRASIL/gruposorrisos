@@ -652,6 +652,19 @@ $menuActive = 'movimentacoes';
     </div>
 </div>
 
+<!-- Modal carregando lista (paginação) -->
+<div class="modal fade" id="modalAguardeLista" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body text-center py-4 px-4">
+                <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+                <div class="fw-semibold">Aguarde</div>
+                <div class="text-muted small mt-1">Carregando dados...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de Confirmação -->
 <div class="modal fade" id="confirmModal" tabindex="-1">
     <div class="modal-dialog">

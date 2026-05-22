@@ -898,6 +898,85 @@ body { background: #f7f9fb; }
     gap: 8px;
 }
 
+/* Fluxo horizontal (modal visualizar pedido) */
+.status-flow--horizontal {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 4px 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.status-flow--horizontal .status-step {
+    flex: 1 1 0;
+    min-width: 108px;
+    max-width: 150px;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 10px 6px 8px;
+    margin: 0;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    background: #fff;
+    z-index: 1;
+}
+
+.status-flow--horizontal .status-step .status-icon {
+    width: 32px;
+    height: 32px;
+    margin: 0 0 6px 0;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.status-flow--horizontal .status-step-body {
+    width: 100%;
+    min-width: 0;
+}
+
+.status-flow--horizontal .status-text {
+    font-size: 0.72rem;
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.status-flow--horizontal .status-date {
+    font-size: 0.65rem;
+    margin-top: 4px;
+    line-height: 1.2;
+}
+
+/* Conector horizontal entre etapas */
+.status-flow--horizontal .status-step:not(:last-child) {
+    margin-right: 28px;
+}
+
+.status-flow--horizontal .status-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 25px;
+    left: calc(100% + 4px);
+    width: 20px;
+    height: 2px;
+    background: #dee2e6;
+    transform: none;
+    bottom: auto;
+    z-index: 0;
+}
+
+.status-flow--horizontal .status-step.completed:not(:last-child)::after {
+    background: #198754;
+}
+
+.status-flow--horizontal .status-step.current:not(:last-child)::after {
+    background: #ffc107;
+}
+
 .status-step {
     display: flex;
     align-items: center;
@@ -906,8 +985,12 @@ body { background: #f7f9fb; }
     border: 2px solid #e9ecef;
     background: #f8f9fa;
     transition: all 0.3s ease;
-    cursor: pointer;
+    cursor: default;
     position: relative;
+}
+
+.status-flow--horizontal .status-step.available {
+    cursor: pointer;
 }
 
 .status-step:hover {
@@ -997,8 +1080,8 @@ body { background: #f7f9fb; }
     margin-top: 2px;
 }
 
-/* Conectores entre status */
-.status-step:not(:last-child)::after {
+/* Conectores verticais (layout em coluna) */
+.status-flow:not(.status-flow--horizontal) .status-step:not(:last-child)::after {
     content: '';
     position: absolute;
     bottom: -12px;
@@ -1009,8 +1092,19 @@ body { background: #f7f9fb; }
     background: #dee2e6;
 }
 
-.status-step.completed:not(:last-child)::after {
+.status-flow:not(.status-flow--horizontal) .status-step.completed:not(:last-child)::after {
     background: #198754;
+}
+
+/* Timeline compacta no painel lateral */
+.timeline-compact .timeline-item {
+    padding-bottom: 0.65rem;
+    margin-bottom: 0.65rem;
+}
+
+.timeline-compact .timeline-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
 }
 
 /* Animação de loading */

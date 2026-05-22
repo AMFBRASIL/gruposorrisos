@@ -15,6 +15,28 @@ if ($_SESSION['usuario_perfil'] !== 'Fornecedor') {
     exit;
 }
 
+// Bloquear se o fornecedor vinculado estiver inativo
+try {
+    require_once __DIR__ . '/config/conexao.php';
+    $pdoAcesso = Conexao::getInstance()->getPdo();
+    $stAtivo = $pdoAcesso->prepare('
+        SELECT f.ativo
+        FROM tbl_usuarios u
+        INNER JOIN tbl_fornecedores f ON f.id_fornecedor = u.id_fornecedor
+        WHERE u.id_usuario = ?
+        LIMIT 1
+    ');
+    $stAtivo->execute([(int) ($_SESSION['usuario_id'] ?? 0)]);
+    $rowAtivo = $stAtivo->fetch(PDO::FETCH_ASSOC);
+    if (!$rowAtivo || (int) ($rowAtivo['ativo'] ?? 0) !== 1) {
+        session_destroy();
+        header('Location: login.php?erro=fornecedor_inativo');
+        exit;
+    }
+} catch (Throwable $e) {
+    // mantém fluxo se consulta falhar
+}
+
 // Inicializar controller de acesso
 $controllerAcesso = new ControllerAcesso();
 
@@ -182,20 +204,14 @@ $menuActive = 'pedidos_fornecedores';
             text-transform: uppercase;
         }
         
-        .status-em_analise { background: #fef3c7; color: #92400e; }
-        .status-pendente { background: #fef3c7; color: #92400e; }
-        .status-aprovado { background: #d1fae5; color: #065f46; }
-        .status-aprovado_cotacao { background: #d1fae5; color: #065f46; }
-        .status-aprovado_para_faturar { background: #dcfce7; color: #166534; }
-        .status-em_producao { background: #dbeafe; color: #1e40af; }
-        .status-enviado { background: #e0e7ff; color: #3730a3; }
-        .status-entregue { background: #dcfce7; color: #166534; }
-        .status-atrasado { background: #fee2e2; color: #991b1b; }
-        .status-urgente { background: #fef2f2; color: #dc2626; }
-        .status-em_transito { background: #e0f2fe; color: #0277bd; }
-        .status-aguardando_aprovacao { background: #fff3cd; color: #856404; }
-        .status-parcialmente_recebido { background: #e8f5e8; color: #2e7d32; }
-        .status-recebido { background: #dcfce7; color: #166534; }
+        .status-aguardando_cotacao, .status-em_analise, .status-pendente { background: #fef3c7; color: #92400e; }
+        .status-em_cotacao, .status-aprovado_cotacao { background: #dbeafe; color: #1e40af; }
+        .status-aguardando_aprovacao_socio { background: #fff3cd; color: #856404; }
+        .status-aprovado_socio { background: #d1fae5; color: #065f46; }
+        .status-aguardando_faturamento, .status-enviar_para_faturamento { background: #e0e7ff; color: #3730a3; }
+        .status-em_faturamento, .status-aprovado_para_faturar, .status-em_transito { background: #e0f2fe; color: #0277bd; }
+        .status-em_conferencia, .status-entregue, .status-parcialmente_recebido { background: #e8f5e8; color: #2e7d32; }
+        .status-finalizado, .status-recebido { background: #dcfce7; color: #166534; }
         .status-cancelado { background: #f3e5f5; color: #7b1fa2; }
         .status-respondido { background: #dbeafe; color: #1e40af; }
         
@@ -537,8 +553,10 @@ $menuActive = 'pedidos_fornecedores';
             <div class="col-md-3">
                 <select class="form-select" id="filtro-status">
                     <option value="">Todos os Status</option>
-                    <option value="aprovado_cotacao">Aprovado Cotação</option>
-                    <option value="aprovado_para_faturar">Aprovado para Faturar</option>
+                    <option value="aguardando_cotacao">Aguardando Cotação</option>
+                    <option value="em_cotacao">Em Cotação</option>
+                    <option value="em_faturamento">Em Faturamento</option>
+                    <option value="aguardando_faturamento">Aguard. Faturamento</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -956,8 +974,49 @@ $menuActive = 'pedidos_fornecedores';
 let pedidosData = [];
 let pedidoAtual = null;
 
+const MAPA_STATUS_FORNECEDOR = {
+    em_analise: 'aguardando_cotacao',
+    pendente: 'aguardando_cotacao',
+    aguardando_aprovacao: 'aguardando_cotacao',
+    aprovado_cotacao: 'em_cotacao',
+    enviar_para_faturamento: 'aguardando_faturamento',
+    enviar_faturamento: 'aguardando_faturamento',
+    aprovado_para_faturar: 'em_faturamento',
+    faturado: 'em_faturamento',
+    em_transito: 'em_faturamento',
+    entregue: 'em_conferencia',
+    recebido: 'finalizado',
+    parcialmente_recebido: 'em_conferencia'
+};
+
+function normalizarStatusFornecedor(status) {
+    const s = (status || '').toLowerCase();
+    return MAPA_STATUS_FORNECEDOR[s] || s;
+}
+
+const LABELS_STATUS_FORNECEDOR = {
+    aguardando_cotacao: 'Aguardando Cotação',
+    em_cotacao: 'Em Cotação',
+    aguardando_aprovacao_socio: 'Aguard. Aprovação Sócio',
+    aprovado_socio: 'Aprovado pelo Sócio',
+    aguardando_faturamento: 'Aguard. Faturamento',
+    em_faturamento: 'Em Faturamento',
+    em_conferencia: 'Em Conferência',
+    finalizado: 'Finalizado',
+    cancelado: 'Cancelado'
+};
+
+function labelStatusFornecedor(status) {
+    const norm = normalizarStatusFornecedor(status);
+    return LABELS_STATUS_FORNECEDOR[norm] || status;
+}
+
 function pedidoFornecedorPodeResponder(status) {
-    return ['em_analise', 'pendente', 'aprovado_cotacao'].includes((status || '').toLowerCase());
+    return ['aguardando_cotacao', 'em_cotacao'].includes(normalizarStatusFornecedor(status));
+}
+
+function pedidoFornecedorPodeFaturar(status) {
+    return ['em_faturamento', 'aguardando_faturamento'].includes(normalizarStatusFornecedor(status));
 }
 
 /** Item que ainda exige preenchimento pelo fornecedor (lista / cartão). */
@@ -1182,8 +1241,8 @@ async function carregarPedidos() {
 // Atualizar estatísticas
 function atualizarEstatisticas() {
     const total = pedidosData.length;
-    const pendentes = pedidosData.filter(p => ['em_analise', 'pendente', 'aguardando_aprovacao'].includes(p.status)).length;
-    const respondidos = pedidosData.filter(p => ['aprovado', 'em_producao', 'enviado', 'entregue', 'em_transito', 'parcialmente_recebido', 'recebido'].includes(p.status)).length;
+    const pendentes = pedidosData.filter(p => pedidoFornecedorPodeResponder(p.status)).length;
+    const respondidos = pedidosData.filter(p => !pedidoFornecedorPodeResponder(p.status) && normalizarStatusFornecedor(p.status) !== 'cancelado').length;
     const valorTotal = pedidosData.reduce((sum, p) => sum + calcularValorTotalPedido(p), 0);
     
     document.getElementById('total-pedidos').textContent = total;
@@ -1226,7 +1285,7 @@ function renderizarPedidos() {
         <div class="pedido-card">
             <div class="pedido-header">
                 <div class="pedido-numero">${pedido.numero}</div>
-                <span class="pedido-status status-${pedido.status}">${pedido.status}</span>
+                <span class="pedido-status status-${normalizarStatusFornecedor(pedido.status)}">${labelStatusFornecedor(pedido.status)}</span>
             </div>
             ${alertaItensSemResposta}
             <div class="pedido-info">
@@ -1285,12 +1344,12 @@ function renderizarPedidos() {
                         <i class="bi bi-reply me-2"></i>Responder
                     </button>
                 ` : ''}
-                ${(['aprovado_cotacao', 'aprovado_para_faturar'].includes(pedido.status)) ? `
+                ${pedidoFornecedorPodeFaturar(pedido.status) ? `
                     <button class="btn btn-success btn-action" onclick="abrirModalAprovarFaturamento(${pedido.id})">
-                        <i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento
+                        <i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento / NF
                     </button>
                 ` : ''}
-                ${(['em_transito', 'entregue'].includes(pedido.status)) ? `
+                ${pedidoFornecedorPodeFaturar(pedido.status) ? `
                     <button class="btn btn-outline-info btn-action" onclick="abrirModalUploadNF(${pedido.id})">
                         <i class="bi bi-file-earmark-pdf me-2"></i>Enviar NF
                     </button>
@@ -1317,7 +1376,7 @@ function filtrarPedidos() {
     }
     
     if (status) {
-        filtrados = filtrados.filter(p => p.status === status);
+        filtrados = filtrados.filter(p => normalizarStatusFornecedor(p.status) === status || p.status === status);
     }
     
     if (data) {
@@ -1373,7 +1432,7 @@ function visualizarPedido(pedidoId) {
         <div class="row mb-4">
             <div class="col-md-6">
                 <strong>Status:</strong>
-                <span class="pedido-status status-${pedido.status}">${pedido.status}</span>
+                <span class="pedido-status status-${normalizarStatusFornecedor(pedido.status)}">${labelStatusFornecedor(pedido.status)}</span>
             </div>
             <div class="col-md-6">
                 <strong>Prioridade:</strong>
@@ -1471,7 +1530,7 @@ function visualizarPedido(pedidoId) {
             </div>
         </div>
         
-        ${(['aprovado_cotacao', 'aprovado_para_faturar'].includes(pedido.status)) ? `
+        ${pedidoFornecedorPodeFaturar(pedido.status) ? `
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card border-success">
@@ -1479,7 +1538,7 @@ function visualizarPedido(pedidoId) {
                         <h6 class="mb-0"><i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento</h6>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted small mb-2">Compras já aprovou a cotação; confirme o faturamento e anexe a NF se quiser. O pedido passará para <strong>Em trânsito</strong> e o compras será notificado por e-mail.</p>
+                        <p class="text-muted small mb-2">Após aprovação do sócio, confirme o faturamento e anexe a NF. O pedido seguirá em <strong>Em Faturamento</strong> até a clínica confirmar o recebimento.</p>
                         <button class="btn btn-success btn-sm" onclick="abrirModalAprovarFaturamento(${pedido.id})">
                             <i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento
                         </button>
@@ -2458,8 +2517,7 @@ async function salvarResposta() {
         if (response.ok) {
             const data = await response.json();
             if (data.success) {
-                // Atualizar status do pedido para 'pendente'
-                pedido.status = 'pendente';
+                pedido.status = 'em_cotacao';
                 pedido.observacoes_fornecedor = (observacoes || '').trim();
                 if (Array.isArray(pedido.itens)) {
                     pedido.itens.forEach((item) => {

@@ -16,6 +16,7 @@ $controllerAcesso = new ControllerAcesso();
 $controllerAcesso->registrarAcessoPagina();
 
 $menuActive = 'pedidos_compra';
+$usuarioEhAdmin = isAdmin();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -156,8 +157,41 @@ $menuActive = 'pedidos_compra';
         .itens-scroll-box {
             max-height: 320px;
             overflow-y: auto;
+            overflow-x: auto;
             border: 1px solid #e9ecef;
             border-radius: 8px;
+        }
+
+        /* Cabeçalho fixo ao rolar itens (Novo Pedido + Visualizar) */
+        #modalNovoPedido .itens-scroll-box table,
+        #modalVisualizarPedido .itens-scroll-box table {
+            margin-bottom: 0;
+        }
+
+        /* table-responsive quebra sticky; o scroll fica no .itens-scroll-box */
+        #modalNovoPedido .itens-scroll-box .table-responsive,
+        #modalVisualizarPedido .itens-scroll-box .table-responsive {
+            overflow: visible;
+        }
+
+        #modalNovoPedido .itens-scroll-box thead th,
+        #modalVisualizarPedido .itens-scroll-box thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            background-color: #f8f9fa;
+            box-shadow: 0 1px 0 #dee2e6;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        #modalVisualizarPedido .itens-scroll-box tfoot th {
+            position: sticky;
+            bottom: 0;
+            z-index: 3;
+            background-color: #f8f9fa;
+            box-shadow: 0 -1px 0 #dee2e6;
+            vertical-align: middle;
         }
         
         /* Botões de ação simples */
@@ -256,12 +290,14 @@ $menuActive = 'pedidos_compra';
                     <div class="col-md-3">
                         <select class="form-select" id="filtro-status">
                             <option value="">Todos os Status</option>
-                            <option value="pendente">Pendente</option>
-                            <option value="respondido">Respondido</option>
-                            <option value="aprovado">Aprovado</option>
-                            <option value="em_producao">Em Produção</option>
-                            <option value="enviado">Enviado</option>
-                            <option value="recebido">Recebido</option>
+                            <option value="aguardando_cotacao">Aguardando Cotação</option>
+                            <option value="em_cotacao">Em Cotação</option>
+                            <option value="aguardando_aprovacao_socio">Aguard. Aprovação Sócio</option>
+                            <option value="aprovado_socio">Aprovado pelo Sócio</option>
+                            <option value="aguardando_faturamento">Aguard. Faturamento</option>
+                            <option value="em_faturamento">Em Faturamento</option>
+                            <option value="em_conferencia">Em Conferência</option>
+                            <option value="finalizado">Finalizado</option>
                             <option value="cancelado">Cancelado</option>
                         </select>
                     </div>
@@ -693,6 +729,24 @@ $menuActive = 'pedidos_compra';
                     </div>
                 </div>
 
+                <!-- Fluxo de Status (horizontal, largura total) -->
+                <div class="card mb-4 border-0 shadow-sm" id="card-fluxo-status-pedido">
+                    <div class="card-header bg-primary bg-opacity-10 border-0 py-2">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-diagram-3 me-2 text-primary"></i>
+                                <h6 class="mb-0 text-primary">Fluxo de Status</h6>
+                            </div>
+                            <small class="text-muted">Acompanhe a evolução do pedido</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-2 p-md-3">
+                        <div class="status-flow status-flow--horizontal" id="status-flow">
+                            <!-- Fluxo de status será carregado aqui -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Itens do Pedido -->
                 <div class="card mb-4 border-0 shadow-sm">
                     <div class="card-header bg-light border-0">
@@ -706,7 +760,7 @@ $menuActive = 'pedidos_compra';
                             <i class="bi bi-exclamation-triangle me-1"></i>
                             <span id="view-alerta-itens-pendentes-resposta-texto"></span>
                         </div>
-                        <div class="table-responsive itens-scroll-box">
+                        <div class="itens-scroll-box">
                             <table class="table table-hover mb-0">
                                 <thead class="table-light">
                                     <tr>
@@ -732,23 +786,57 @@ $menuActive = 'pedidos_compra';
                     </div>
                 </div>
 
-                <!-- Informações Adicionais -->
-                <div class="row g-4">
-                    <div class="col-md-8">
-                        <div class="card border-0 shadow-sm mb-3">
-                            <div class="card-header bg-light border-0">
+                <!-- Observações, NF e Histórico -->
+                <div class="row g-3 g-lg-4">
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-light border-0 py-2">
                                 <div class="d-flex align-items-center">
                                     <i class="bi bi-chat-text me-2 text-primary"></i>
                                     <h6 class="mb-0">Observações</h6>
                                 </div>
                             </div>
                             <div class="card-body">
-                                <div class="info-item">
+                                <div class="info-item mb-0">
                                     <div class="info-value" id="view_observacoes">Nenhuma observação registrada</div>
                                 </div>
                             </div>
                         </div>
-                        
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-warning bg-opacity-10 border-0 py-2">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-clock-history me-2 text-warning"></i>
+                                        <h6 class="mb-0 text-warning">Histórico de Status</h6>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="mostrarHistoricoCompleto()">
+                                        <i class="bi bi-eye me-1"></i>Ver Completo
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body py-2">
+                                <div class="timeline-container timeline-compact" id="timeline-status" style="max-height: 200px; overflow-y: auto;">
+                                    <!-- Timeline será carregada aqui -->
+                                </div>
+                                <div class="row g-2 mt-2 pt-2 border-top small">
+                                    <div class="col-6">
+                                        <div class="text-muted">Criado em</div>
+                                        <div class="fw-semibold" id="view-data-criacao">—</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted">Última atualização</div>
+                                        <div class="fw-semibold" id="view-data-atualizacao">—</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12">
                         <!-- Nota Fiscal -->
                         <div class="card border-0 shadow-sm" id="card-nota-fiscal" style="display: none;">
                             <div class="card-header bg-light border-0">
@@ -773,58 +861,6 @@ $menuActive = 'pedidos_compra';
                                     <button type="button" class="btn btn-primary btn-sm" id="btn-visualizar-nf" onclick="visualizarNFPedido()">
                                         <i class="bi bi-eye me-2"></i>Visualizar Nota Fiscal
                                     </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <!-- Quadro de Fluxo de Status -->
-                        <div class="card border-0 shadow-sm mb-3">
-                            <div class="card-header bg-primary bg-opacity-10 border-0">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-diagram-3 me-2 text-primary"></i>
-                                    <h6 class="mb-0 text-primary">Fluxo de Status</h6>
-                                </div>
-                            </div>
-                            <div class="card-body p-3">
-                                <div class="status-flow" id="status-flow">
-                                    <!-- Fluxo de status será carregado aqui -->
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Histórico de Status -->
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-header bg-warning bg-opacity-10 border-0">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-clock-history me-2 text-warning"></i>
-                                        <h6 class="mb-0 text-warning">Histórico de Status</h6>
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="mostrarHistoricoCompleto()">
-                                        <i class="bi bi-eye me-1"></i>Ver Completo
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="timeline-container" id="timeline-status">
-                                    <!-- Timeline será carregada aqui -->
-                                </div>
-                                <div class="mt-3">
-                                    <div class="info-item">
-                                        <div class="info-label">
-                                            <i class="bi bi-calendar-plus me-2 text-muted"></i>
-                                            Criado em
-                                        </div>
-                                        <div class="info-value" id="view-data-criacao">01/01/2024</div>
-                                    </div>
-                                    <div class="info-item">
-                                        <div class="info-label">
-                                            <i class="bi bi-calendar-check me-2 text-muted"></i>
-                                            Última atualização
-                                        </div>
-                                        <div class="info-value" id="view-data-atualizacao">01/01/2024</div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -876,29 +912,34 @@ $menuActive = 'pedidos_compra';
                         <i class="bi bi-envelope me-2"></i>Enviar Email
                     </button>
                     
-                    <!-- Botão Aprovar para Pendente (Em Análise → Pendente) -->
-                    <button type="button" class="btn btn-success d-none" id="btn-aprovar-pendente">
-                        <i class="bi bi-check-circle me-2"></i>Aprovar (Gestor)
+                    <!-- Passo 2: Compras inicia cotação -->
+                    <button type="button" class="btn btn-info d-none" id="btn-iniciar-cotacao">
+                        <i class="bi bi-clipboard2-check me-2"></i>Iniciar Cotação (Compras)
                     </button>
                     
-                    <!-- Botão Aprovar Cotação (Pendente → Cotação Aprovada) -->
-                    <button type="button" class="btn btn-info d-none" id="btn-aprovar-cotacao">
-                        <i class="bi bi-clipboard-check me-2"></i>Aprovar Cotação (Compras)
+                    <!-- Passo 2→3: Compras envia ao sócio -->
+                    <button type="button" class="btn btn-primary d-none" id="btn-enviar-aprovacao-socio">
+                        <i class="bi bi-send me-2"></i>Enviar para Aprovação do Sócio
                     </button>
                     
-                    <!-- Botão Aprovar Faturamento (Enviar para Faturamento → Aprovado para Faturar) -->
-                    <button type="button" class="btn btn-warning d-none" id="btn-aprovar-faturamento">
-                        <i class="bi bi-receipt me-2"></i>Aprovar Faturamento (Compras)
+                    <!-- Passo 3: Sócio aprova -->
+                    <button type="button" class="btn btn-success d-none" id="btn-aprovar-socio">
+                        <i class="bi bi-check-circle me-2"></i>Aprovar (Sócio)
                     </button>
                     
-                    <!-- Botão Marcar como Entregue (Em Trânsito → Entregue) -->
-                    <button type="button" class="btn btn-success d-none" id="btn-marcar-entregue">
-                        <i class="bi bi-box-seam me-2"></i>Marcar como Entregue
+                    <!-- Passo 4: Compras encaminha faturamento -->
+                    <button type="button" class="btn btn-warning d-none" id="btn-encaminhar-faturamento">
+                        <i class="bi bi-receipt me-2"></i>Encaminhar para Faturamento (Compras)
                     </button>
                     
-                    <!-- Botão Confirmar Recebimento (Entregue → Recebido) -->
+                    <!-- Passo 5: Clínica confirma recebimento → conferência -->
                     <button type="button" class="btn btn-primary d-none" id="btn-confirmar-recebimento">
-                        <i class="bi bi-check2-all me-2"></i>Confirmar Recebimento
+                        <i class="bi bi-box-arrow-in-down me-2"></i>Confirmar Recebimento (Conferência)
+                    </button>
+                    
+                    <!-- Passo 5→6: Finalizar e entrada no estoque -->
+                    <button type="button" class="btn btn-success d-none" id="btn-finalizar-pedido">
+                        <i class="bi bi-check2-all me-2"></i>Finalizar Pedido
                     </button>
                     
                     <!-- Botão de Cancelamento (disponível para vários status) -->
@@ -910,6 +951,13 @@ $menuActive = 'pedidos_compra';
                     <button type="button" class="btn btn-outline-warning d-none" id="btn-voltar-status" onclick="mostrarOpcoesVoltarStatus()">
                         <i class="bi bi-arrow-left me-2"></i>Voltar Status
                     </button>
+
+                    <!-- Reversão completa do pedido (admin) — disponível inclusive em status recebido -->
+                    <?php if ($usuarioEhAdmin): ?>
+                    <button type="button" class="btn btn-danger d-none" id="btn-reverter-pedido-admin" onclick="abrirModalReverterPedidoFromVisualizar()" title="Reverter pedido e estornar estoque">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i>Reverter Pedido
+                    </button>
+                    <?php endif; ?>
                 </div>
                 
                 <button type="button" class="btn btn-success" onclick="imprimirPedido()">
@@ -1152,6 +1200,252 @@ $menuActive = 'pedidos_compra';
     </div>
 </div>
 
+<!-- Modal de Reversão de Pedido (apenas administradores) -->
+<div class="modal fade modal-modern" id="modalReverterPedido" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger bg-opacity-10 border-0">
+                <div>
+                    <h5 class="modal-title text-danger mb-1">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i>Reverter Pedido de Compra
+                    </h5>
+                    <div class="text-muted">
+                        Confira <strong>tudo</strong> que será desfeito antes de confirmar. Esta ação é
+                        <strong>irreversível</strong>.
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="reverter-loading" class="text-center py-5">
+                    <div class="spinner-border text-danger" role="status">
+                        <span class="visually-hidden">Carregando prévia...</span>
+                    </div>
+                    <p class="mt-3 mb-0 text-muted">Calculando o que será revertido...</p>
+                </div>
+
+                <div id="reverter-erro" class="alert alert-danger d-none" role="alert"></div>
+
+                <div id="reverter-conteudo" class="d-none">
+                    <div class="alert alert-warning d-flex align-items-start">
+                        <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+                        <div>
+                            <div class="fw-semibold mb-1">Atenção: o pedido será excluído por completo.</div>
+                            <div class="small">
+                                Todas as movimentações de estoque originadas por este pedido serão
+                                <strong>estornadas</strong> e os registros relacionados (itens, histórico de
+                                status e mensagens de chat) serão <strong>apagados</strong>.
+                                Use somente quando o pedido foi feito de forma errada ou em ambiente de teste.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger d-none" id="rev-alerta-recebido">
+                        <i class="bi bi-box-seam me-2"></i>
+                        <strong>Pedido com status Recebido:</strong>
+                        este pedido já gerou <strong><span class="rev-alerta-recebido-qtd">0</span> entrada(s)</strong>
+                        no estoque. A reversão irá <strong>subtrair essas quantidades</strong> do saldo da clínica
+                        antes de excluir o pedido.
+                    </div>
+
+                    <!-- Resumo do pedido -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light border-0">
+                            <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Dados do Pedido</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 small">
+                                <div class="col-md-4"><strong>Número:</strong> <span id="rev-numero-pedido">-</span></div>
+                                <div class="col-md-4"><strong>Status atual:</strong> <span id="rev-status-atual">-</span></div>
+                                <div class="col-md-4"><strong>Valor total:</strong> <span id="rev-valor-total">-</span></div>
+                                <div class="col-md-4"><strong>Clínica:</strong> <span id="rev-filial">-</span></div>
+                                <div class="col-md-4"><strong>Fornecedor:</strong> <span id="rev-fornecedor">-</span></div>
+                                <div class="col-md-4"><strong>Solicitante:</strong> <span id="rev-solicitante">-</span></div>
+                                <div class="col-md-4"><strong>Data do pedido:</strong> <span id="rev-data-pedido">-</span></div>
+                                <div class="col-md-4"><strong>Entrega prevista:</strong> <span id="rev-data-entrega">-</span></div>
+                                <div class="col-md-4"><strong>Nota fiscal:</strong> <span id="rev-tem-nf">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cards de resumo -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">Itens do pedido</div>
+                                    <div class="fs-4 fw-bold text-danger" id="rev-qtd-itens">0</div>
+                                    <div class="small text-muted">serão apagados</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">Movimentações de estoque</div>
+                                    <div class="fs-4 fw-bold text-danger" id="rev-qtd-movimentacoes">0</div>
+                                    <div class="small text-muted">serão estornadas</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">Histórico de status</div>
+                                    <div class="fs-4 fw-bold text-danger" id="rev-qtd-historico">0</div>
+                                    <div class="small text-muted">registros apagados</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">Mensagens de chat</div>
+                                    <div class="fs-4 fw-bold text-danger" id="rev-qtd-chat">0</div>
+                                    <div class="small text-muted">serão apagadas</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Impacto no estoque -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light border-0">
+                            <h6 class="mb-0">
+                                <i class="bi bi-box-seam me-2"></i>Impacto no Estoque
+                            </h6>
+                            <small class="text-muted">Estes saldos serão ajustados ao reverter o pedido.</small>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 260px;">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Clínica</th>
+                                            <th class="text-center">Estoque atual</th>
+                                            <th class="text-center">Será estornado</th>
+                                            <th class="text-center">Estoque após reversão</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rev-tbody-impacto">
+                                        <tr><td colspan="5" class="text-center text-muted py-3">Nenhuma movimentação de estoque vinculada a este pedido.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Movimentações detalhadas -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light border-0">
+                            <h6 class="mb-0">
+                                <i class="bi bi-list-check me-2"></i>Movimentações que serão apagadas
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 240px;">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Tipo</th>
+                                            <th>Material</th>
+                                            <th class="text-center">Quantidade</th>
+                                            <th>Clínica</th>
+                                            <th>Observação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rev-tbody-movimentacoes">
+                                        <tr><td colspan="6" class="text-center text-muted py-3">Sem movimentações.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Itens do pedido -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light border-0">
+                            <h6 class="mb-0"><i class="bi bi-box me-2"></i>Itens do pedido que serão apagados</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 220px;">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Material</th>
+                                            <th class="text-center">Quantidade</th>
+                                            <th class="text-center">Preço unitário</th>
+                                            <th class="text-center">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rev-tbody-itens">
+                                        <tr><td colspan="4" class="text-center text-muted py-3">Sem itens.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Histórico de status -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light border-0">
+                            <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Histórico de status que será apagado</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 200px;">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Status</th>
+                                            <th>Usuário</th>
+                                            <th>Observação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rev-tbody-historico">
+                                        <tr><td colspan="4" class="text-center text-muted py-3">Sem histórico.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campo de observação obrigatória -->
+                    <div class="mb-3">
+                        <label for="rev-observacao" class="form-label fw-semibold">
+                            <i class="bi bi-pencil-square me-1"></i>
+                            Motivo da reversão <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="rev-observacao" rows="3"
+                                  placeholder="Descreva por que este pedido está sendo revertido (ex.: pedido criado de forma errada, teste, duplicidade)."></textarea>
+                        <small class="text-muted">Este motivo ficará registrado nos logs de auditoria do sistema.</small>
+                    </div>
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="rev-confirmacao">
+                        <label class="form-check-label" for="rev-confirmacao">
+                            Estou ciente de que esta ação é <strong>irreversível</strong> e desejo prosseguir.
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="btn-confirmar-reverter-pedido" disabled>
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Reverter Pedido Definitivamente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.usuarioEhAdmin = <?php echo $usuarioEhAdmin ? 'true' : 'false'; ?>;
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="assets/js/pedidos-compra.js"></script>

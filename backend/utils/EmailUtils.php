@@ -3,7 +3,7 @@
  * Utilitários para envio de e-mails usando PHPMailer
  * GrupoSorrisos - Sistema de Gestão
  *
- * A configuração SMTP vem de tbl_configuracoes (tela configuracoes.php), chaves smtp_*.
+ * Configuração em tbl_configuracoes (configuracoes.php): email_provedor = smtp | mailgun.
  */
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -13,6 +13,78 @@ use PHPMailer\PHPMailer\Exception;
  * Classe utilitária para envio de e-mails
  */
 class EmailUtils {
+
+    /** @var string|null */
+    private static $ultimoErro = null;
+
+    public static function getUltimoErro(): ?string {
+        if (self::$ultimoErro !== null) {
+            return self::$ultimoErro;
+        }
+        if (class_exists('MailgunSender', false) && MailgunSender::getUltimoErro()) {
+            return MailgunSender::getUltimoErro();
+        }
+        return null;
+    }
+
+    private static function setErro(?string $msg): void {
+        self::$ultimoErro = $msg;
+    }
+
+    /**
+     * Valida config Mailgun antes do envio (mensagens em português).
+     * @return array<string,mixed>|null
+     */
+    public static function montarConfigMailgun(?array $override = null): ?array {
+        self::setErro(null);
+        try {
+            $model = self::getModelConfiguracao();
+
+            $ativo = $override['smtp_ativo'] ?? $model->getValor('smtp_ativo', '0');
+            if ($ativo !== '1' && strtolower((string)$ativo) !== 'true') {
+                self::setErro('Ative «Ativar envio de e-mails» e salve antes de testar.');
+                return null;
+            }
+
+            $apiKey = trim((string)($override['mailgun_api_key'] ?? $model->getValor('mailgun_api_key', '')));
+            if ($apiKey === '' && !empty($override['_mailgun_api_key_definida'])) {
+                $apiKey = trim((string)$model->getValor('mailgun_api_key', ''));
+            }
+            $domainRaw = (string)($override['mailgun_domain'] ?? $model->getValor('mailgun_domain', ''));
+            require_once __DIR__ . '/MailgunSender.php';
+            $domain = MailgunSender::normalizarDominio($domainRaw);
+
+            if ($apiKey === '') {
+                self::setErro('Chave API Mailgun vazia. Informe a chave e clique em Salvar (ou preencha antes do teste).');
+                return null;
+            }
+            if ($domain === '') {
+                self::setErro('Domínio Mailgun vazio.');
+                return null;
+            }
+
+            $region = strtolower(trim((string)($override['mailgun_region'] ?? $model->getValor('mailgun_region', 'us'))));
+            $apiBase = ($region === 'eu') ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net';
+
+            $fromEmail = trim((string)($override['smtp_from_email'] ?? $model->getValor('smtp_from_email', '')));
+            $fromName = trim((string)($override['smtp_from_name'] ?? $model->getValor('smtp_from_name', 'Grupo Sorrisos')));
+            if ($fromEmail === '' || filter_var($fromEmail, FILTER_VALIDATE_EMAIL) === false) {
+                self::setErro('E-mail remetente (From) inválido. No sandbox use postmaster@seu-dominio.mailgun.org');
+                return null;
+            }
+
+            return [
+                'api_key' => $apiKey,
+                'domain' => $domain,
+                'api_base' => $apiBase,
+                'from_email' => $fromEmail,
+                'from_name' => $fromName,
+            ];
+        } catch (Throwable $e) {
+            self::setErro('Erro ao ler configurações: ' . $e->getMessage());
+            return null;
+        }
+    }
 
     /**
      * Carrega PHPMailer via Composer quando necessário.
@@ -29,6 +101,73 @@ class EmailUtils {
         return class_exists(PHPMailer::class, false);
     }
 
+    private static function getModelConfiguracao(): Configuracao {
+        require_once __DIR__ . '/../../config/conexao.php';
+        require_once __DIR__ . '/../../models/Configuracao.php';
+        return new Configuracao();
+    }
+
+    private static function emailEnvioAtivo(Configuracao $model): bool {
+        $ativo = $model->getValor('smtp_ativo', '0');
+        if ($ativo !== '1' && strtolower((string)$ativo) !== 'true') {
+            error_log('EmailUtils: envio de e-mail desativado (smtp_ativo).');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * smtp | mailgun
+     */
+    public static function obterProvedorEmail(): string {
+        try {
+            $model = self::getModelConfiguracao();
+            $p = strtolower(trim((string)$model->getValor('email_provedor', 'smtp')));
+            return $p === 'mailgun' ? 'mailgun' : 'smtp';
+        } catch (Throwable $e) {
+            return 'smtp';
+        }
+    }
+
+    /**
+     * Remetente comum (smtp_from_*), usado por SMTP e Mailgun.
+     *
+     * @return array{from_email:string,from_name:string,reply_to:string,reply_to_name:string}|null
+     */
+    private static function obterRemetente(Configuracao $model, string $usernameFallback = ''): ?array {
+        $fromEmail = trim((string)$model->getValor('smtp_from_email', ''));
+        $fromName = trim((string)$model->getValor('smtp_from_name', 'Grupo Sorrisos'));
+        $replyTo = trim((string)$model->getValor('smtp_reply_to', ''));
+        $replyToName = trim((string)$model->getValor('smtp_reply_to_name', ''));
+
+        if ($fromEmail === '' && filter_var($usernameFallback, FILTER_VALIDATE_EMAIL)) {
+            $fromEmail = $usernameFallback;
+        }
+        if ($fromEmail === '' || filter_var($fromEmail, FILTER_VALIDATE_EMAIL) === false) {
+            error_log('EmailUtils: smtp_from_email inválido ou vazio.');
+            return null;
+        }
+        if ($replyTo === '') {
+            $replyTo = $fromEmail;
+        }
+        if ($replyToName === '') {
+            $replyToName = $fromName;
+        }
+        return [
+            'from_email' => $fromEmail,
+            'from_name' => $fromName,
+            'reply_to' => $replyTo,
+            'reply_to_name' => $replyToName,
+        ];
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private static function obterConfigMailgun() {
+        return self::montarConfigMailgun();
+    }
+
     /**
      * Lê SMTP em tbl_configuracoes (smtp_ativo=1 e smtp_host preenchido).
      *
@@ -36,13 +175,8 @@ class EmailUtils {
      */
     private static function obterConfigSmtp() {
         try {
-            require_once __DIR__ . '/../../config/conexao.php';
-            require_once __DIR__ . '/../../models/Configuracao.php';
-
-            $model = new Configuracao();
-            $ativo = $model->getValor('smtp_ativo', '0');
-            if ($ativo !== '1' && strtolower((string)$ativo) !== 'true') {
-                error_log('EmailUtils: SMTP desativado nas configurações (smtp_ativo).');
+            $model = self::getModelConfiguracao();
+            if (!self::emailEnvioAtivo($model)) {
                 return null;
             }
 
@@ -61,10 +195,10 @@ class EmailUtils {
             $username = trim((string)$model->getValor('smtp_username', ''));
             $password = (string)$model->getValor('smtp_password', '');
 
-            $fromEmail = trim((string)$model->getValor('smtp_from_email', ''));
-            $fromName = trim((string)$model->getValor('smtp_from_name', 'Grupo Sorrisos'));
-            $replyTo = trim((string)$model->getValor('smtp_reply_to', ''));
-            $replyToName = trim((string)$model->getValor('smtp_reply_to_name', ''));
+            $remetente = self::obterRemetente($model, $username);
+            if (!$remetente) {
+                return null;
+            }
 
             $timeout = (int)$model->getValor('smtp_timeout', '15');
             if ($timeout <= 0) {
@@ -74,33 +208,14 @@ class EmailUtils {
                 $timeout = 120;
             }
 
-            if ($fromEmail === '' && filter_var($username, FILTER_VALIDATE_EMAIL)) {
-                $fromEmail = $username;
-            }
-            if ($fromEmail === '' || filter_var($fromEmail, FILTER_VALIDATE_EMAIL) === false) {
-                error_log('EmailUtils: smtp_from_email inválido ou vazio.');
-                return null;
-            }
-
-            if ($replyTo === '') {
-                $replyTo = $fromEmail;
-            }
-            if ($replyToName === '') {
-                $replyToName = $fromName;
-            }
-
-            return [
+            return array_merge($remetente, [
                 'host' => $host,
                 'port' => $port,
                 'secure' => $secure,
                 'username' => $username,
                 'password' => $password,
-                'from_email' => $fromEmail,
-                'from_name' => $fromName,
-                'reply_to' => $replyTo,
-                'reply_to_name' => $replyToName,
                 'timeout' => $timeout,
-            ];
+            ]);
         } catch (Throwable $e) {
             error_log('EmailUtils obterConfigSmtp: ' . $e->getMessage());
             return null;
@@ -118,10 +233,36 @@ class EmailUtils {
      * @param array $attachments Array de anexos (opcional)
      * @return bool True se enviado com sucesso, false caso contrário
      */
-    public static function enviarEmail($toEmail, $toName, $subject, $htmlBody, $textBody = null, $attachments = []) {
+    public static function enviarEmail($toEmail, $toName, $subject, $htmlBody, $textBody = null, $attachments = [], ?array $configOverride = null) {
         error_log("=== INÍCIO ENVIO EMAIL UTILS ===");
         error_log("Para: {$toEmail} ({$toName})");
         error_log("Assunto: {$subject}");
+        self::setErro(null);
+
+        $provedor = self::obterProvedorEmail();
+        if ($configOverride !== null && !empty($configOverride['email_provedor'])) {
+            $p = strtolower(trim((string)$configOverride['email_provedor']));
+            $provedor = ($p === 'mailgun') ? 'mailgun' : 'smtp';
+        }
+        error_log("EmailUtils: provedor={$provedor}");
+
+        if ($provedor === 'mailgun') {
+            require_once __DIR__ . '/MailgunSender.php';
+            $mg = self::montarConfigMailgun($configOverride);
+            if (!$mg) {
+                return false;
+            }
+            if (!empty($attachments)) {
+                error_log('EmailUtils: anexos ignorados no envio Mailgun (não implementado).');
+            }
+            $result = MailgunSender::enviarComResultado($mg, $toEmail, $toName, $subject, $htmlBody, $textBody);
+            if (!$result['success']) {
+                self::setErro($result['error'] ?? MailgunSender::getUltimoErro());
+            }
+            $ok = $result['success'];
+            error_log("=== FIM ENVIO EMAIL UTILS (mailgun) ok=" . ($ok ? '1' : '0') . " ===");
+            return $ok;
+        }
 
         if (!self::garantirAutoloadPhpmailer()) {
             error_log('EmailUtils: vendor/autoload não encontrado.');

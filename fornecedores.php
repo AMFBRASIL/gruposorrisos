@@ -24,6 +24,7 @@ if (!$controllerAcesso->verificarAcessoPagina()) {
 $controllerAcesso->registrarAcessoPagina();
 
 $menuActive = 'fornecedores';
+$podeEditarFornecedor = $controllerAcesso->verificarEAutorizar('editar', 'fornecedores.php', false);
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -209,21 +210,20 @@ $menuActive = 'fornecedores';
             </div>
         </main>
 
-<!-- Modal de Confirmação -->
-<div class="modal fade" id="modalConfirmacao" tabindex="-1">
+<!-- Modal Inativar / Reativar -->
+<div class="modal fade" id="modalStatusFornecedor" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <h5 class="modal-title" id="modalStatusFornecedorTitulo">Confirmar</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir este fornecedor?</p>
-                <p class="text-muted small">Esta ação não pode ser desfeita.</p>
+            <div class="modal-body" id="modalStatusFornecedorCorpo">
+                <p></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger" id="btnConfirmarExclusao">Excluir</button>
+                <button type="button" class="btn btn-warning" id="btnConfirmarStatusFornecedor">Confirmar</button>
             </div>
         </div>
     </div>
@@ -231,8 +231,9 @@ $menuActive = 'fornecedores';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+const PODE_EDITAR_FORNECEDOR = <?php echo $podeEditarFornecedor ? 'true' : 'false'; ?>;
 let currentPage = 1;
-let fornecedorParaExcluir = null;
+let fornecedorAcaoPendente = { id: null, acao: null };
 
 // Carregar dados iniciais
 document.addEventListener('DOMContentLoaded', function() {
@@ -341,9 +342,15 @@ function renderizarTabela(fornecedores) {
                 <button class="icon-btn text-success me-2" title="Editar" onclick="editarFornecedor(${fornecedor.id_fornecedor})">
                     <i class="bi bi-pencil"></i>
                 </button>
-                <button class="icon-btn text-danger" title="Excluir" onclick="confirmarExclusao(${fornecedor.id_fornecedor})">
-                    <i class="bi bi-trash"></i>
-                </button>
+                ${PODE_EDITAR_FORNECEDOR ? (
+                    parseInt(fornecedor.ativo, 10) === 1
+                        ? `<button class="icon-btn text-warning" title="Inativar fornecedor" onclick="confirmarInativarFornecedor(${fornecedor.id_fornecedor}, '${escapeHtmlJs(fornecedor.razao_social)}')">
+                               <i class="bi bi-slash-circle"></i>
+                           </button>`
+                        : `<button class="icon-btn text-primary" title="Reativar fornecedor" onclick="confirmarReativarFornecedor(${fornecedor.id_fornecedor}, '${escapeHtmlJs(fornecedor.razao_social)}')">
+                               <i class="bi bi-check-circle"></i>
+                           </button>`
+                ) : ''}
             </td>
         </tr>
     `).join('');
@@ -414,39 +421,71 @@ function editarFornecedor(id) {
     window.location.href = `addFornecedor.php?id=${id}`;
 }
 
-// Confirmar exclusão
-function confirmarExclusao(id) {
-    fornecedorParaExcluir = id;
-    const modal = new bootstrap.Modal(document.getElementById('modalConfirmacao'));
-    modal.show();
+function escapeHtmlJs(texto) {
+    return String(texto || '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"');
 }
 
-// Excluir fornecedor
-document.getElementById('btnConfirmarExclusao').addEventListener('click', function() {
-    if (!fornecedorParaExcluir) return;
-    
-    fetch(`api/fornecedores.php?action=delete&id=${fornecedorParaExcluir}`, {
-        method: 'DELETE'
+function abrirModalStatusFornecedor(titulo, corpoHtml, acao, btnClass) {
+    fornecedorAcaoPendente.acao = acao;
+    document.getElementById('modalStatusFornecedorTitulo').textContent = titulo;
+    document.getElementById('modalStatusFornecedorCorpo').innerHTML = corpoHtml;
+    const btn = document.getElementById('btnConfirmarStatusFornecedor');
+    btn.className = 'btn ' + btnClass;
+    btn.textContent = acao === 'inativar' ? 'Inativar' : 'Reativar';
+    new bootstrap.Modal(document.getElementById('modalStatusFornecedor')).show();
+}
+
+function confirmarInativarFornecedor(id, razaoSocial) {
+    fornecedorAcaoPendente.id = id;
+    abrirModalStatusFornecedor(
+        'Inativar fornecedor',
+        `<p>Inativar <strong>${razaoSocial}</strong>?</p>
+         <ul class="small text-muted mb-0">
+           <li>Usuários vinculados não poderão mais acessar o sistema</li>
+           <li>Materiais deste fornecedor ficarão inativos no catálogo</li>
+           <li>O fornecedor deixa de aparecer em novos pedidos de compra</li>
+         </ul>`,
+        'inativar',
+        'btn-warning'
+    );
+}
+
+function confirmarReativarFornecedor(id, razaoSocial) {
+    fornecedorAcaoPendente.id = id;
+    abrirModalStatusFornecedor(
+        'Reativar fornecedor',
+        `<p>Reativar <strong>${razaoSocial}</strong> e restaurar materiais e acessos de usuário?</p>`,
+        'reativar',
+        'btn-primary'
+    );
+}
+
+document.getElementById('btnConfirmarStatusFornecedor').addEventListener('click', function() {
+    const { id, acao } = fornecedorAcaoPendente;
+    if (!id || !acao) return;
+
+    fetch(`api/fornecedores.php?action=${acao}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Fechar modal
-            bootstrap.Modal.getInstance(document.getElementById('modalConfirmacao')).hide();
-            
-            // Recarregar dados
+            bootstrap.Modal.getInstance(document.getElementById('modalStatusFornecedor')).hide();
             carregarEstatisticas();
             carregarFornecedores(currentPage);
-            
-            // Mostrar mensagem de sucesso
-            alert('Fornecedor excluído com sucesso!');
+            alert(data.message || 'Operação realizada com sucesso.');
         } else {
-            alert('Erro ao excluir fornecedor: ' + (data.error || 'Erro desconhecido'));
+            alert('Erro: ' + (data.error || 'Erro desconhecido'));
         }
     })
     .catch(error => {
-        console.error('Erro ao excluir fornecedor:', error);
-        alert('Erro ao excluir fornecedor');
+        console.error('Erro ao alterar status do fornecedor:', error);
+        alert('Erro ao processar a solicitação.');
     });
 });
 </script>

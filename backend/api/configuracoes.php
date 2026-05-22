@@ -54,8 +54,10 @@ try {
                 case 'buscar_agrupadas':
                     $resultado = $configuracao->buscarAgrupadasPorCategoria();
                     foreach ($resultado as $cat => $lista) {
-                        foreach ($lista as $i => $row) {
-                            if (($row['chave'] ?? '') === 'smtp_password' && !empty($row['valor'])) {
+                        $chavesSecretas = ['smtp_password', 'mailgun_api_key'];
+                    foreach ($lista as $i => $row) {
+                            $ch = $row['chave'] ?? '';
+                            if (in_array($ch, $chavesSecretas, true) && !empty($row['valor'])) {
                                 $resultado[$cat][$i]['valor'] = '';
                                 $resultado[$cat][$i]['_senha_definida'] = true;
                             }
@@ -89,39 +91,74 @@ try {
                         }
                         
                         $lista = $dados['configuracoes'];
-                        // Não sobrescrever senha SMTP se o campo veio em branco (mantém a atual no banco)
-                        if (isset($lista['smtp_password']) && trim((string)$lista['smtp_password']) === '') {
-                            unset($lista['smtp_password']);
+                        // Não sobrescrever segredos se o campo veio em branco
+                        foreach (['smtp_password', 'mailgun_api_key'] as $chaveSecreta) {
+                            if (isset($lista[$chaveSecreta]) && trim((string)$lista[$chaveSecreta]) === '') {
+                                unset($lista[$chaveSecreta]);
+                            }
+                        }
+                        if (isset($lista['email_provedor'])) {
+                            $p = strtolower(trim((string)$lista['email_provedor']));
+                            $lista['email_provedor'] = ($p === 'mailgun') ? 'mailgun' : 'smtp';
+                        }
+                        if (isset($lista['mailgun_domain'])) {
+                            require_once __DIR__ . '/../utils/MailgunSender.php';
+                            $lista['mailgun_domain'] = MailgunSender::normalizarDominio((string)$lista['mailgun_domain']);
                         }
                         
                         $configuracao->atualizarConfiguracoes($lista);
                         echo json_encode(['success' => true, 'message' => 'Configurações atualizadas com sucesso']);
                         break;
 
+                    case 'testar_email':
                     case 'testar_smtp':
                         $emailTeste = isset($dados['email_teste']) ? trim((string)$dados['email_teste']) : '';
                         if ($emailTeste === '' || filter_var($emailTeste, FILTER_VALIDATE_EMAIL) === false) {
                             echo json_encode(['success' => false, 'error' => 'Informe um e-mail válido para o teste']);
                             break;
                         }
-                        $vendorAutoload = realpath(__DIR__ . '/../../vendor/autoload.php');
-                        if (!$vendorAutoload || !is_readable($vendorAutoload)) {
-                            echo json_encode(['success' => false, 'error' => 'Composer (vendor) não encontrado no servidor']);
-                            break;
-                        }
                         require_once __DIR__ . '/../utils/EmailUtils.php';
-                        $html = '<p>Este é um e-mail de teste do sistema <strong>Grupo Sorrisos</strong>.</p><p>Se você recebeu esta mensagem, o SMTP está configurado corretamente.</p>';
-                        $texto = "E-mail de teste Grupo Sorrisos.\nSe você recebeu, o SMTP está OK.";
+                        $override = null;
+                        if (!empty($dados['config_teste']) && is_array($dados['config_teste'])) {
+                            $override = $dados['config_teste'];
+                        }
+                        $provedor = EmailUtils::obterProvedorEmail();
+                        if ($override !== null && !empty($override['email_provedor'])) {
+                            $p = strtolower(trim((string)$override['email_provedor']));
+                            $provedor = ($p === 'mailgun') ? 'mailgun' : 'smtp';
+                        }
+                        if ($provedor === 'mailgun') {
+                            if (!function_exists('curl_init')) {
+                                echo json_encode(['success' => false, 'error' => 'Extensão cURL do PHP não está ativa. Habilite extension=curl no php.ini do XAMPP.']);
+                                break;
+                            }
+                        } else {
+                            $vendorAutoload = realpath(__DIR__ . '/../../vendor/autoload.php');
+                            if (!$vendorAutoload || !is_readable($vendorAutoload)) {
+                                echo json_encode(['success' => false, 'error' => 'Composer (vendor) não encontrado no servidor']);
+                                break;
+                            }
+                        }
+                        $rotulo = $provedor === 'mailgun' ? 'Mailgun' : 'SMTP';
+                        $html = '<p>Este é um e-mail de teste do sistema <strong>Grupo Sorrisos</strong>.</p><p>Se você recebeu esta mensagem, a configuração de e-mail (' . htmlspecialchars($rotulo, ENT_QUOTES, 'UTF-8') . ') está correta.</p>';
+                        $texto = "E-mail de teste Grupo Sorrisos.\nProvedor: {$rotulo}.";
                         $ok = EmailUtils::enviarEmail(
                             $emailTeste,
-                            'Teste SMTP',
-                            'Grupo Sorrisos — Teste de SMTP',
+                            'Teste de e-mail',
+                            'Grupo Sorrisos — Teste de envio (' . $rotulo . ')',
                             $html,
-                            $texto
+                            $texto,
+                            [],
+                            $override
                         );
+                        $detalhe = EmailUtils::getUltimoErro();
+                        $msgErro = $detalhe ?: ($provedor === 'mailgun'
+                            ? 'Falha ao enviar. Verifique domínio, região, chave API e remetente.'
+                            : 'Falha ao enviar. Verifique host, porta, usuário e senha.');
                         echo json_encode([
                             'success' => $ok,
-                            'message' => $ok ? 'E-mail de teste enviado. Verifique a caixa de entrada (e spam).' : 'Falha ao enviar. Verifique host, porta, usuário, senha e os logs do servidor.'
+                            'error' => $ok ? null : $msgErro,
+                            'message' => $ok ? 'E-mail de teste enviado. Verifique a caixa de entrada (e spam).' : $msgErro
                         ]);
                         break;
                         

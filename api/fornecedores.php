@@ -13,6 +13,7 @@ require_once '../config/config.php';
 require_once '../config/session.php';
 require_once '../config/conexao.php';
 require_once '../models/Fornecedor.php';
+require_once '../backend/controllers/ControllerAcesso.php';
 
 // Verificar se o usuário está logado
 if (!isLoggedIn()) {
@@ -315,10 +316,53 @@ function handlePost($fornecedor, $action) {
             }
             break;
             
+        case 'inativar':
+        case 'reativar':
+            exigirPermissaoEditarFornecedor();
+            $payload = json_decode(file_get_contents('php://input'), true) ?: [];
+            $id = (int) ($payload['id'] ?? $_GET['id'] ?? 0);
+            if ($id <= 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID não fornecido']);
+                break;
+            }
+            try {
+                if ($action === 'inativar') {
+                    $resultado = $fornecedor->inativar($id);
+                    logActivity('INATIVAR', $resultado, 'tbl_fornecedores', $id);
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'Fornecedor inativado. Materiais e acessos de usuário foram bloqueados.',
+                        'data' => $resultado,
+                    ]);
+                } else {
+                    $resultado = $fornecedor->reativar($id);
+                    logActivity('REATIVAR', $resultado, 'tbl_fornecedores', $id);
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'Fornecedor reativado com sucesso.',
+                        'data' => $resultado,
+                    ]);
+                }
+            } catch (Exception $e) {
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+            }
+            break;
+
         default:
             http_response_code(404);
             echo json_encode(['error' => 'Ação não encontrada']);
             break;
+    }
+}
+
+function exigirPermissaoEditarFornecedor() {
+    $controller = new ControllerAcesso();
+    if (!$controller->verificarEAutorizar('editar', 'fornecedores.php', false)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Sem permissão para alterar fornecedores']);
+        exit;
     }
 }
 
@@ -481,25 +525,19 @@ function handleDelete($fornecedor, $action) {
                 return;
             }
             
-            // Verificar se fornecedor tem materiais vinculados
-            if ($fornecedor->hasMateriais($id)) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Não é possível excluir fornecedor com materiais vinculados']);
-                return;
-            }
-            
-            $result = $fornecedor->delete($id);
-            if ($result) {
-                // Log da ação
-                logActivity('EXCLUIR', null, 'tbl_fornecedores', $id);
-                
+            exigirPermissaoEditarFornecedor();
+
+            try {
+                $resultado = $fornecedor->inativar($id);
+                logActivity('INATIVAR', $resultado, 'tbl_fornecedores', $id);
                 echo json_encode([
                     'success' => true,
-                    'message' => 'Fornecedor excluído com sucesso'
+                    'message' => 'Fornecedor inativado. Materiais e acessos de usuário foram bloqueados.',
+                    'data' => $resultado,
                 ]);
-            } else {
+            } catch (Exception $e) {
                 http_response_code(500);
-                echo json_encode(['error' => 'Erro ao excluir fornecedor']);
+                echo json_encode(['error' => $e->getMessage()]);
             }
             break;
             

@@ -67,6 +67,31 @@ $menuActive = 'configuracoes';
             border: 1px solid #eef2f7;
             height: 100%;
         }
+        .email-provedor-card {
+            cursor: pointer;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+            height: 100%;
+        }
+        .email-provedor-card:hover {
+            border-color: #93c5fd;
+            background: #f8fafc;
+        }
+        .email-provedor-card.active {
+            border-color: #2563eb;
+            background: #eff6ff;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .email-provedor-card .provedor-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
         @media (max-width: 991px) {
             .card-config .card-body { padding: 1.2rem; }
             .nav-tabs-config .nav-link { font-size: 0.9rem; padding: 0.5rem 0.75rem; }
@@ -95,7 +120,7 @@ $menuActive = 'configuracoes';
                         <button class="nav-link active" id="tab-geral-btn" data-bs-toggle="tab" data-bs-target="#tab-geral" type="button" role="tab" aria-controls="tab-geral" aria-selected="true"><i class="bi bi-building"></i> Geral</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="tab-email-btn" data-bs-toggle="tab" data-bs-target="#tab-email" type="button" role="tab" aria-controls="tab-email" aria-selected="false"><i class="bi bi-envelope-at"></i> E-mail (SMTP)</button>
+                        <button class="nav-link" id="tab-email-btn" data-bs-toggle="tab" data-bs-target="#tab-email" type="button" role="tab" aria-controls="tab-email" aria-selected="false"><i class="bi bi-envelope-at"></i> E-mail</button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="tab-notif-btn" data-bs-toggle="tab" data-bs-target="#tab-notif" type="button" role="tab" aria-controls="tab-notif" aria-selected="false"><i class="bi bi-bell"></i> Notificações</button>
@@ -149,21 +174,50 @@ $menuActive = 'configuracoes';
                         </div>
                     </div>
 
-                    <!-- Aba E-mail SMTP -->
+                    <!-- Aba E-mail -->
                     <div class="tab-pane fade" id="tab-email" role="tabpanel" aria-labelledby="tab-email-btn" tabindex="0">
+                        <p class="text-muted small mb-3">Boas-vindas, pedidos, recuperação de senha e demais e-mails do sistema usam estas definições.</p>
+
+                        <div class="row g-3 mb-4" id="email-provedor-cards">
+                            <div class="col-md-6">
+                                <div class="card email-provedor-card p-3" data-provedor="smtp" role="button" tabindex="0" aria-pressed="false">
+                                    <div class="d-flex gap-3 align-items-start">
+                                        <div class="provedor-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-hdd-network"></i></div>
+                                        <div>
+                                            <div class="fw-bold">Servidor SMTP</div>
+                                            <div class="text-muted small">Host, porta, usuário e senha do seu provedor de e-mail.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card email-provedor-card p-3" data-provedor="mailgun" role="button" tabindex="0" aria-pressed="false">
+                                    <div class="d-flex gap-3 align-items-start">
+                                        <div class="provedor-icon bg-success bg-opacity-10 text-success"><i class="bi bi-cloud-arrow-up"></i></div>
+                                        <div>
+                                            <div class="fw-bold">API Mailgun</div>
+                                            <div class="text-muted small">Envio via HTTP com domínio e chave privada da Mailgun.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="email_provedor" name="email_provedor" data-chave="email_provedor" value="smtp">
+
                         <div class="tab-subcard mb-3">
-                            <div class="section-title mb-2"><i class="bi bi-envelope-at"></i> Servidor de envio</div>
-                            <p class="text-muted small mb-3">Boas-vindas, pedidos, recuperação de senha e demais e-mails do sistema usam estas definições. Ative o SMTP só depois de preencher host e credenciais.</p>
-                            <div class="row align-items-center mb-3 g-0">
+                            <div class="row align-items-center g-0">
                                 <div class="col">
-                                    <div class="fw-semibold">Ativar envio por SMTP</div>
-                                    <div class="text-muted small">Desligado = nenhum e-mail é enviado.</div>
+                                    <div class="fw-semibold">Ativar envio de e-mails</div>
+                                    <div class="text-muted small">Desligado = nenhum e-mail é enviado pelo sistema.</div>
                                 </div>
                                 <div class="col-auto">
                                     <input class="form-check-input" type="checkbox" id="smtp_ativo" name="smtp_ativo" data-chave="smtp_ativo" role="switch" style="width: 2.5em; height: 1.25em;">
                                 </div>
                             </div>
-                            <hr class="my-3">
+                        </div>
+
+                        <div id="painel-smtp" class="tab-subcard mb-3">
+                            <div class="section-title mb-2"><i class="bi bi-hdd-network"></i> Configuração SMTP</div>
                             <div class="row g-3">
                                 <div class="col-lg-8">
                                     <label class="form-label" for="smtp_host">Servidor SMTP (host)</label>
@@ -196,8 +250,34 @@ $menuActive = 'configuracoes';
                                 </div>
                             </div>
                         </div>
+
+                        <div id="painel-mailgun" class="tab-subcard mb-3 d-none">
+                            <div class="section-title mb-2"><i class="bi bi-cloud-arrow-up"></i> Configuração Mailgun</div>
+                            <p class="text-muted small mb-3">Use a chave privada do painel Mailgun. Domínio: só o nome (ex. <code>mg.seudominio.com</code> ou <code>sandbox….mailgun.org</code>), sem <code>https://</code>.<br>
+                            <strong>Sandbox:</strong> remetente deve ser <code>postmaster@seu-sandbox.mailgun.org</code> e o e-mail de teste precisa estar autorizado em «Authorized Recipients» no painel Mailgun.</p>
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label" for="mailgun_domain">Domínio Mailgun</label>
+                                    <input type="text" class="form-control" id="mailgun_domain" name="mailgun_domain" data-chave="mailgun_domain" placeholder="mg.seudominio.com" autocomplete="off">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="mailgun_region">Região da API</label>
+                                    <select class="form-select" id="mailgun_region" name="mailgun_region" data-chave="mailgun_region">
+                                        <option value="us">EUA (api.mailgun.net)</option>
+                                        <option value="eu">Europa (api.eu.mailgun.net)</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="mailgun_api_key">Chave API privada</label>
+                                    <input type="password" class="form-control" id="mailgun_api_key" name="mailgun_api_key" data-chave="mailgun_api_key" placeholder="Em branco mantém a chave já salva" autocomplete="new-password">
+                                    <div class="form-text" id="mailgun_api_key_hint"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="tab-subcard mb-3">
-                            <div class="section-title mb-3"><i class="bi bi-person-vcard"></i> Remetente e resposta</div>
+                            <div class="section-title mb-3"><i class="bi bi-person-vcard"></i> Remetente</div>
+                            <p class="text-muted small mb-3">Usado tanto no SMTP quanto na Mailgun. O e-mail remetente deve estar autorizado no provedor escolhido.</p>
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label" for="smtp_from_email">E-mail remetente (From)</label>
@@ -221,14 +301,14 @@ $menuActive = 'configuracoes';
                             <div class="section-title mb-3"><i class="bi bi-send-check"></i> Teste de envio</div>
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-8">
-                                    <label class="form-label" for="smtp_email_teste">Enviar teste para</label>
-                                    <input type="email" class="form-control" id="smtp_email_teste" placeholder="E-mail que receberá o teste">
+                                    <label class="form-label" for="email_teste_destino">Enviar teste para</label>
+                                    <input type="email" class="form-control" id="email_teste_destino" placeholder="E-mail que receberá o teste">
                                 </div>
                                 <div class="col-md-4">
-                                    <button type="button" class="btn btn-outline-primary w-100" id="btn-testar-smtp"><i class="bi bi-send me-1"></i> Testar SMTP</button>
+                                    <button type="button" class="btn btn-outline-primary w-100" id="btn-testar-email"><i class="bi bi-send me-1"></i> <span id="btn-testar-email-label">Testar envio</span></button>
                                 </div>
                                 <div class="col-12">
-                                    <p class="text-muted small mb-0 mt-2">O teste usa apenas valores <strong>já salvos</strong>. Salve as alterações antes, se mudou host ou senha.</p>
+                                    <p class="text-muted small mb-0 mt-2">O teste usa apenas valores <strong>já salvos</strong>. Salve as alterações antes, se mudou credenciais ou domínio.</p>
                                 </div>
                             </div>
                         </div>
@@ -454,15 +534,64 @@ async function carregarConfiguracoes() {
     }
 }
 
-// Preencher formulário com as configurações carregadas
-function smtpSenhaJaSalva() {
+function configTemSenhaSalva(chave) {
     for (const categoria in configuracoes) {
-        const row = configuracoes[categoria].find(c => c.chave === 'smtp_password');
+        const row = configuracoes[categoria].find(c => c.chave === chave);
         if (row && row._senha_definida) {
             return true;
         }
     }
     return false;
+}
+
+function obterProvedorEmailAtual() {
+    const input = document.getElementById('email_provedor');
+    if (input && input.value) {
+        return input.value === 'mailgun' ? 'mailgun' : 'smtp';
+    }
+    const v = getValorConfiguracao('email_provedor');
+    return (v === 'mailgun') ? 'mailgun' : 'smtp';
+}
+
+function coletarConfigTesteEmail() {
+    const cfg = { email_provedor: obterProvedorEmailAtual() };
+    ['smtp_ativo', 'mailgun_domain', 'mailgun_region', 'smtp_from_email', 'smtp_from_name'].forEach(chave => {
+        const el = document.querySelector('[data-chave="' + chave + '"]');
+        if (!el) return;
+        cfg[chave] = el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
+    });
+    const keyEl = document.getElementById('mailgun_api_key');
+    if (keyEl && String(keyEl.value).trim()) {
+        cfg.mailgun_api_key = keyEl.value.trim();
+    } else if (configTemSenhaSalva('mailgun_api_key')) {
+        cfg._mailgun_api_key_definida = true;
+    }
+    return cfg;
+}
+
+function aplicarProvedorEmailUI(provedor) {
+    const p = provedor === 'mailgun' ? 'mailgun' : 'smtp';
+    const input = document.getElementById('email_provedor');
+    if (input) {
+        input.value = p;
+    }
+    document.querySelectorAll('.email-provedor-card').forEach(card => {
+        const ativo = card.getAttribute('data-provedor') === p;
+        card.classList.toggle('active', ativo);
+        card.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+    });
+    const painelSmtp = document.getElementById('painel-smtp');
+    const painelMailgun = document.getElementById('painel-mailgun');
+    if (painelSmtp) {
+        painelSmtp.classList.toggle('d-none', p !== 'smtp');
+    }
+    if (painelMailgun) {
+        painelMailgun.classList.toggle('d-none', p !== 'mailgun');
+    }
+    const labelBtn = document.getElementById('btn-testar-email-label');
+    if (labelBtn) {
+        labelBtn.textContent = p === 'mailgun' ? 'Testar Mailgun' : 'Testar SMTP';
+    }
 }
 
 function preencherFormulario() {
@@ -482,12 +611,19 @@ function preencherFormulario() {
         }
     });
 
-    const hint = document.getElementById('smtp_password_hint');
-    if (hint) {
-        hint.textContent = smtpSenhaJaSalva()
+    const hintSmtp = document.getElementById('smtp_password_hint');
+    if (hintSmtp) {
+        hintSmtp.textContent = configTemSenhaSalva('smtp_password')
             ? 'Uma senha já está salva no servidor. Preencha apenas se quiser alterá-la.'
             : 'Informe a senha do SMTP para o primeiro envio.';
     }
+    const hintMg = document.getElementById('mailgun_api_key_hint');
+    if (hintMg) {
+        hintMg.textContent = configTemSenhaSalva('mailgun_api_key')
+            ? 'Uma chave API já está salva. Preencha apenas se quiser alterá-la.'
+            : 'Informe a chave API privada da Mailgun.';
+    }
+    aplicarProvedorEmailUI(obterProvedorEmailAtual());
 }
 
 // Obter valor de uma configuração
@@ -524,7 +660,7 @@ async function salvarConfiguracoes() {
                 valor = element.value;
             }
 
-            if (chave === 'smtp_password' && !String(valor).trim()) {
+            if ((chave === 'smtp_password' || chave === 'mailgun_api_key') && !String(valor).trim()) {
                 return;
             }
             
@@ -615,22 +751,37 @@ const slider = document.getElementById('sessao_expira');
         salvarConfiguracoes();
     });
 
-    const btnTestarSmtp = document.getElementById('btn-testar-smtp');
-    if (btnTestarSmtp) {
-        btnTestarSmtp.addEventListener('click', async function() {
-            const email = document.getElementById('smtp_email_teste').value.trim();
+    document.querySelectorAll('.email-provedor-card').forEach(card => {
+        const selecionar = () => aplicarProvedorEmailUI(card.getAttribute('data-provedor'));
+        card.addEventListener('click', selecionar);
+        card.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selecionar();
+            }
+        });
+    });
+
+    const btnTestarEmail = document.getElementById('btn-testar-email');
+    if (btnTestarEmail) {
+        btnTestarEmail.addEventListener('click', async function() {
+            const email = document.getElementById('email_teste_destino').value.trim();
             if (!email) {
                 Swal.fire({ icon: 'warning', title: 'Atenção', text: 'Informe o e-mail que receberá o teste.' });
                 return;
             }
-            btnTestarSmtp.disabled = true;
-            const original = btnTestarSmtp.innerHTML;
-            btnTestarSmtp.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Enviando...';
+            btnTestarEmail.disabled = true;
+            const original = btnTestarEmail.innerHTML;
+            btnTestarEmail.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Enviando...';
             try {
                 const response = await fetch('backend/api/configuracoes.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'testar_smtp', email_teste: email })
+                    body: JSON.stringify({
+                        action: 'testar_email',
+                        email_teste: email,
+                        config_teste: coletarConfigTesteEmail()
+                    })
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -641,8 +792,8 @@ const slider = document.getElementById('sessao_expira');
             } catch (err) {
                 Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao comunicar com o servidor.' });
             } finally {
-                btnTestarSmtp.disabled = false;
-                btnTestarSmtp.innerHTML = original;
+                btnTestarEmail.disabled = false;
+                btnTestarEmail.innerHTML = original;
             }
         });
     }

@@ -302,12 +302,96 @@ class Fornecedor extends BaseModel {
     }
     
     /**
-     * Exclui um fornecedor (soft delete)
+     * Exclui um fornecedor (soft delete) — preferir inativar()
      */
     public function delete($id) {
-        $sql = "UPDATE {$this->table} SET ativo = 0, data_atualizacao = ? WHERE id_fornecedor = ?";
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([date('Y-m-d H:i:s'), $id]);
+        return $this->inativar($id);
+    }
+
+    /**
+     * Inativa fornecedor, materiais do catálogo e usuários vinculados (sem acesso ao sistema).
+     */
+    public function inativar($id) {
+        $id = (int) $id;
+        if ($id <= 0) {
+            throw new Exception('ID do fornecedor inválido.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $agora = date('Y-m-d H:i:s');
+
+            $stmt = $this->pdo->prepare("UPDATE {$this->table} SET ativo = 0, data_atualizacao = ? WHERE id_fornecedor = ?");
+            $stmt->execute([$agora, $id]);
+
+            $stmtMat = $this->pdo->prepare("UPDATE tbl_catalogo_materiais SET ativo = 0, data_atualizacao = ? WHERE id_fornecedor = ?");
+            $stmtMat->execute([$agora, $id]);
+            $materiaisInativados = $stmtMat->rowCount();
+
+            $usuariosInativados = 0;
+            if ($this->tabelaExiste('tbl_usuarios')) {
+                $stmtUsu = $this->pdo->prepare("UPDATE tbl_usuarios SET ativo = 0, data_atualizacao = ? WHERE id_fornecedor = ?");
+                $stmtUsu->execute([$agora, $id]);
+                $usuariosInativados = $stmtUsu->rowCount();
+            }
+
+            $this->pdo->commit();
+
+            return [
+                'success' => true,
+                'materiais_inativados' => $materiaisInativados,
+                'usuarios_inativados' => $usuariosInativados,
+            ];
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Reativa fornecedor, materiais e usuários vinculados.
+     */
+    public function reativar($id) {
+        $id = (int) $id;
+        if ($id <= 0) {
+            throw new Exception('ID do fornecedor inválido.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $agora = date('Y-m-d H:i:s');
+
+            $stmt = $this->pdo->prepare("UPDATE {$this->table} SET ativo = 1, data_atualizacao = ? WHERE id_fornecedor = ?");
+            $stmt->execute([$agora, $id]);
+
+            $stmtMat = $this->pdo->prepare("UPDATE tbl_catalogo_materiais SET ativo = 1, data_atualizacao = ? WHERE id_fornecedor = ?");
+            $stmtMat->execute([$agora, $id]);
+            $materiaisReativados = $stmtMat->rowCount();
+
+            $usuariosReativados = 0;
+            if ($this->tabelaExiste('tbl_usuarios')) {
+                $stmtUsu = $this->pdo->prepare("UPDATE tbl_usuarios SET ativo = 1, data_atualizacao = ? WHERE id_fornecedor = ?");
+                $stmtUsu->execute([$agora, $id]);
+                $usuariosReativados = $stmtUsu->rowCount();
+            }
+
+            $this->pdo->commit();
+
+            return [
+                'success' => true,
+                'materiais_reativados' => $materiaisReativados,
+                'usuarios_reativados' => $usuariosReativados,
+            ];
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    private function tabelaExiste($nomeTabela) {
+        $stmt = $this->pdo->prepare('SHOW TABLES LIKE ?');
+        $stmt->execute([$nomeTabela]);
+        return $stmt->rowCount() > 0;
     }
     
     /**

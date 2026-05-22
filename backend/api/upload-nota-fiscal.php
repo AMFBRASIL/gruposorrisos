@@ -87,11 +87,11 @@ try {
         throw new Exception('Pedido não pertence ao fornecedor');
     }
     
-    // Verificar se o status permite upload de NF
-    // Permitir upload quando: aprovado_para_faturar, em_transito, entregue
-    $statusPermitidos = ['aprovado_cotacao', 'aprovado_para_faturar', 'em_transito', 'entregue'];
-    if (!in_array($pedido['status'], $statusPermitidos)) {
-        throw new Exception('Status do pedido não permite upload de Nota Fiscal. Status atual: ' . $pedido['status']);
+    require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+    $statusNorm = fluxoPedidoNormalizarStatus($pedido['status'] ?? '');
+    $statusPermitidos = ['em_faturamento', 'aguardando_faturamento'];
+    if (!in_array($statusNorm, $statusPermitidos, true)) {
+        throw new Exception('Status do pedido não permite upload de Nota Fiscal. Status atual: ' . fluxoPedidoLabelStatus($pedido['status'] ?? ''));
     }
     
     // Validar tipo de arquivo

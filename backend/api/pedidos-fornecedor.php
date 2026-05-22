@@ -427,20 +427,17 @@ function responderPedido($pdo, $input, $fornecedor_id) {
     }
     
     // Após enviar para faturamento, o fornecedor apenas acompanha o pedido.
-    $statusPermitidos = ['em_analise', 'pendente', 'aprovado_cotacao'];
-    if (!in_array(strtolower($pedido['status'] ?? ''), $statusPermitidos)) {
-        return ['success' => false, 'error' => 'Pedido não está disponível para resposta. Status atual: ' . $pedido['status']];
+    require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+    $statusNorm = fluxoPedidoNormalizarStatus($pedido['status'] ?? '');
+    $statusPermitidos = ['aguardando_cotacao', 'em_cotacao'];
+    if (!in_array($statusNorm, $statusPermitidos, true)) {
+        return ['success' => false, 'error' => 'Pedido não está disponível para resposta de cotação. Status atual: ' . fluxoPedidoLabelStatus($pedido['status'] ?? '')];
     }
     
     try {
         $pdo->beginTransaction();
 
-        // Após resposta: manter em aprovado_cotacao quando compras já liberou essa etapa,
-        // para o fornecedor seguir com "Aprovar Faturamento"; caso contrário volta para pendente (fluxo anterior).
-        $statusAposResposta = 'pendente';
-        if (strtolower((string)($pedido['status'] ?? '')) === 'aprovado_cotacao') {
-            $statusAposResposta = 'aprovado_cotacao';
-        }
+        $statusAposResposta = 'em_cotacao';
 
         $sql = "UPDATE tbl_pedidos_compra 
                 SET status = ?, 
@@ -693,7 +690,7 @@ function coletarEmailsNotificacaoCompras(PDO $pdo, int $idFilial, int $idSolicit
 }
 
 /**
- * Fornecedor aprova faturamento: opcional NF, status → em_transito, e-mail ao setor de compras.
+ * Fornecedor aprova faturamento: opcional NF, mantém/confirma em_faturamento, e-mail ao setor de compras.
  *
  * @param array{id_usuario:int, razao_social?:string|null} $usuarioRow
  * @return array{success: bool, message?: string, error?: string, email_enviado?: bool}
@@ -726,12 +723,13 @@ function aprovarFaturamentoFornecedorMultipart(PDO $pdo, int $fornecedor_id, arr
         return ['success' => false, 'error' => 'Pedido não encontrado ou não pertence ao fornecedor'];
     }
 
-    $statusAtual = strtolower((string)($pedidoRow['status'] ?? ''));
-    $statusPermitemAprovacaoFat = ['aprovado_cotacao', 'aprovado_para_faturar'];
+    require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+    $statusAtual = fluxoPedidoNormalizarStatus($pedidoRow['status'] ?? '');
+    $statusPermitemAprovacaoFat = ['em_faturamento', 'aguardando_faturamento'];
     if (!in_array($statusAtual, $statusPermitemAprovacaoFat, true)) {
         return [
             'success' => false,
-            'error' => 'Este pedido não está disponível para aprovação de faturamento (requer Cotação aprovada ou Aprovado para faturar). Status atual: ' . ($pedidoRow['status'] ?? ''),
+            'error' => 'Este pedido não está disponível para faturamento/NF. Status atual: ' . fluxoPedidoLabelStatus($pedidoRow['status'] ?? ''),
         ];
     }
 
@@ -791,21 +789,23 @@ function aprovarFaturamentoFornecedorMultipart(PDO $pdo, int $fornecedor_id, arr
     }
 
     $nomeFornecedor = $pedidoRow['nome_fornecedor'] ?? ($usuarioRow['razao_social'] ?? 'Fornecedor');
-    $obsHist = "[Fornecedor] Aprovação de faturamento — pedido em trânsito.\n\n" . $detalhes;
+    $obsHist = "[Fornecedor] Confirmação de faturamento.\n\n" . $detalhes;
     if ($urlNf) {
         $obsHist .= "\n\nNota fiscal anexada: " . $urlNf;
     }
 
     try {
         $pedidoModel = new PedidoCompra();
-        $pedidoModel->atualizarStatus($pedidoId, 'em_transito', $obsHist);
+        if ($statusAtual === 'aguardando_faturamento') {
+            $pedidoModel->atualizarStatus($pedidoId, 'em_faturamento', $obsHist);
+        }
     } catch (Throwable $e) {
         error_log('aprovarFaturamentoFornecedorMultipart atualizarStatus: ' . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 
     $obsFornAtual = trim((string)($pedidoRow['observacoes_fornecedor'] ?? ''));
-    $bloco = "\n\n[" . date('d/m/Y H:i') . "] Aprovação de faturamento (Em trânsito):\n" . $detalhes;
+    $bloco = "\n\n[" . date('d/m/Y H:i') . "] Confirmação de faturamento:\n" . $detalhes;
     if ($urlNf) {
         $bloco .= "\nNF anexada.";
     }

@@ -17,6 +17,7 @@ class Usuario extends BaseModel {
                        u.senha,
                        u.id_perfil,
                        u.id_filial,
+                       u.id_fornecedor,
                        u.ativo,
                        u.ultimo_acesso,
                        u.data_criacao,
@@ -24,16 +25,23 @@ class Usuario extends BaseModel {
                        p.nome_perfil,
                        f.nome_filial,
                        f.codigo_filial,
-                       f.id_filial as filial_id
+                       f.id_filial as filial_id,
+                       fn.ativo AS fornecedor_ativo,
+                       fn.razao_social AS fornecedor_razao_social
                 FROM {$this->table} u
                 LEFT JOIN tbl_perfis p ON u.id_perfil = p.id_perfil
                 LEFT JOIN tbl_filiais f ON u.id_filial = f.id_filial
+                LEFT JOIN tbl_fornecedores fn ON u.id_fornecedor = fn.id_fornecedor
                 WHERE u.email = ? AND u.ativo = 1";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$email]);
         $usuario = $stmt->fetch();
         
+        if ($usuario && !empty($usuario['id_fornecedor']) && (int) ($usuario['fornecedor_ativo'] ?? 0) !== 1) {
+            return false;
+        }
+
         if ($usuario && password_verify($senha, $usuario['senha'])) {
             // Atualiza último acesso
             $this->atualizarUltimoAcesso($usuario['id_usuario']);
