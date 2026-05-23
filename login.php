@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/config/url.php';
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     // Redirecionamento inteligente baseado nas permissões
     require_once 'config/session.php';
@@ -12,13 +13,11 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
         if ($primeiraPagina) {
             header('Location: ' . $primeiraPagina);
         } else {
-            header('Location: index.php');
+            redirect_to('index');
         }
         exit;
     } catch (Exception $e) {
-        // Fallback para index.php em caso de erro
-        header('Location: index.php');
-        exit;
+        redirect_to('index');
     }
 }
 ?>

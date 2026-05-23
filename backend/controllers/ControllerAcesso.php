@@ -9,6 +9,7 @@
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../config/url.php';
 require_once __DIR__ . '/ControllerPermissoes.php';
 
 class ControllerAcesso {
@@ -30,7 +31,7 @@ class ControllerAcesso {
             return false;
         }
         
-        $urlPagina = basename($_SERVER['PHP_SELF']);
+        $urlPagina = pagina_url_banco();
         $temPermissao = $this->controllerPermissoes->verificarPermissaoUsuarioLogado($urlPagina, 'visualizar');
         
         if (!$temPermissao) {
@@ -54,12 +55,11 @@ class ControllerAcesso {
         // Registrar erro de acesso
         $this->registrarErroAcesso($mensagem, $codigo, $tipo);
         
-        $url = "error.php?message=" . urlencode($mensagem) . 
-               "&codigo=" . urlencode($codigo) . 
-               "&tipo=" . urlencode($tipo);
-        
-        header('Location: ' . $url);
-        exit();
+        redirect_to('error', [
+            'message' => $mensagem,
+            'codigo' => $codigo,
+            'tipo' => $tipo,
+        ]);
     }
     
     /**
@@ -311,7 +311,7 @@ class ControllerAcesso {
         $isActive = ($current == basename($pagina['url_pagina'], '.php')) ? ' active' : '';
         
         $html = '<li class="nav-item">';
-        $html .= '<a class="nav-link' . $isActive . '" href="' . htmlspecialchars($pagina['url_pagina']) . '">';
+        $html .= '<a class="nav-link' . $isActive . '" href="' . htmlspecialchars(app_url($pagina['url_pagina'])) . '">';
         $html .= '<i class="' . htmlspecialchars($pagina['icone']) . ' me-2"></i>';
         $html .= htmlspecialchars($pagina['nome_pagina']);
         $html .= '</a>';
@@ -393,7 +393,7 @@ class ControllerAcesso {
                 if (isset($dadosCategoria['paginas']) && !empty($dadosCategoria['paginas'])) {
                     // Retornar a primeira página da primeira categoria
                     $primeiraPagina = $dadosCategoria['paginas'][0];
-                    return $primeiraPagina['url_pagina'];
+                    return app_url($primeiraPagina['url_pagina']);
                 }
             }
             

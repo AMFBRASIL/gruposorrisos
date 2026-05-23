@@ -4,6 +4,8 @@
  * Funções para verificar autenticação e gerenciar sessões
  */
 
+require_once __DIR__ . '/url.php';
+
 // Inicia a sessão se não estiver ativa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -61,8 +63,7 @@ function isVisualizador() {
  */
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: login.php');
-        exit();
+        redirect_to('login');
     }
 }
 
@@ -73,7 +74,7 @@ function requireProfile($perfil) {
     requireLogin();
     
     if (!hasProfile($perfil)) {
-        header('Location: error.php?message=Acesso negado');
+        redirect_to('error', ['message' => 'Acesso negado']);
         exit();
     }
 }
@@ -85,7 +86,7 @@ function requireAdmin() {
     requireLogin();
     
     if (!isAdmin()) {
-        header('Location: error.php?message=Acesso negado - Administrador necessário');
+        redirect_to('error', ['message' => 'Acesso negado - Administrador necessário']);
         exit();
     }
 }
@@ -97,7 +98,7 @@ function requireGerente() {
     requireLogin();
     
     if (!isGerente()) {
-        header('Location: error.php?message=Acesso negado - Gerente necessário');
+        redirect_to('error', ['message' => 'Acesso negado - Gerente necessário']);
         exit();
     }
 }
@@ -109,7 +110,7 @@ function requireOperador() {
     requireLogin();
     
     if (!isOperador()) {
-        header('Location: error.php?message=Acesso negado - Operador necessário');
+        redirect_to('error', ['message' => 'Acesso negado - Operador necessário']);
         exit();
     }
 }
@@ -223,7 +224,7 @@ function checkSessionExpiration() {
  */
 function forceLogout() {
     session_destroy();
-    header('Location: login.php?message=Sessão expirada');
+    redirect_to('login', ['message' => 'Sessão expirada']);
     exit();
 }
 

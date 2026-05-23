@@ -2,14 +2,14 @@
 require_once 'config/session.php';
 require_once 'backend/controllers/ControllerAcesso.php';
 
-$current = basename($_SERVER['PHP_SELF'], '.php');
+$current = pagina_atual_slug();
 
 // Inicializar controller de acesso
 $controllerAcesso = new ControllerAcesso();
 
 // Verificar se o usuário tem acesso à página atual
 // IMPORTANTE: Só verificar se a página estiver registrada na tabela
-$paginaAtual = basename($_SERVER['PHP_SELF']);
+$paginaAtual = pagina_url_banco();
 $paginaRegistrada = $controllerAcesso->verificarSePaginaRegistrada($paginaAtual);
 
 if ($paginaRegistrada) {
@@ -77,7 +77,7 @@ echo "<!-- DEBUG: Menu obtido: " . print_r($menuUsuario, true) . " -->";
                         <?php foreach ($dados['paginas'] as $pagina): ?>
                             <li class="nav-item">
                                 <a class="nav-link<?php if($current == basename($pagina['url_pagina'], '.php')) echo ' active'; ?>" 
-                                   href="<?php echo htmlspecialchars($pagina['url_pagina']); ?>">
+                                   href="<?php echo htmlspecialchars(app_url($pagina['url_pagina'])); ?>">
                                     <i class="<?php echo htmlspecialchars($pagina['icone'] ?? 'bi-circle'); ?> me-2"></i>
                                     <?php echo htmlspecialchars($pagina['nome_pagina']); ?>
                                 </a>
@@ -273,7 +273,7 @@ function logout() {
             method: 'POST'
         }).finally(() => {
             // Redirecionar para login
-            window.location.href = 'login.php';
+            window.location.href = 'login';
         });
     }
 }
