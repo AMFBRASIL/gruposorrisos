@@ -2368,6 +2368,12 @@ async function visualizarPedido(id) {
                 const modal = new bootstrap.Modal(modalElement);
                 modal.show();
             }
+
+            pedidoIdAtual = parseInt(id, 10);
+            sessionStorage.removeItem(`chat_visto_${id}`);
+            ativarAbaDetalhesPedido();
+            verificarMensagensChatNaoLidas(id, true);
+            iniciarPollingChatBadge(id);
         } else {
             mostrarErro('Erro ao carregar dados do pedido');
         }
@@ -5051,25 +5057,181 @@ async function buscarUltimoPrecoMaterial(idMaterial, idFilial, precoAtual) {
 
 // ===== FUNÇÕES DO CHAT =====
 let chatInterval;
+let chatBadgeInterval;
 let pedidoIdAtual;
+
+function obterPedidoIdChat() {
+    if (window.pedidoAtual) {
+        const id = window.pedidoAtual.id_pedido || window.pedidoAtual.id;
+        if (id) return parseInt(id, 10);
+    }
+    const modalElement = document.getElementById('modalVisualizarPedido');
+    if (modalElement) {
+        const id = modalElement.getAttribute('data-pedido-id');
+        if (id) return parseInt(id, 10);
+    }
+    return pedidoIdAtual || null;
+}
+
+function atualizarAvisoChatTab(qtd) {
+    const n = Math.max(0, parseInt(qtd, 10) || 0);
+    const modal = document.getElementById('modalVisualizarPedido');
+    const badge = modal ? modal.querySelector('#chat-badge') : document.getElementById('chat-badge');
+    const tabBtn = modal ? modal.querySelector('#chat-tab') : document.getElementById('chat-tab');
+    const dot = modal ? modal.querySelector('#chat-tab-aviso') : document.getElementById('chat-tab-aviso');
+
+    if (badge) {
+        if (n > 0) {
+            badge.textContent = n > 99 ? '99+' : String(n);
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+            badge.textContent = '0';
+        }
+    }
+    if (tabBtn) {
+        tabBtn.classList.toggle('chat-tab-com-aviso', n > 0);
+    }
+    if (dot) {
+        dot.classList.toggle('d-none', n === 0);
+    }
+}
+
+function chatAbaEstaAtiva() {
+    const modal = document.getElementById('modalVisualizarPedido');
+    const pane = modal ? modal.querySelector('#chat') : document.getElementById('chat');
+    return pane && pane.classList.contains('active');
+}
+
+function mensagemEstaLida(lida) {
+    return lida === 1 || lida === '1' || lida === true;
+}
+
+function mensagemChatNaoLida(m) {
+    if (m.eh_minha === true || m.eh_minha === 1 || m.eh_minha === '1') {
+        return false;
+    }
+    return !mensagemEstaLida(m.lida);
+}
+
+function contarNaoLidasDasMensagens(mensagens) {
+    if (!Array.isArray(mensagens)) {
+        return 0;
+    }
+    return mensagens.filter(mensagemChatNaoLida).length;
+}
+
+function marcarChatVistoNoPedido(pedidoId) {
+    const id = pedidoId || obterPedidoIdChat();
+    if (id) {
+        sessionStorage.setItem(`chat_visto_${id}`, '1');
+    }
+}
+
+function chatFoiVistoNoPedido(pedidoId) {
+    const id = pedidoId || obterPedidoIdChat();
+    return id ? sessionStorage.getItem(`chat_visto_${id}`) === '1' : false;
+}
+
+/** Conta não lidas; fallback: última msg do fornecedor se ainda não abriu o chat neste pedido. */
+function calcularAvisoChat(mensagens) {
+    const naoLidas = contarNaoLidasDasMensagens(mensagens);
+    if (naoLidas > 0) {
+        return naoLidas;
+    }
+    if (chatFoiVistoNoPedido() || !Array.isArray(mensagens) || mensagens.length === 0) {
+        return 0;
+    }
+    const ultima = mensagens[mensagens.length - 1];
+    const minha = ultima.eh_minha === true || ultima.eh_minha === 1 || ultima.eh_minha === '1';
+    if (!minha) {
+        return 1;
+    }
+    return 0;
+}
+
+async function fetchChatApi(payload) {
+    const response = await fetch('backend/api/chat-pedidos.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    return response;
+}
+
+async function verificarMensagensChatNaoLidas(pedidoId, forcarAtualizacao = false) {
+    const id = pedidoId || obterPedidoIdChat();
+    if (!id) {
+        atualizarAvisoChatTab(0);
+        return 0;
+    }
+
+    if (!forcarAtualizacao && chatAbaEstaAtiva()) {
+        return 0;
+    }
+
+    try {
+        const response = await fetchChatApi({
+            action: 'listar_mensagens',
+            pedido_id: id
+        });
+        if (!response.ok) {
+            console.warn('Chat aviso: HTTP', response.status);
+            return 0;
+        }
+        const data = await response.json();
+
+        if (!data.success) {
+            console.warn('Chat aviso:', data.error || 'falha ao listar mensagens');
+            return 0;
+        }
+
+        const qtd = Math.max(
+            calcularAvisoChat(data.mensagens),
+            parseInt(data.nao_lidas, 10) || 0
+        );
+        atualizarAvisoChatTab(qtd);
+        return qtd;
+    } catch (e) {
+        console.error('Erro ao verificar mensagens não lidas:', e);
+    }
+    return 0;
+}
+
+function ativarAbaDetalhesPedido() {
+    const detalhesTab = document.getElementById('detalhes-tab');
+    if (detalhesTab && typeof bootstrap !== 'undefined') {
+        bootstrap.Tab.getOrCreateInstance(detalhesTab).show();
+    }
+}
+
+function pararPollingChatBadge() {
+    if (chatBadgeInterval) {
+        clearInterval(chatBadgeInterval);
+        chatBadgeInterval = null;
+    }
+}
+
+function iniciarPollingChatBadge(pedidoId) {
+    pararPollingChatBadge();
+    const id = pedidoId || obterPedidoIdChat();
+    if (!id) return;
+    chatBadgeInterval = setInterval(() => {
+        const modal = document.getElementById('modalVisualizarPedido');
+        if (!modal || !modal.classList.contains('show')) {
+            pararPollingChatBadge();
+            return;
+        }
+        if (!chatAbaEstaAtiva()) {
+            verificarMensagensChatNaoLidas(id);
+        }
+    }, 5000);
+}
 
 // Carregar mensagens do chat
 async function carregarChat() {
-    console.log('carregarChat() chamada');
-    console.log('window.pedidoAtual:', window.pedidoAtual);
-    
-    // Tentar obter o ID do pedido de diferentes fontes
-    let pedidoId = null;
-    
-    if (window.pedidoAtual && window.pedidoAtual.id) {
-        pedidoId = window.pedidoAtual.id;
-    } else {
-        // Tentar obter do modal
-        const modalElement = document.getElementById('modalVisualizarPedido');
-        if (modalElement) {
-            pedidoId = modalElement.getAttribute('data-pedido-id');
-        }
-    }
+    const pedidoId = obterPedidoIdChat();
     
     if (!pedidoId) {
         console.error('ID do pedido não encontrado');
@@ -5082,40 +5244,25 @@ async function carregarChat() {
         return;
     }
     
-    pedidoIdAtual = parseInt(pedidoId);
-    console.log('pedidoIdAtual definido como:', pedidoIdAtual);
+    pedidoIdAtual = pedidoId;
     
     try {
         const requestData = {
             action: 'listar_mensagens',
             pedido_id: pedidoIdAtual
         };
-        console.log('Enviando dados:', requestData);
         
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestData)
-        });
-        
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-        
+        const response = await fetchChatApi(requestData);
         const data = await response.json();
-        console.log('Dados recebidos da API:', data);
         
         if (data.success) {
-            console.log('Mensagens recebidas:', data.mensagens);
-            console.log('Quantidade de mensagens:', data.mensagens ? data.mensagens.length : 0);
             renderizarMensagens(data.mensagens);
-            marcarMensagensComoLidas();
+            await marcarMensagensComoLidas();
+            atualizarAvisoChatTab(0);
             
-            // Iniciar atualização automática
             if (chatInterval) clearInterval(chatInterval);
             chatInterval = setInterval(() => {
-                if (document.getElementById('chat').classList.contains('active')) {
+                if (chatAbaEstaAtiva()) {
                     carregarNovasMensagens();
                 }
             }, 3000);
@@ -5183,21 +5330,17 @@ async function carregarNovasMensagens() {
     if (!pedidoIdAtual) return;
     
     try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'listar_mensagens',
-                pedido_id: pedidoIdAtual
-            })
+        const response = await fetchChatApi({
+            action: 'listar_mensagens',
+            pedido_id: pedidoIdAtual
         });
-        
         const data = await response.json();
         
         if (data.success) {
             renderizarMensagens(data.mensagens);
+            if (!chatAbaEstaAtiva()) {
+                atualizarAvisoChatTab(calcularAvisoChat(data.mensagens));
+            }
         }
     } catch (error) {
         console.error('Erro ao carregar novas mensagens:', error);
@@ -5236,22 +5379,10 @@ async function enviarMensagem() {
         };
         console.log('Enviando dados:', requestData);
         
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestData)
-        });
-        
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-        
+        const response = await fetchChatApi(requestData);
         const data = await response.json();
-        console.log('Dados recebidos da API:', data);
         
         if (data.success) {
-            console.log('Mensagem enviada com sucesso');
             input.value = '';
             carregarNovasMensagens();
         } else {
@@ -5269,16 +5400,15 @@ async function marcarMensagensComoLidas() {
     if (!pedidoIdAtual) return;
     
     try {
-        await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'marcar_como_lida',
-                pedido_id: pedidoIdAtual
-            })
+        const response = await fetchChatApi({
+            action: 'marcar_como_lida',
+            pedido_id: pedidoIdAtual
         });
+        const data = await response.json();
+        if (data.success) {
+            marcarChatVistoNoPedido(pedidoIdAtual);
+            atualizarAvisoChatTab(0);
+        }
     } catch (error) {
         console.error('Erro ao marcar mensagens como lidas:', error);
     }
@@ -5313,11 +5443,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Event listener para quando a aba de chat é ativada
-    const chatTab = document.querySelector('[data-bs-target="#chat"]');
-    console.log('Aba chat encontrada:', chatTab);
+    const chatTab = document.getElementById('chat-tab');
     if (chatTab) {
         chatTab.addEventListener('shown.bs.tab', function() {
-            console.log('Aba chat ativada');
             carregarChat();
         });
     }
@@ -5326,13 +5454,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalPedido = document.getElementById('modalVisualizarPedido');
     console.log('Modal pedido encontrado:', modalPedido);
     if (modalPedido) {
+        modalPedido.addEventListener('shown.bs.modal', function() {
+            const id = obterPedidoIdChat();
+            if (id) {
+                verificarMensagensChatNaoLidas(id, true);
+                iniciarPollingChatBadge(id);
+            }
+        });
         modalPedido.addEventListener('hidden.bs.modal', function() {
-            console.log('Modal fechado, limpando chat');
             if (chatInterval) {
                 clearInterval(chatInterval);
                 chatInterval = null;
             }
+            pararPollingChatBadge();
             pedidoIdAtual = null;
+            atualizarAvisoChatTab(0);
         });
     }
 });

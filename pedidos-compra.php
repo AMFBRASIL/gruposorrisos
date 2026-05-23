@@ -572,9 +572,10 @@ $usuarioEhAdmin = isAdmin();
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab">
+                        <button class="nav-link position-relative" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab">
                             <i class="bi bi-chat-dots me-2"></i>Chat
-                            <span class="badge bg-danger ms-1 d-none" id="chat-badge">0</span>
+                            <span class="badge bg-danger ms-1 d-none" id="chat-badge" title="Mensagens não lidas">0</span>
+                            <span class="chat-tab-aviso d-none" id="chat-tab-aviso" title="Nova mensagem"></span>
                         </button>
                     </li>
                 </ul>
@@ -1448,6 +1449,6 @@ $usuarioEhAdmin = isAdmin();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="assets/js/pedidos-compra.js"></script>
+<script src="assets/js/pedidos-compra.js?v=<?php echo @filemtime(__DIR__ . '/assets/js/pedidos-compra.js') ?: time(); ?>"></script>
 </body>
 </html>

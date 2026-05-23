@@ -1127,3 +1127,30 @@ body { background: #f7f9fb; }
         opacity: 1;
     }
 }
+
+/* Aviso de nova mensagem na aba Chat */
+#modalVisualizarPedido #chat-tab {
+    overflow: visible;
+}
+#chat-tab.chat-tab-com-aviso {
+    color: #dc2626 !important;
+    font-weight: 600;
+}
+#chat-tab.chat-tab-com-aviso .bi-chat-dots {
+    color: #dc2626;
+}
+.chat-tab-aviso {
+    position: absolute;
+    top: 6px;
+    right: 4px;
+    width: 9px;
+    height: 9px;
+    background: #dc2626;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    animation: chatAvisoPulse 1.4s ease-in-out infinite;
+}
+@keyframes chatAvisoPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.75; }
+}

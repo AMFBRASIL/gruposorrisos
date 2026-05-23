@@ -49,6 +49,10 @@ try {
         case 'marcar_como_lida':
             echo json_encode(marcarComoLida($pdo, $input));
             break;
+
+        case 'contar_nao_lidas':
+            echo json_encode(contarNaoLidas($pdo, $input));
+            break;
             
         default:
             http_response_code(400);
@@ -120,14 +124,47 @@ function listarMensagens($pdo, $input) {
             error_log("Mensagem ID {$mensagem['id_mensagem']}: remetente_id={$mensagem_remetente_id}, usuario_atual={$usuario_id}, tipo={$mensagem_tipo}, eh_minha=" . ($mensagem['eh_minha'] ? 'true' : 'false'));
         }
         
+        $nao_lidas = contarMensagensNaoLidasPedido($pdo, $pedido_id, $usuario_id);
+
         return [
             'success' => true,
-            'mensagens' => $mensagens
+            'mensagens' => $mensagens,
+            'nao_lidas' => $nao_lidas
         ];
     } catch (Exception $e) {
         error_log("Erro ao listar mensagens: " . $e->getMessage());
         return ['success' => false, 'error' => 'Erro ao buscar mensagens: ' . $e->getMessage()];
     }
+}
+
+/**
+ * Conta mensagens não lidas de outros usuários no pedido
+ */
+function contarNaoLidas($pdo, $input) {
+    $pedido_id = (int)($input['pedido_id'] ?? 0);
+    if (!$pedido_id) {
+        return ['success' => false, 'error' => 'ID do pedido é obrigatório'];
+    }
+    if (!verificarAcessoPedido($pdo, $pedido_id, $_SESSION['usuario_id'])) {
+        return ['success' => false, 'error' => 'Acesso negado ao pedido'];
+    }
+    $usuario_id = (int)$_SESSION['usuario_id'];
+    return [
+        'success' => true,
+        'nao_lidas' => contarMensagensNaoLidasPedido($pdo, $pedido_id, $usuario_id)
+    ];
+}
+
+function contarMensagensNaoLidasPedido($pdo, $pedido_id, $usuario_id) {
+    // Mensagens de outro remetente (mais confiável que tipo_usuario no histórico)
+    $sql = "SELECT COUNT(*) FROM tbl_chat_pedidos
+            WHERE id_pedido = ?
+            AND (id_usuario_remetente IS NULL OR id_usuario_remetente != ?)
+            AND (lida = 0 OR lida IS NULL OR lida = '0')
+            AND (ativo = 1 OR ativo IS NULL OR ativo = '1')";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$pedido_id, (int)$usuario_id]);
+    return (int)$stmt->fetchColumn();
 }
 
 /**
@@ -209,17 +246,16 @@ function marcarComoLida($pdo, $input) {
         return ['success' => false, 'error' => 'Acesso negado ao pedido'];
     }
     
-    $tipo_usuario = getTipoUsuario($_SESSION['usuario_perfil_id']);
-    
-    // Marcar como lidas apenas as mensagens que NÃO são do usuário atual
+    $usuario_id = (int)$_SESSION['usuario_id'];
+
     $sql = "UPDATE tbl_chat_pedidos 
             SET lida = 1 
             WHERE id_pedido = ? 
-            AND tipo_usuario != ? 
-            AND lida = 0";
+            AND (id_usuario_remetente IS NULL OR id_usuario_remetente != ?)
+            AND (lida = 0 OR lida IS NULL OR lida = '0')";
     
     $stmt = $pdo->prepare($sql);
-    $success = $stmt->execute([$pedido_id, $tipo_usuario]);
+    $success = $stmt->execute([$pedido_id, $usuario_id]);
     
     return [
         'success' => $success,
