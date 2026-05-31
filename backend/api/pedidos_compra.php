@@ -75,7 +75,9 @@ if ($method === 'POST') {
 
 try {
     $pedidoCompra = new PedidoCompra();
-    garantirMetadadosNotaFiscalPedido(Conexao::getInstance()->getPdo());
+    $pdoPedidos = Conexao::getInstance()->getPdo();
+    garantirMetadadosNotaFiscalPedido($pdoPedidos);
+    garantirEnumStatusPedidoCompra($pdoPedidos);
 
     switch ($method) {
         case 'GET':

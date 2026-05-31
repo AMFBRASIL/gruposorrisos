@@ -707,6 +707,9 @@ class PedidoCompra extends BaseModel {
      * Registrar histórico de mudança de status
      */
     private function registrarHistoricoStatus($idPedido, $status, $observacao = null) {
+        require_once __DIR__ . '/../backend/helpers/fluxo_pedido_compra.php';
+        garantirEnumStatusPedidoCompra($this->pdo);
+
         $sql = "INSERT INTO tbl_historico_status_pedidos 
                 (id_pedido, status, observacao, data_alteracao, id_usuario) 
                 VALUES (?, ?, ?, NOW(), ?)";

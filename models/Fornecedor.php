@@ -389,9 +389,16 @@ class Fornecedor extends BaseModel {
     }
 
     private function tabelaExiste($nomeTabela) {
-        $stmt = $this->pdo->prepare('SHOW TABLES LIKE ?');
-        $stmt->execute([$nomeTabela]);
-        return $stmt->rowCount() > 0;
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = DATABASE() AND table_name = ?
+            ");
+            $stmt->execute([$nomeTabela]);
+            return ((int) $stmt->fetchColumn()) > 0;
+        } catch (Exception $e) {
+            return false;
+        }
     }
     
     /**

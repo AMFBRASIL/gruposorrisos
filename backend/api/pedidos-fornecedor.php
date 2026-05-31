@@ -82,6 +82,8 @@ function garantirColunasPedidoFornecedor(PDO $pdo): void {
     }
 
     garantirMetadadosNotaFiscalPedido($pdo);
+    require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+    garantirEnumStatusPedidoCompra($pdo);
 }
 
 function obterColunasItensPedido(PDO $pdo): array {
