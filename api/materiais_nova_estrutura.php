@@ -182,6 +182,27 @@ function resolverFilialIdListagemMateriais(): ?int {
 }
 
 /**
+ * Converte valor de formulário/API para decimal (evita '' em colunas DECIMAL).
+ */
+function normalizarDecimalMaterial($value, float $default = 0.0): float {
+    if ($value === null) {
+        return $default;
+    }
+    if (is_string($value)) {
+        $value = trim($value);
+        if ($value === '') {
+            return $default;
+        }
+        $value = str_replace([' ', '.'], ['', ''], $value);
+        $value = str_replace(',', '.', $value);
+    }
+    if (!is_numeric($value)) {
+        return $default;
+    }
+    return (float) $value;
+}
+
+/**
  * Lista materiais com estoque (por filial)
  */
 function listarMateriais($estoque) {
@@ -520,9 +541,9 @@ function criarMaterial($catalogo, $estoque, $data) {
             'id_fornecedor' => $emptyToNull($catalogoData['id_fornecedor'] ?? null),
             'id_fabricante' => $emptyToNull($catalogoData['id_fabricante'] ?? null),
             'id_unidade' => $catalogoData['id_unidade'] ?? 1,
-            'preco_unitario_padrao' => $catalogoData['preco_unitario_padrao'] ?? 0.00,
-            'estoque_minimo_padrao' => $catalogoData['estoque_minimo_padrao'] ?? 0.00,
-            'estoque_maximo_padrao' => $catalogoData['estoque_maximo_padrao'] ?? 0.00,
+            'preco_unitario_padrao' => normalizarDecimalMaterial($catalogoData['preco_unitario_padrao'] ?? null),
+            'estoque_minimo_padrao' => normalizarDecimalMaterial($catalogoData['estoque_minimo_padrao'] ?? null),
+            'estoque_maximo_padrao' => normalizarDecimalMaterial($catalogoData['estoque_maximo_padrao'] ?? null),
             'codigo_barras' => $emptyToNull($catalogoData['codigo_barras'] ?? null),
             'ca' => $emptyToNull($catalogoData['ca'] ?? null),
             'marca' => $emptyToNull($catalogoData['marca'] ?? null),
@@ -538,13 +559,14 @@ function criarMaterial($catalogo, $estoque, $data) {
         
         // Criar estoque para a filial se especificada
         if (!empty($estoqueData['id_filial'])) {
+            $precoPadrao = normalizarDecimalMaterial($catalogoData['preco_unitario_padrao'] ?? null);
             $dadosEstoque = [
-                'estoque_atual' => $estoqueData['estoque_atual'] ?? 0.00,
+                'estoque_atual' => normalizarDecimalMaterial($estoqueData['estoque_atual'] ?? null),
                 // Se estoque_minimo/maximo não foram fornecidos, deixar NULL (será usado valor padrão do catálogo como fallback)
                 // Se foram fornecidos, usar os valores específicos da filial
-                'estoque_minimo' => isset($estoqueData['estoque_minimo']) ? $estoqueData['estoque_minimo'] : null,
-                'estoque_maximo' => isset($estoqueData['estoque_maximo']) ? $estoqueData['estoque_maximo'] : null,
-                'preco_unitario' => $estoqueData['preco_unitario'] ?? $catalogoData['preco_unitario_padrao'] ?? 0.00,
+                'estoque_minimo' => isset($estoqueData['estoque_minimo']) ? normalizarDecimalMaterial($estoqueData['estoque_minimo']) : null,
+                'estoque_maximo' => isset($estoqueData['estoque_maximo']) ? normalizarDecimalMaterial($estoqueData['estoque_maximo']) : null,
+                'preco_unitario' => normalizarDecimalMaterial($estoqueData['preco_unitario'] ?? null, $precoPadrao),
                 'data_vencimento' => $estoqueData['data_vencimento'] ?? null,
                 'localizacao_estoque' => $estoqueData['localizacao_estoque'] ?? null,
                 'observacoes_estoque' => $estoqueData['observacoes_estoque'] ?? null
@@ -572,10 +594,12 @@ function criarMaterial($catalogo, $estoque, $data) {
                     // IMPORTANTE: Não definir estoque_minimo e estoque_maximo ao criar - devem ser configurados por filial depois
                     // Usar valores padrão do catálogo apenas como fallback inicial (NULL permite que seja configurado depois)
                     $dadosEstoque = [
-                        'estoque_atual' => $estoqueData['estoque_atual'] ?? 0.00,
+                        'estoque_atual' => normalizarDecimalMaterial($estoqueData['estoque_atual'] ?? null),
                         // Não definir estoque_minimo e estoque_maximo - deixar NULL para ser configurado por filial
                         // O sistema usará os valores padrão do catálogo como fallback até serem configurados
-                        'preco_unitario' => $estoqueData['preco_unitario'] ?? $catalogoData['preco_unitario_padrao'] ?? 0.00,
+                        'preco_unitario' => normalizarDecimalMaterial(
+                            $estoqueData['preco_unitario'] ?? $catalogoData['preco_unitario_padrao'] ?? null
+                        ),
                         'localizacao_estoque' => $estoqueData['localizacao_estoque'] ?? 'A definir',
                         'observacoes_estoque' => $estoqueData['observacoes_estoque'] ?? 'Estoque inicial criado automaticamente. Configure estoque mínimo/máximo por filial na tela de materiais.',
                         'ativo' => 1
@@ -637,9 +661,9 @@ function duplicarMaterial($catalogo, $estoque, $data) {
             'id_categoria' => $material['id_categoria'],
             'id_fornecedor' => $material['id_fornecedor'],
             'id_unidade' => $material['id_unidade'],
-            'preco_unitario_padrao' => $material['preco_unitario_padrao'] ?? 0.00,
-            'estoque_minimo_padrao' => $material['estoque_minimo_padrao'] ?? 0.00,
-            'estoque_maximo_padrao' => $material['estoque_maximo_padrao'] ?? 0.00,
+            'preco_unitario_padrao' => normalizarDecimalMaterial($material['preco_unitario_padrao'] ?? null),
+            'estoque_minimo_padrao' => normalizarDecimalMaterial($material['estoque_minimo_padrao'] ?? null),
+            'estoque_maximo_padrao' => normalizarDecimalMaterial($material['estoque_maximo_padrao'] ?? null),
             'codigo_barras' => null, // Não duplicar código de barras
             'marca' => $material['marca'],
             'modelo' => $material['modelo'],
@@ -655,9 +679,9 @@ function duplicarMaterial($catalogo, $estoque, $data) {
         // Criar estoque para a mesma filial
         $dadosEstoque = [
             'estoque_atual' => 0.00, // Estoque zerado para cópia
-            'estoque_minimo' => $material['estoque_minimo'] ?? 0.00,
-            'estoque_maximo' => $material['estoque_maximo'] ?? 0.00,
-            'preco_unitario' => $material['preco_unitario'] ?? 0.00,
+            'estoque_minimo' => normalizarDecimalMaterial($material['estoque_minimo'] ?? null),
+            'estoque_maximo' => normalizarDecimalMaterial($material['estoque_maximo'] ?? null),
+            'preco_unitario' => normalizarDecimalMaterial($material['preco_unitario'] ?? null),
             'data_vencimento' => null,
             'localizacao_estoque' => $material['localizacao_estoque'],
             'observacoes_estoque' => 'Material duplicado do ID: ' . $id
@@ -730,9 +754,21 @@ function atualizarMaterial($catalogo, $estoque, $data) {
             'id_fornecedor' => $emptyToNull($catalogoData['id_fornecedor'] ?? $material['id_fornecedor']),
             'id_fabricante' => $emptyToNull($catalogoData['id_fabricante'] ?? $material['id_fabricante']),
             'id_unidade' => $catalogoData['id_unidade'] ?? $material['id_unidade'],
-            'preco_unitario_padrao' => $catalogoData['preco_unitario_padrao'] ?? $material['preco_unitario_padrao'],
-            'estoque_minimo_padrao' => $catalogoData['estoque_minimo_padrao'] ?? $material['estoque_minimo_padrao'],
-            'estoque_maximo_padrao' => $catalogoData['estoque_maximo_padrao'] ?? $material['estoque_maximo_padrao'],
+            'preco_unitario_padrao' => normalizarDecimalMaterial(
+                array_key_exists('preco_unitario_padrao', $catalogoData)
+                    ? $catalogoData['preco_unitario_padrao']
+                    : $material['preco_unitario_padrao']
+            ),
+            'estoque_minimo_padrao' => normalizarDecimalMaterial(
+                array_key_exists('estoque_minimo_padrao', $catalogoData)
+                    ? $catalogoData['estoque_minimo_padrao']
+                    : $material['estoque_minimo_padrao']
+            ),
+            'estoque_maximo_padrao' => normalizarDecimalMaterial(
+                array_key_exists('estoque_maximo_padrao', $catalogoData)
+                    ? $catalogoData['estoque_maximo_padrao']
+                    : $material['estoque_maximo_padrao']
+            ),
             'codigo_barras' => $emptyToNull($catalogoData['codigo_barras'] ?? $material['codigo_barras']),
             'ca' => $emptyToNull($catalogoData['ca'] ?? $material['ca']),
             'marca' => $emptyToNull($catalogoData['marca'] ?? $material['marca']),
@@ -764,11 +800,15 @@ function atualizarMaterial($catalogo, $estoque, $data) {
         // Atualizar estoque da filial se fornecido
         if (!empty($estoqueData['id_filial'])) {
             $dadosEstoqueFilial = [
-                'estoque_atual' => $estoqueData['estoque_atual'] ?? $material['estoque_atual'] ?? 0.00,
+                'estoque_atual' => normalizarDecimalMaterial($estoqueData['estoque_atual'] ?? $material['estoque_atual'] ?? null),
                 // IMPORTANTE: Salvar estoque_minimo e estoque_maximo na filial quando fornecidos
-                'estoque_minimo' => isset($estoqueData['estoque_minimo']) && $estoqueData['estoque_minimo'] !== null ? $estoqueData['estoque_minimo'] : null,
-                'estoque_maximo' => isset($estoqueData['estoque_maximo']) && $estoqueData['estoque_maximo'] !== null ? $estoqueData['estoque_maximo'] : null,
-                'preco_unitario' => $estoqueData['preco_unitario'] ?? $material['preco_unitario'] ?? 0.00,
+                'estoque_minimo' => isset($estoqueData['estoque_minimo']) && $estoqueData['estoque_minimo'] !== null && $estoqueData['estoque_minimo'] !== ''
+                    ? normalizarDecimalMaterial($estoqueData['estoque_minimo'])
+                    : null,
+                'estoque_maximo' => isset($estoqueData['estoque_maximo']) && $estoqueData['estoque_maximo'] !== null && $estoqueData['estoque_maximo'] !== ''
+                    ? normalizarDecimalMaterial($estoqueData['estoque_maximo'])
+                    : null,
+                'preco_unitario' => normalizarDecimalMaterial($estoqueData['preco_unitario'] ?? $material['preco_unitario'] ?? null),
                 'data_vencimento' => $estoqueData['data_vencimento'] ?? $material['data_vencimento'] ?? null,
                 'localizacao_estoque' => $estoqueData['localizacao_estoque'] ?? $material['localizacao_estoque'] ?? null,
                 'observacoes_estoque' => $estoqueData['observacoes_estoque'] ?? $material['observacoes_estoque'] ?? null

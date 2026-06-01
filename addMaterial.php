@@ -625,23 +625,18 @@ async function salvarMaterial(e) {
         // Converter checkbox para boolean
         data.ativo = data.ativo ? 1 : 0;
         
-        // Converter valores formatados para números usando jQuery Mask Plugin
-        if (data.preco_unitario) {
-            data.preco_unitario = parseFloat($('#preco_unitario').val().replace(/\./g, '').replace(',', '.'));
+        function parseDecimalForm(selector, fallback) {
+            const raw = $(selector).length ? $(selector).val() : '';
+            const str = String(raw ?? '').trim();
+            if (!str) return fallback;
+            const n = parseFloat(str.replace(/\./g, '').replace(',', '.'));
+            return Number.isFinite(n) ? n : fallback;
         }
-        
-        if (data.estoque_atual) {
-            data.estoque_atual = parseFloat($('#estoque_atual').val().replace(/\./g, '').replace(',', '.'));
-        }
-        
-        // Capturar valores padrão do catálogo
-        if ($('#estoque_minimo_padrao').val()) {
-            data.estoque_minimo_padrao = parseFloat($('#estoque_minimo_padrao').val().replace(/\./g, '').replace(',', '.'));
-        }
-        
-        if ($('#estoque_maximo_padrao').val()) {
-            data.estoque_maximo_padrao = parseFloat($('#estoque_maximo_padrao').val().replace(/\./g, '').replace(',', '.'));
-        }
+
+        data.preco_unitario = parseDecimalForm('#preco_unitario', 0);
+        data.estoque_atual = parseDecimalForm('#estoque_atual', 0);
+        data.estoque_minimo_padrao = parseDecimalForm('#estoque_minimo_padrao', 0);
+        data.estoque_maximo_padrao = parseDecimalForm('#estoque_maximo_padrao', 0);
         
         // Preparar dados para nova estrutura centralizada
         const filialId = localStorage.getItem('filialSelecionada');
@@ -670,9 +665,9 @@ async function salvarMaterial(e) {
             id_unidade: data.id_unidade,
             codigo_barras: data.codigo_barras,
             ca: data.ca,
-            preco_unitario_padrao: data.preco_unitario,
-            estoque_minimo_padrao: data.estoque_minimo_padrao || 0,
-            estoque_maximo_padrao: data.estoque_maximo_padrao || 0,
+            preco_unitario_padrao: data.preco_unitario ?? 0,
+            estoque_minimo_padrao: data.estoque_minimo_padrao ?? 0,
+            estoque_maximo_padrao: data.estoque_maximo_padrao ?? 0,
             observacoes: data.observacoes
         };
         
