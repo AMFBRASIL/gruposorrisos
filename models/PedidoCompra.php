@@ -534,9 +534,10 @@ class PedidoCompra extends BaseModel {
                     'aguardando_faturamento', 'enviar_para_faturamento', 'enviar_faturamento'
                 ) THEN 1 END) as fase_aguardando_faturamento,
                 COUNT(CASE WHEN status IN (
-                    'em_faturamento', 'aprovado_para_faturar', 'faturado', 'em_transito',
-                    'em_producao', 'enviado', 'aprovado'
+                    'em_faturamento', 'aprovado_para_faturar', 'faturado',
+                    'em_producao', 'aprovado'
                 ) THEN 1 END) as fase_em_faturamento,
+                COUNT(CASE WHEN status IN ('em_transito', 'enviado') THEN 1 END) as fase_em_transito,
                 COUNT(CASE WHEN status IN ('em_conferencia', 'entregue', 'parcialmente_recebido') THEN 1 END) as em_conferencia,
                 COUNT(CASE WHEN status IN ('finalizado', 'recebido') THEN 1 END) as finalizados,
                 COUNT(CASE WHEN status = 'cancelado' THEN 1 END) as cancelados,
@@ -642,7 +643,7 @@ class PedidoCompra extends BaseModel {
             
             $statusValidos = [
                 'aguardando_cotacao', 'em_cotacao', 'aguardando_aprovacao_socio', 'aprovado_socio',
-                'aguardando_faturamento', 'em_faturamento', 'em_conferencia', 'finalizado', 'cancelado'
+                'aguardando_faturamento', 'em_faturamento', 'em_transito', 'em_conferencia', 'finalizado', 'cancelado'
             ];
             if (!in_array($novoStatus, $statusValidos, true)) {
                 throw new Exception('Status inválido: ' . $novoStatus);
@@ -869,7 +870,8 @@ class PedidoCompra extends BaseModel {
             'aguardando_aprovacao_socio' => ['aprovado_socio' => 'Aprovar (Sócio)'],
             'aprovado_socio' => ['aguardando_faturamento' => 'Aguardando Faturamento'],
             'aguardando_faturamento' => ['em_faturamento' => 'Encaminhar para Faturamento (Compras)'],
-            'em_faturamento' => ['em_conferencia' => 'Confirmar Recebimento (Clínica)'],
+            'em_faturamento' => ['em_transito' => 'Marcar Em Trânsito'],
+            'em_transito' => ['em_conferencia' => 'Confirmar Recebimento (Clínica)'],
             'em_conferencia' => ['finalizado' => 'Finalizar e Dar Entrada no Estoque'],
         ];
         

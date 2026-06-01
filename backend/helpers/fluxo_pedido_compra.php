@@ -8,8 +8,9 @@
  * 4. Aprovado pelo Sócio     — Sócio aprova
  * 5. Aguard. Faturamento     — Compras encaminha após aprovação do sócio
  * 6. Em Faturamento          — Fornecedor / faturamento
- * 7. Em Conferência          — Recebimento + conferência cega
- * 8. Finalizado              — Entrada no estoque
+ * 7. Em Trânsito             — Envio / transporte
+ * 8. Em Conferência          — Recebimento + conferência cega
+ * 9. Finalizado              — Entrada no estoque
  */
 
 function fluxoPedidoStatusLabels(): array {
@@ -20,6 +21,7 @@ function fluxoPedidoStatusLabels(): array {
         'aprovado_socio' => 'Aprovado pelo Sócio',
         'aguardando_faturamento' => 'Aguard. Faturamento',
         'em_faturamento' => 'Em Faturamento',
+        'em_transito' => 'Em Trânsito',
         'em_conferencia' => 'Em Conferência',
         'finalizado' => 'Finalizado',
         'cancelado' => 'Cancelado',
@@ -32,13 +34,12 @@ function fluxoPedidoStatusLabels(): array {
         'enviar_faturamento' => 'Aguard. Faturamento',
         'aprovado_para_faturar' => 'Em Faturamento',
         'faturado' => 'Em Faturamento',
-        'em_transito' => 'Em Faturamento',
+        'enviado' => 'Em Trânsito',
         'entregue' => 'Em Conferência',
         'recebido' => 'Finalizado',
         'parcialmente_recebido' => 'Em Conferência',
         'aprovado' => 'Aprovado',
         'em_producao' => 'Em Produção',
-        'enviado' => 'Enviado',
     ];
 }
 
@@ -51,8 +52,9 @@ function fluxoPedidoEtapasOrdenadas(): array {
         ['key' => 'aprovado_socio', 'nome' => 'Aprovado pelo Sócio', 'icon' => '4', 'passo' => 4],
         ['key' => 'aguardando_faturamento', 'nome' => 'Aguard. Faturamento', 'icon' => '5', 'passo' => 5],
         ['key' => 'em_faturamento', 'nome' => 'Em Faturamento', 'icon' => '6', 'passo' => 6],
-        ['key' => 'em_conferencia', 'nome' => 'Em Conferência', 'icon' => '7', 'passo' => 7],
-        ['key' => 'finalizado', 'nome' => 'Finalizado', 'icon' => '8', 'passo' => 8],
+        ['key' => 'em_transito', 'nome' => 'Em Trânsito', 'icon' => '7', 'passo' => 7],
+        ['key' => 'em_conferencia', 'nome' => 'Em Conferência', 'icon' => '8', 'passo' => 8],
+        ['key' => 'finalizado', 'nome' => 'Finalizado', 'icon' => '9', 'passo' => 9],
     ];
 }
 
@@ -72,7 +74,7 @@ function fluxoPedidoNormalizarStatus(?string $status): string {
         'enviar_faturamento' => 'aguardando_faturamento',
         'aprovado_para_faturar' => 'em_faturamento',
         'faturado' => 'em_faturamento',
-        'em_transito' => 'em_faturamento',
+        'enviado' => 'em_transito',
         'entregue' => 'em_conferencia',
         'recebido' => 'finalizado',
         'parcialmente_recebido' => 'em_conferencia',
@@ -88,8 +90,9 @@ function fluxoPedidoTransicoesPermitidas(): array {
         'aguardando_aprovacao_socio' => ['aguardando_faturamento', 'em_cotacao', 'cancelado'],
         'aprovado_socio' => ['aguardando_faturamento', 'aguardando_aprovacao_socio', 'cancelado'],
         'aguardando_faturamento' => ['em_faturamento', 'aguardando_aprovacao_socio', 'cancelado'],
-        'em_faturamento' => ['em_conferencia', 'aguardando_faturamento', 'cancelado'],
-        'em_conferencia' => ['finalizado', 'em_faturamento', 'cancelado'],
+        'em_faturamento' => ['em_transito', 'aguardando_faturamento', 'cancelado'],
+        'em_transito' => ['em_conferencia', 'em_faturamento', 'cancelado'],
+        'em_conferencia' => ['finalizado', 'em_transito', 'cancelado'],
         'finalizado' => [],
         'cancelado' => [],
     ];

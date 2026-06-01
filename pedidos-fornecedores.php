@@ -209,7 +209,8 @@ $menuActive = 'pedidos_fornecedores';
         .status-aguardando_aprovacao_socio { background: #fff3cd; color: #856404; }
         .status-aprovado_socio { background: #d1fae5; color: #065f46; }
         .status-aguardando_faturamento, .status-enviar_para_faturamento { background: #e0e7ff; color: #3730a3; }
-        .status-em_faturamento, .status-aprovado_para_faturar, .status-em_transito { background: #e0f2fe; color: #0277bd; }
+        .status-em_faturamento, .status-aprovado_para_faturar { background: #e0f2fe; color: #0277bd; }
+        .status-em_transito, .status-enviado { background: #cffafe; color: #0e7490; }
         .status-em_conferencia, .status-entregue, .status-parcialmente_recebido { background: #e8f5e8; color: #2e7d32; }
         .status-finalizado, .status-recebido { background: #dcfce7; color: #166534; }
         .status-cancelado { background: #f3e5f5; color: #7b1fa2; }
@@ -983,7 +984,7 @@ const MAPA_STATUS_FORNECEDOR = {
     enviar_faturamento: 'aguardando_faturamento',
     aprovado_para_faturar: 'em_faturamento',
     faturado: 'em_faturamento',
-    em_transito: 'em_faturamento',
+    enviado: 'em_transito',
     entregue: 'em_conferencia',
     recebido: 'finalizado',
     parcialmente_recebido: 'em_conferencia'
@@ -1001,6 +1002,7 @@ const LABELS_STATUS_FORNECEDOR = {
     aprovado_socio: 'Aprovado pelo Sócio',
     aguardando_faturamento: 'Aguard. Faturamento',
     em_faturamento: 'Em Faturamento',
+    em_transito: 'Em Trânsito',
     em_conferencia: 'Em Conferência',
     finalizado: 'Finalizado',
     cancelado: 'Cancelado'

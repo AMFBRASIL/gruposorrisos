@@ -162,6 +162,86 @@ $usuarioEhAdmin = isAdmin();
             border-radius: 8px;
         }
 
+        #modalVisualizarPedido .itens-scroll-box--resize {
+            resize: vertical;
+            min-height: 140px;
+            max-height: min(70vh, 560px);
+            height: 220px;
+            overflow: auto;
+        }
+
+        #modalVisualizarPedido .pedido-view-compact .card-header {
+            padding: 0.45rem 0.85rem;
+        }
+
+        #modalVisualizarPedido .pedido-view-compact .card-body {
+            padding: 0.65rem 0.85rem;
+        }
+
+        #modalVisualizarPedido .info-item-compact {
+            padding: 0.35rem 0.5rem;
+            border-radius: 6px;
+            background: #f8fafc;
+            height: 100%;
+        }
+
+        #modalVisualizarPedido .info-item-compact .info-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            color: #64748b;
+            margin-bottom: 0.15rem;
+        }
+
+        #modalVisualizarPedido .info-item-compact .info-value {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.25;
+        }
+
+        #modalVisualizarPedido .pedido-metricas-inline {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+        }
+
+        @media (min-width: 768px) {
+            #modalVisualizarPedido .pedido-metricas-inline {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        #modalVisualizarPedido .pedido-metrica-chip {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.45rem 0.55rem;
+            text-align: center;
+        }
+
+        #modalVisualizarPedido .pedido-metrica-chip .metric-label {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 0.1rem;
+        }
+
+        #modalVisualizarPedido .pedido-metrica-chip .metric-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        #pedidoTabs .nav-link {
+            white-space: nowrap;
+        }
+
+        .observacoes-pedido-conteudo {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.5;
+        }
+
         /* Cabeçalho fixo ao rolar itens (Novo Pedido + Visualizar) */
         #modalNovoPedido .itens-scroll-box table,
         #modalVisualizarPedido .itens-scroll-box table {
@@ -296,6 +376,7 @@ $usuarioEhAdmin = isAdmin();
                             <option value="aprovado_socio">Aprovado pelo Sócio</option>
                             <option value="aguardando_faturamento">Aguard. Faturamento</option>
                             <option value="em_faturamento">Em Faturamento</option>
+                            <option value="em_transito">Em Trânsito</option>
                             <option value="em_conferencia">Em Conferência</option>
                             <option value="finalizado">Finalizado</option>
                             <option value="cancelado">Cancelado</option>
@@ -565,10 +646,21 @@ $usuarioEhAdmin = isAdmin();
                 </div>
 
                 <!-- Navegação por abas -->
-                <ul class="nav nav-tabs mb-4" id="pedidoTabs" role="tablist">
+                <ul class="nav nav-tabs mb-4 flex-nowrap overflow-auto" id="pedidoTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="detalhes-tab" data-bs-toggle="tab" data-bs-target="#detalhes" type="button" role="tab">
-                            <i class="bi bi-info-circle me-2"></i>Detalhes do Pedido
+                            <i class="bi bi-info-circle me-2"></i>Detalhes
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link position-relative" id="observacoes-tab" data-bs-toggle="tab" data-bs-target="#observacoes" type="button" role="tab">
+                            <i class="bi bi-chat-text me-2"></i>Observações
+                            <span class="badge bg-primary rounded-pill ms-1 d-none" id="observacoes-tab-badge" title="Há observações">!</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="historico-tab" data-bs-toggle="tab" data-bs-target="#historico" type="button" role="tab">
+                            <i class="bi bi-clock-history me-2"></i>Histórico
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -586,8 +678,8 @@ $usuarioEhAdmin = isAdmin();
                     <div class="tab-pane fade show active" id="detalhes" role="tabpanel">
                         <div class="mt-3" id="modal-pedido-content">
 
-                <!-- Informações do Pedido -->
-                <div class="card mb-4 border-0 shadow-sm">
+                <!-- Informações do Pedido (quadro único compacto) -->
+                <div class="card mb-3 border-0 shadow-sm pedido-view-compact">
                     <div class="card-header bg-light border-0">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-info-circle me-2 text-primary"></i>
@@ -595,137 +687,47 @@ $usuarioEhAdmin = isAdmin();
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        <i class="bi bi-building me-2 text-muted"></i>
-                                        Clínica
-                                    </div>
+                        <div class="row g-2 row-cols-2 row-cols-lg-3">
+                            <div class="col">
+                                <div class="info-item-compact">
+                                    <div class="info-label"><i class="bi bi-building me-1"></i>Clínica</div>
                                     <div class="info-value" id="view_filial">Clínica</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        <i class="bi bi-truck me-2 text-muted"></i>
-                                        Fornecedor
-                                    </div>
+                            <div class="col">
+                                <div class="info-item-compact">
+                                    <div class="info-label"><i class="bi bi-truck me-1"></i>Fornecedor</div>
                                     <div class="info-value" id="view_fornecedor">Fornecedor</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        <i class="bi bi-calendar-event me-2 text-muted"></i>
-                                        Entrega Prevista
-                                    </div>
+                            <div class="col">
+                                <div class="info-item-compact">
+                                    <div class="info-label"><i class="bi bi-calendar-event me-1"></i>Entrega prevista</div>
                                     <div class="info-value" id="view_data_entrega">Não informado</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        <i class="bi bi-person me-2 text-muted"></i>
-                                        Solicitante
-                                    </div>
+                            <div class="col">
+                                <div class="info-item-compact">
+                                    <div class="info-label"><i class="bi bi-person me-1"></i>Solicitante</div>
                                     <div class="info-value" id="view_solicitante">Usuário</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        <i class="bi bi-exclamation-triangle me-2 text-muted"></i>
-                                        Prioridade
-                                    </div>
+                            <div class="col">
+                                <div class="info-item-compact">
+                                    <div class="info-label"><i class="bi bi-exclamation-triangle me-1"></i>Prioridade</div>
                                     <div class="info-value" id="view_prioridade">Padrão</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        <i class="bi bi-calendar-check me-2 text-muted"></i>
-                                        Prazo de Entrega
-                                    </div>
+                            <div class="col">
+                                <div class="info-item-compact">
+                                    <div class="info-label"><i class="bi bi-calendar-check me-1"></i>Prazo de entrega</div>
                                     <div class="info-value" id="view_prazo_entrega">8 dias</div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Resumo e Valores -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-6">
-                        <div class="card border-0 shadow-sm h-100">
-                            <div class="card-header bg-success bg-opacity-10 border-0">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-box-seam me-2 text-success"></i>
-                                    <h6 class="mb-0 text-success">Itens do Pedido</h6>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-6">
-                                        <div class="metric-card">
-                                            <div class="metric-icon bg-success bg-opacity-10">
-                                                <i class="bi bi-list-ul text-success"></i>
-                                            </div>
-                                            <div class="metric-content">
-                                                <div class="metric-label">Total de Itens</div>
-                                                <div class="metric-value" id="view-total-itens">0</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="metric-card">
-                                            <div class="metric-icon bg-info bg-opacity-10">
-                                                <i class="bi bi-box text-info"></i>
-                                            </div>
-                                            <div class="metric-content">
-                                                <div class="metric-label">Quantidade Total</div>
-                                                <div class="metric-value" id="view-quantidade-total">0</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card border-0 shadow-sm h-100">
-                            <div class="card-header bg-primary bg-opacity-10 border-0">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-currency-dollar me-2 text-primary"></i>
-                                    <h6 class="mb-0 text-primary">Valores</h6>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-6">
-                                        <div class="metric-card">
-                                            <div class="metric-icon bg-primary bg-opacity-10">
-                                                <i class="bi bi-tag text-primary"></i>
-                                            </div>
-                                            <div class="metric-content">
-                                                <div class="metric-label">Preço Médio</div>
-                                                <div class="metric-value" id="view-preco-medio">R$ 0,00</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="metric-card">
-                                            <div class="metric-icon bg-success bg-opacity-10">
-                                                <i class="bi bi-cash-stack text-success"></i>
-                                            </div>
-                                            <div class="metric-content">
-                                                <div class="metric-label">Valor Total</div>
-                                                <div class="metric-value" id="view_valor_total">R$ 0,00</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="d-flex flex-wrap gap-3 small text-muted border-top pt-2 mt-2">
+                            <span><i class="bi bi-calendar-plus me-1"></i>Criado: <strong id="view-data-criacao">—</strong></span>
+                            <span><i class="bi bi-arrow-repeat me-1"></i>Atualizado: <strong id="view-data-atualizacao">—</strong></span>
                         </div>
                     </div>
                 </div>
@@ -748,21 +750,40 @@ $usuarioEhAdmin = isAdmin();
                     </div>
                 </div>
 
-                <!-- Itens do Pedido -->
-                <div class="card mb-4 border-0 shadow-sm">
-                    <div class="card-header bg-light border-0">
+                <!-- Itens do Pedido + Valores (quadro único) -->
+                <div class="card mb-3 border-0 shadow-sm pedido-view-compact">
+                    <div class="card-header bg-light border-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-list-ul me-2 text-primary"></i>
-                            <h6 class="mb-0">Itens do Pedido</h6>
+                            <h6 class="mb-0">Itens do Pedido e Valores</h6>
                         </div>
+                        <small class="text-muted"><i class="bi bi-arrows-expand me-1"></i>Arraste a borda inferior da tabela para redimensionar</small>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-danger py-2 px-3 d-none mb-3" id="view-alerta-itens-pendentes-resposta">
+                        <div class="pedido-metricas-inline mb-2">
+                            <div class="pedido-metrica-chip">
+                                <div class="metric-label">Total de itens</div>
+                                <div class="metric-value" id="view-total-itens">0</div>
+                            </div>
+                            <div class="pedido-metrica-chip">
+                                <div class="metric-label">Qtd. total</div>
+                                <div class="metric-value" id="view-quantidade-total">0</div>
+                            </div>
+                            <div class="pedido-metrica-chip">
+                                <div class="metric-label">Preço médio</div>
+                                <div class="metric-value" id="view-preco-medio">R$ 0,00</div>
+                            </div>
+                            <div class="pedido-metrica-chip">
+                                <div class="metric-label">Valor total</div>
+                                <div class="metric-value text-success" id="view_valor_total">R$ 0,00</div>
+                            </div>
+                        </div>
+                        <div class="alert alert-danger py-2 px-3 d-none mb-2" id="view-alerta-itens-pendentes-resposta">
                             <i class="bi bi-exclamation-triangle me-1"></i>
                             <span id="view-alerta-itens-pendentes-resposta-texto"></span>
                         </div>
-                        <div class="itens-scroll-box">
-                            <table class="table table-hover mb-0">
+                        <div class="itens-scroll-box itens-scroll-box--resize">
+                            <table class="table table-sm table-hover mb-0">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Material</th>
@@ -783,55 +804,6 @@ $usuarioEhAdmin = isAdmin();
                                     </tr>
                                 </tfoot>
                             </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Observações, NF e Histórico -->
-                <div class="row g-3 g-lg-4">
-                    <div class="col-lg-7">
-                        <div class="card border-0 shadow-sm h-100">
-                            <div class="card-header bg-light border-0 py-2">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-chat-text me-2 text-primary"></i>
-                                    <h6 class="mb-0">Observações</h6>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="info-item mb-0">
-                                    <div class="info-value" id="view_observacoes">Nenhuma observação registrada</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-5">
-                        <div class="card border-0 shadow-sm h-100">
-                            <div class="card-header bg-warning bg-opacity-10 border-0 py-2">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-clock-history me-2 text-warning"></i>
-                                        <h6 class="mb-0 text-warning">Histórico de Status</h6>
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="mostrarHistoricoCompleto()">
-                                        <i class="bi bi-eye me-1"></i>Ver Completo
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body py-2">
-                                <div class="timeline-container timeline-compact" id="timeline-status" style="max-height: 200px; overflow-y: auto;">
-                                    <!-- Timeline será carregada aqui -->
-                                </div>
-                                <div class="row g-2 mt-2 pt-2 border-top small">
-                                    <div class="col-6">
-                                        <div class="text-muted">Criado em</div>
-                                        <div class="fw-semibold" id="view-data-criacao">—</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="text-muted">Última atualização</div>
-                                        <div class="fw-semibold" id="view-data-atualizacao">—</div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -867,6 +839,45 @@ $usuarioEhAdmin = isAdmin();
                         </div>
                     </div>
                 </div>
+                        </div>
+                    </div>
+
+                    <!-- Aba Observações -->
+                    <div class="tab-pane fade" id="observacoes" role="tabpanel">
+                        <div class="mt-3">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-light border-0 py-2">
+                                    <h6 class="mb-0"><i class="bi bi-chat-text me-2 text-primary"></i>Observações do pedido</h6>
+                                </div>
+                                <div class="card-body observacoes-pedido-conteudo" id="view_observacoes">
+                                    <p class="text-muted mb-0">Nenhuma observação registrada.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aba Histórico de Status -->
+                    <div class="tab-pane fade" id="historico" role="tabpanel">
+                        <div class="mt-3">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-warning bg-opacity-10 border-0 py-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <h6 class="mb-0 text-warning"><i class="bi bi-clock-history me-2"></i>Histórico de Status</h6>
+                                    <span class="badge bg-primary" id="historico-aba-status-atual">—</span>
+                                </div>
+                                <div class="card-body py-3">
+                                    <div class="timeline-container" id="timeline-historico-aba" style="max-height: min(55vh, 480px); overflow-y: auto;">
+                                        <p class="text-muted mb-0">Selecione esta aba para carregar o histórico.</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-top">
+                                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="abrirHistoricoModalCompleto()">
+                                            <i class="bi bi-arrows-fullscreen me-1"></i>Abrir em tela maior
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="mostrarOpcoesVoltarStatus()">
+                                            <i class="bi bi-arrow-left me-1"></i>Voltar status
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -933,7 +944,12 @@ $usuarioEhAdmin = isAdmin();
                         <i class="bi bi-receipt me-2"></i>Encaminhar para Faturamento (Compras)
                     </button>
                     
-                    <!-- Passo 5: Clínica confirma recebimento → conferência -->
+                    <!-- Passo 6→7: Marcar em trânsito -->
+                    <button type="button" class="btn btn-info d-none" id="btn-marcar-em-transito">
+                        <i class="bi bi-truck me-2"></i>Marcar Em Trânsito
+                    </button>
+                    
+                    <!-- Passo 7→8: Clínica confirma recebimento → conferência -->
                     <button type="button" class="btn btn-primary d-none" id="btn-confirmar-recebimento">
                         <i class="bi bi-box-arrow-in-down me-2"></i>Confirmar Recebimento (Conferência)
                     </button>

@@ -593,6 +593,7 @@ try {
                 'aprovado_socio',
                 'aguardando_faturamento',
                 'em_faturamento',
+                'em_transito',
                 'em_conferencia',
                 'finalizado',
                 'cancelado'

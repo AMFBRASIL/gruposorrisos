@@ -67,8 +67,9 @@ const FLUXO_PEDIDO_ETAPAS = [
     { key: 'aprovado_socio', nome: 'Aprovado pelo Sócio', icon: '4' },
     { key: 'aguardando_faturamento', nome: 'Aguard. Faturamento', icon: '5' },
     { key: 'em_faturamento', nome: 'Em Faturamento', icon: '6' },
-    { key: 'em_conferencia', nome: 'Em Conferência', icon: '7' },
-    { key: 'finalizado', nome: 'Finalizado', icon: '8' }
+    { key: 'em_transito', nome: 'Em Trânsito', icon: '7' },
+    { key: 'em_conferencia', nome: 'Em Conferência', icon: '8' },
+    { key: 'finalizado', nome: 'Finalizado', icon: '9' }
 ];
 
 const MAPA_STATUS_LEGADO = {
@@ -81,8 +82,7 @@ const MAPA_STATUS_LEGADO = {
     enviar_faturamento: 'aguardando_faturamento',
     aprovado_para_faturar: 'em_faturamento',
     faturado: 'em_faturamento',
-    em_transito: 'em_faturamento',
-    enviado: 'em_faturamento',
+    enviado: 'em_transito',
     entregue: 'em_conferencia',
     recebido: 'finalizado',
     parcialmente_recebido: 'em_conferencia'
@@ -1041,6 +1041,7 @@ function getStatusBadge(status) {
         aprovado_socio: { class: 'badge-success', text: 'Aprovado pelo Sócio' },
         aguardando_faturamento: { class: 'badge-warning', text: 'Aguard. Faturamento' },
         em_faturamento: { class: 'badge-warning', text: 'Em Faturamento' },
+        em_transito: { class: 'badge-info', text: 'Em Trânsito' },
         em_conferencia: { class: 'badge-info', text: 'Em Conferência' },
         finalizado: { class: 'badge-success', text: 'Finalizado' },
         cancelado: { class: 'badge-danger', text: 'Cancelado' },
@@ -1049,7 +1050,7 @@ function getStatusBadge(status) {
         aprovado_cotacao: { class: 'badge-info', text: 'Em Cotação' },
         enviar_para_faturamento: { class: 'badge-warning', text: 'Aguard. Faturamento' },
         aprovado_para_faturar: { class: 'badge-warning', text: 'Em Faturamento' },
-        em_transito: { class: 'badge-warning', text: 'Em Faturamento' },
+        enviado: { class: 'badge-info', text: 'Em Trânsito' },
         entregue: { class: 'badge-info', text: 'Em Conferência' },
         recebido: { class: 'badge-success', text: 'Finalizado' }
     };
@@ -2306,6 +2307,7 @@ async function visualizarPedido(id) {
                 } else {
                     observacoesElement.innerHTML = `<div><strong>Solicitante:</strong> ${escaparHtml(observacaoSolicitante)}</div>`;
                 }
+                atualizarIndicadorAbaObservacoes(!!(observacaoSolicitante || observacaoFornecedor));
             }
             
             // Nota Fiscal (metadados do último envio + visualização)
@@ -2341,6 +2343,11 @@ async function visualizarPedido(id) {
             // Armazenar ID para edição
             modalElement.setAttribute('data-pedido-id', id);
             modalElement.setAttribute('data-pedido-status', pedido.status || '');
+            historicoAbaPedidoIdCarregado = null;
+            const timelineAba = document.getElementById('timeline-historico-aba');
+            if (timelineAba) {
+                timelineAba.innerHTML = '<p class="text-muted mb-0">Abra esta aba para ver o histórico de alterações de status.</p>';
+            }
             
             const btnEditarPedido = document.getElementById('btn-editar-pedido');
             if (btnEditarPedido) {
@@ -2349,11 +2356,13 @@ async function visualizarPedido(id) {
                 btnEditarPedido.classList.toggle('btn-warning', !pedidoPodeSerEditado(pedido.status));
             }
             
-            // Carregar histórico de status
-            await carregarHistoricoStatus(id);
-            
             // Carregar fluxo de status
             await carregarFluxoStatus(id, pedido.status);
+
+            const historicoPane = document.getElementById('historico');
+            if (historicoPane && historicoPane.classList.contains('active')) {
+                await carregarHistoricoAba(true);
+            }
             
             // Verificar se o modal já está aberto
             const modalInstance = bootstrap.Modal.getInstance(modalElement);
@@ -2474,6 +2483,16 @@ function configurarStatusPedido(statusBadge, statusText, statusCard, statusAtivo
                 bgColor: 'rgba(59, 130, 246, 0.1)',
                 borderColor: 'rgba(59, 130, 246, 0.2)',
                 textColor: '#2563eb'
+            };
+            break;
+        case 'em_transito':
+            statusConfig = {
+                icon: 'bi-truck',
+                text: 'Em Trânsito',
+                color: 'info',
+                bgColor: 'rgba(6, 182, 212, 0.1)',
+                borderColor: 'rgba(6, 182, 212, 0.2)',
+                textColor: '#0891b2'
             };
             break;
         case 'em_conferencia':
@@ -2624,16 +2643,6 @@ function configurarStatusPedido(statusBadge, statusText, statusCard, statusAtivo
                 bgColor: 'rgba(234, 179, 8, 0.1)',
                 borderColor: 'rgba(234, 179, 8, 0.2)',
                 textColor: '#d97706'
-            };
-            break;
-        case 'em_transito':
-            statusConfig = {
-                icon: 'bi-arrow-right-circle',
-                text: 'Em Trânsito',
-                color: 'info',
-                bgColor: 'rgba(6, 182, 212, 0.1)',
-                borderColor: 'rgba(6, 182, 212, 0.2)',
-                textColor: '#0891b2'
             };
             break;
         case 'aguardando_aprovacao':
@@ -3523,6 +3532,7 @@ function configurarBotoesAcao(status) {
             'btn-enviar-aprovacao-socio',
             'btn-aprovar-socio',
             'btn-encaminhar-faturamento',
+            'btn-marcar-em-transito',
             'btn-confirmar-recebimento',
             'btn-finalizar-pedido',
             'btn-cancelar',
@@ -3556,6 +3566,11 @@ function configurarBotoesAcao(status) {
                 document.getElementById('btn-voltar-status')?.classList.remove('d-none');
                 break;
             case 'em_faturamento':
+                document.getElementById('btn-marcar-em-transito')?.classList.remove('d-none');
+                document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
+                break;
+            case 'em_transito':
                 document.getElementById('btn-confirmar-recebimento')?.classList.remove('d-none');
                 document.getElementById('btn-cancelar')?.classList.remove('d-none');
                 document.getElementById('btn-voltar-status')?.classList.remove('d-none');
@@ -3601,6 +3616,7 @@ async function atualizarStatusPedido(novoStatus, observacao = null) {
             'aprovado_socio': 'Aprovado pelo Sócio',
             'aguardando_faturamento': 'Aguard. Faturamento',
             'em_faturamento': 'Em Faturamento',
+            'em_transito': 'Em Trânsito',
             'em_conferencia': 'Em Conferência',
             'finalizado': 'Finalizado',
             'em_analise': 'Aguardando Cotação',
@@ -3608,7 +3624,6 @@ async function atualizarStatusPedido(novoStatus, observacao = null) {
             'aprovado_cotacao': 'Cotação Aprovada',
             'enviar_para_faturamento': 'Enviar para Faturamento',
             'aprovado_para_faturar': 'Aprovado para Faturar',
-            'em_transito': 'Em Trânsito',
             'entregue': 'Entregue',
             'recebido': 'Recebido',
             'cancelado': 'Cancelado'
@@ -3752,7 +3767,8 @@ async function mostrarOpcoesVoltarStatus() {
             aguardando_aprovacao_socio: [{ valor: 'em_cotacao', nome: 'Em Cotação' }],
             aguardando_faturamento: [{ valor: 'aguardando_aprovacao_socio', nome: 'Aguard. Aprovação Sócio' }],
             em_faturamento: [{ valor: 'aguardando_faturamento', nome: 'Aguard. Faturamento' }],
-            em_conferencia: [{ valor: 'em_faturamento', nome: 'Em Faturamento' }],
+            em_transito: [{ valor: 'em_faturamento', nome: 'Em Faturamento' }],
+            em_conferencia: [{ valor: 'em_transito', nome: 'Em Trânsito' }],
             finalizado: [{ valor: 'em_conferencia', nome: 'Em Conferência' }]
         };
         
@@ -3815,19 +3831,44 @@ async function buscarHistoricoStatus(pedidoId) {
     }
 }
 
-// Carregar histórico de status do pedido
+// Carregar histórico de status do pedido (dados para modal / fluxo)
 async function carregarHistoricoStatus(pedidoId) {
-    const historico = await buscarHistoricoStatus(pedidoId);
-    const container = document.getElementById('timeline-status');
-    if (!container) return historico;
+    return buscarHistoricoStatus(pedidoId);
+}
 
-    if (historico.length > 0) {
-        renderizarTimelineStatus(historico, 'timeline-status');
-    } else {
-        container.innerHTML = '<p class="text-muted">Nenhum histórico de status encontrado.</p>';
+function atualizarIndicadorAbaObservacoes(temObservacoes) {
+    const badge = document.getElementById('observacoes-tab-badge');
+    if (!badge) return;
+    badge.classList.toggle('d-none', !temObservacoes);
+}
+
+async function carregarHistoricoAba(forcar = false) {
+    const modal = document.getElementById('modalVisualizarPedido');
+    const pedidoId = modal?.getAttribute('data-pedido-id');
+    const container = document.getElementById('timeline-historico-aba');
+    if (!pedidoId || !container) {
+        return;
     }
 
-    return historico;
+    if (!forcar && historicoAbaPedidoIdCarregado === pedidoId) {
+        return;
+    }
+
+    container.innerHTML = '<div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Carregando histórico...</div>';
+
+    const historico = await buscarHistoricoStatus(pedidoId);
+    if (historico.length > 0) {
+        renderizarTimelineStatus(historico, 'timeline-historico-aba', true);
+    } else {
+        container.innerHTML = '<p class="text-muted mb-0">Nenhum histórico de status encontrado.</p>';
+    }
+
+    const statusBadge = document.getElementById('historico-aba-status-atual');
+    if (statusBadge) {
+        statusBadge.textContent = document.getElementById('view-status-text')?.textContent?.trim() || '—';
+    }
+
+    historicoAbaPedidoIdCarregado = pedidoId;
 }
 
 // Carregar fluxo de status do pedido
@@ -3883,7 +3924,7 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
         
         const passouEtapa = historicoDeste
             || (indiceAtual >= 0 && index < indiceAtual)
-            || (status.key === 'aprovado_socio' && ['aguardando_faturamento', 'em_faturamento', 'em_conferencia', 'finalizado'].includes(statusAtualNorm));
+            || (status.key === 'aprovado_socio' && ['aguardando_faturamento', 'em_faturamento', 'em_transito', 'em_conferencia', 'finalizado'].includes(statusAtualNorm));
 
         if (passouEtapa && !historicoDeste && status.key === 'aprovado_socio' && statusAtualNorm !== 'aprovado_socio') {
             classe += ' completed';
@@ -3963,6 +4004,7 @@ function getStatusNome(status) {
         aprovado_socio: 'Aprovado pelo Sócio',
         aguardando_faturamento: 'Aguard. Faturamento',
         em_faturamento: 'Em Faturamento',
+        em_transito: 'Em Trânsito',
         em_conferencia: 'Em Conferência',
         finalizado: 'Finalizado',
         cancelado: 'Cancelado'
@@ -4163,37 +4205,36 @@ function renderizarTimelineStatus(historico, containerId, isCompleta = false) {
     container.innerHTML = html;
 }
 
-// Mostrar histórico completo
-async function mostrarHistoricoCompleto() {
+/** Abre a aba Histórico (mesmo padrão do Chat). */
+function mostrarHistoricoCompleto() {
+    const tab = document.getElementById('historico-tab');
+    if (tab) {
+        bootstrap.Tab.getOrCreateInstance(tab).show();
+    }
+}
+
+/** Modal ampliado opcional a partir da aba Histórico. */
+async function abrirHistoricoModalCompleto() {
     try {
         const modal = document.getElementById('modalVisualizarPedido');
-        const pedidoId = modal.getAttribute('data-pedido-id');
-        
+        const pedidoId = modal?.getAttribute('data-pedido-id');
         if (!pedidoId) {
             mostrarErro('ID do pedido não encontrado');
             return;
         }
-        
-        // Carregar histórico
-        const historico = await carregarHistoricoStatus(pedidoId);
-        
-        // Preencher informações do modal
+
+        const historico = await buscarHistoricoStatus(pedidoId);
         const numeroPedido = document.getElementById('view_numero_pedido')?.textContent || 'N/A';
         const statusAtual = document.getElementById('view-status-text')?.textContent || 'N/A';
-        
+
         document.getElementById('historico-numero-pedido').textContent = numeroPedido;
         document.getElementById('historico-status-atual').textContent = statusAtual;
-        
-        // Renderizar timeline completa
         renderizarTimelineStatus(historico, 'timeline-completa', true);
-        
-        // Abrir modal
-        const modalHistorico = new bootstrap.Modal(document.getElementById('modalHistoricoCompleto'));
-        modalHistorico.show();
-        
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalHistoricoCompleto')).show();
     } catch (error) {
-        console.error('Erro ao mostrar histórico completo:', error);
-        mostrarErro('Erro ao carregar histórico completo');
+        console.error('Erro ao abrir histórico ampliado:', error);
+        mostrarErro('Erro ao carregar histórico');
     }
 }
 
@@ -4834,6 +4875,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-enviar-aprovacao-socio')?.addEventListener('click', () => atualizarStatusPedido('aguardando_aprovacao_socio'));
     document.getElementById('btn-aprovar-socio')?.addEventListener('click', () => atualizarStatusPedido('aguardando_faturamento'));
     document.getElementById('btn-encaminhar-faturamento')?.addEventListener('click', () => atualizarStatusPedido('em_faturamento'));
+    document.getElementById('btn-marcar-em-transito')?.addEventListener('click', () => atualizarStatusPedido('em_transito'));
     document.getElementById('btn-confirmar-recebimento')?.addEventListener('click', () => atualizarStatusPedido('em_conferencia'));
     document.getElementById('btn-finalizar-pedido')?.addEventListener('click', () => atualizarStatusPedido('finalizado'));
     document.getElementById('btn-cancelar')?.addEventListener('click', () => atualizarStatusPedido('cancelado'));
@@ -5059,6 +5101,7 @@ async function buscarUltimoPrecoMaterial(idMaterial, idFilial, precoAtual) {
 let chatInterval;
 let chatBadgeInterval;
 let pedidoIdAtual;
+let historicoAbaPedidoIdCarregado = null;
 
 function obterPedidoIdChat() {
     if (window.pedidoAtual) {
@@ -5443,6 +5486,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Event listener para quando a aba de chat é ativada
+    const historicoTab = document.getElementById('historico-tab');
+    if (historicoTab) {
+        historicoTab.addEventListener('shown.bs.tab', function() {
+            carregarHistoricoAba();
+        });
+    }
+
     const chatTab = document.getElementById('chat-tab');
     if (chatTab) {
         chatTab.addEventListener('shown.bs.tab', function() {
