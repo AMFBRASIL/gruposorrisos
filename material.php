@@ -225,8 +225,8 @@ $user = getCurrentUser();
             <!-- Lista de Materiais -->
             <div class="card card-resumo">
                 <div class="card-body">
-                    <div class="fw-bold mb-1" style="font-size:1.3rem;">Lista de Materiais</div>
-                    <div class="text-muted mb-3">Todos os materiais cadastrados no sistema</div>
+                    <div class="fw-bold mb-1" style="font-size:1.3rem;" id="lista-materiais-titulo">Lista de Materiais</div>
+                    <div class="text-muted mb-3" id="lista-materiais-subtitulo">Selecione uma clínica no Dashboard para ver o estoque local de cada material.</div>
                     
                     <!-- Loading -->
                     <div id="loading" class="text-center py-4">
@@ -694,9 +694,12 @@ async function carregarFilialSelecionada() {
                 if (filial) {
                     filialNome.textContent = filial.nome;
                     indicator.style.display = 'flex';
+                    indicator.className = 'alert alert-info d-flex align-items-center mb-3';
+                    atualizarTituloListaMateriais(filial.nome);
                     console.log('✅ Filial exibida:', filial.nome);
                 } else {
                     indicator.style.display = 'none';
+                    atualizarTituloListaMateriais(null);
                 }
             } else {
                 indicator.style.display = 'none';
@@ -713,6 +716,7 @@ async function carregarFilialSelecionada() {
         if (sub) {
             sub.textContent = 'Selecione uma clínica no Dashboard. Sem isso, o mesmo material pode aparecer repetido para cada filial.';
         }
+        atualizarTituloListaMateriais(null);
         console.log('⚠️ Nenhuma filial selecionada');
     }
 }
@@ -726,6 +730,27 @@ function exibirMensagemSemDados(mensagem, iconeClasse) {
         iconEl.className = iconeClasse || 'bi bi-inbox fs-1 text-muted';
     }
     if (semDados) semDados.style.display = 'block';
+}
+
+/** Atualiza título da lista: estoque da clínica (1 linha por material) vs aguardando seleção. */
+function atualizarTituloListaMateriais(nomeFilial) {
+    const titulo = document.getElementById('lista-materiais-titulo');
+    const subtitulo = document.getElementById('lista-materiais-subtitulo');
+    const filialId = obterFilialIdParaConsulta();
+    if (filialId && nomeFilial) {
+        if (titulo) titulo.textContent = 'Estoque da clínica';
+        if (subtitulo) {
+            subtitulo.textContent = 'Um registro por material em «' + nomeFilial + '». O catálogo é único na rede; quantidade e limites variam por clínica.';
+        }
+    } else if (filialId) {
+        if (titulo) titulo.textContent = 'Estoque da clínica';
+        if (subtitulo) subtitulo.textContent = 'Um registro por material na clínica selecionada.';
+    } else {
+        if (titulo) titulo.textContent = 'Lista de Materiais';
+        if (subtitulo) {
+            subtitulo.textContent = 'Selecione uma clínica no Dashboard. Sem filtro, o mesmo material apareceria repetido para cada filial.';
+        }
+    }
 }
 
 async function carregarEstatisticas() {
@@ -937,18 +962,24 @@ function renderizarTabela(materiais) {
     
     tbody.innerHTML = '';
     
+    const filialFiltroAtiva = !!obterFilialIdParaConsulta();
+
     materiais.forEach((material, index) => {
         console.log(`🔧 Renderizando material ${index + 1}:`, material.nome);
+        const linhaClinica = filialFiltroAtiva
+            ? ''
+            : `<span class="text-muted small d-block">Clínica: ${material.nome_filial || 'Sem filial'}</span>`;
+        const linhaFornecedor = material.fornecedor_nome
+            ? `<span class="text-muted small d-block">Fornecedor: ${material.fornecedor_nome}</span>`
+            : '';
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><input type="checkbox" class="form-check-input material-checkbox" value="${material.id_material}"></td>
             <td>${material.codigo}</td>
             <td>
-                <strong>${material.nome}</strong><br>
-                <span class="text-muted small"> Clínica: 
-                    ${material.nome_filial || 'Sem filial'} 
-                    ${material.fornecedor_nome ? `<br> Fornecedor:  ${material.fornecedor_nome}` : ''}
-                </span>
+                <strong>${material.nome}</strong>
+                ${linhaClinica}
+                ${linhaFornecedor}
             </td>
             <td>${material.nome_categoria || 'Sem categoria'}</td>
             <td>${material.unidade_sigla || 'UN'}</td>
