@@ -433,5 +433,100 @@ class EstoqueFilial extends BaseModel {
         $stmt->execute([$idFilial]);
         return $stmt->fetchAll();
     }
+
+    /**
+     * Prévia da zeragem: itens com estoque > 0 na filial.
+     */
+    public function previewZerarEstoquePorFilial(int $idFilial): array {
+        $sql = "SELECT COUNT(*) as total_itens,
+                       COALESCE(SUM(ef.estoque_atual), 0) as quantidade_total,
+                       COALESCE(SUM(ef.estoque_atual * COALESCE(ef.preco_unitario, cm.preco_unitario_padrao, 0)), 0) as valor_total
+                FROM {$this->table} ef
+                INNER JOIN tbl_catalogo_materiais cm ON cm.id_catalogo = ef.id_catalogo
+                WHERE ef.id_filial = ? AND ef.ativo = 1 AND ef.estoque_atual > 0";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$idFilial]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'total_itens' => (int) ($row['total_itens'] ?? 0),
+            'quantidade_total' => (float) ($row['quantidade_total'] ?? 0),
+            'valor_total' => (float) ($row['valor_total'] ?? 0),
+        ];
+    }
+
+    /**
+     * Zera o estoque atual de todos os materiais ativos da filial (com movimentação de ajuste).
+     */
+    public function zerarEstoquePorFilial(int $idFilial, ?int $idUsuario, string $observacoes = ''): array {
+        $sql = "SELECT ef.id_estoque,
+                       ef.id_catalogo,
+                       ef.estoque_atual,
+                       COALESCE(ef.preco_unitario, cm.preco_unitario_padrao, 0) as preco_unitario
+                FROM {$this->table} ef
+                INNER JOIN tbl_catalogo_materiais cm ON cm.id_catalogo = ef.id_catalogo
+                WHERE ef.id_filial = ? AND ef.ativo = 1 AND ef.estoque_atual > 0
+                ORDER BY ef.id_estoque";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$idFilial]);
+        $itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if ($itens === []) {
+            return [
+                'success' => true,
+                'message' => 'Nenhum material com estoque para zerar nesta clínica.',
+                'itens_zerados' => 0,
+            ];
+        }
+
+        $obsBase = trim($observacoes) !== ''
+            ? trim($observacoes)
+            : 'Zeragem de estoque da clínica (tela de inventário)';
+        $documento = 'ZERAR-FILIAL-' . $idFilial . '-' . date('YmdHis');
+
+        require_once __DIR__ . '/Movimentacao.php';
+        $movimentacao = new Movimentacao();
+
+        $this->pdo->beginTransaction();
+        try {
+            $count = 0;
+            foreach ($itens as $item) {
+                $qtd = (float) ($item['estoque_atual'] ?? 0);
+                if ($qtd <= 0) {
+                    continue;
+                }
+                $preco = (float) ($item['preco_unitario'] ?? 0);
+
+                $movimentacao->criar([
+                    'id_catalogo' => (int) $item['id_catalogo'],
+                    'id_filial_destino' => $idFilial,
+                    'tipo_movimentacao' => 'ajuste',
+                    'subtipo_movimentacao' => 'zeragem_filial',
+                    'quantidade' => -$qtd,
+                    'valor_unitario' => $preco,
+                    'valor_total' => $qtd * $preco,
+                    'documento' => $documento,
+                    'numero_documento' => 'EST-' . (int) $item['id_estoque'],
+                    'observacoes' => $obsBase,
+                    'id_usuario_executor' => $idUsuario,
+                ]);
+                $count++;
+            }
+
+            $this->pdo->commit();
+
+            return [
+                'success' => true,
+                'message' => "Estoque zerado em {$count} material(is) da clínica.",
+                'itens_zerados' => $count,
+                'documento' => $documento,
+            ];
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
 }
 ?> 

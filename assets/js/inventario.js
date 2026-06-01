@@ -1933,4 +1933,146 @@ function exportarXLS() {
 
 function imprimir() {
     window.print();
+}
+
+function obterFilialIdInventario() {
+    const salva = localStorage.getItem('filialSelecionada');
+    if (salva) return parseInt(salva, 10);
+    if (typeof USER_INFO !== 'undefined' && USER_INFO.filial_id) {
+        return parseInt(USER_INFO.filial_id, 10);
+    }
+    return null;
+}
+
+function formatarMoedaBRL(valor) {
+    return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+let modalZerarEstoqueInstancia = null;
+
+async function abrirModalZerarEstoqueFilial() {
+    if (typeof USER_INFO !== 'undefined' && !USER_INFO.pode_zerar_estoque) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sem permissão',
+            text: 'Apenas administradores ou gerentes podem zerar o estoque da clínica.',
+        });
+        return;
+    }
+
+    const idFilial = obterFilialIdInventario();
+    if (!idFilial) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Clínica não selecionada',
+            text: 'Selecione uma clínica no Dashboard antes de zerar o estoque.',
+        });
+        return;
+    }
+
+    const modalEl = document.getElementById('modalZerarEstoqueFilial');
+    if (!modalEl) return;
+
+    document.getElementById('zerar-estoque-observacoes').value = '';
+    document.getElementById('zerar-estoque-confirmacao').value = '';
+    document.getElementById('btn-confirmar-zerar-estoque').disabled = true;
+    document.getElementById('zerar-estoque-preview').textContent = 'Carregando prévia...';
+    document.getElementById('zerar-estoque-filial-nome').textContent = document.getElementById('filial-nome')?.textContent?.trim() || '—';
+
+    if (!modalZerarEstoqueInstancia) {
+        modalZerarEstoqueInstancia = new bootstrap.Modal(modalEl);
+        const inputConf = document.getElementById('zerar-estoque-confirmacao');
+        if (inputConf) {
+            inputConf.addEventListener('input', function () {
+                const ok = inputConf.value.trim().toUpperCase() === 'ZERAR';
+                document.getElementById('btn-confirmar-zerar-estoque').disabled = !ok;
+            });
+        }
+    }
+
+    modalZerarEstoqueInstancia.show();
+
+    try {
+        const params = new URLSearchParams({
+            action: 'preview_zerar_estoque',
+            id_filial: String(idFilial),
+        });
+        const res = await fetch(`api/inventario.php?${params}`, { credentials: 'same-origin' });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Não foi possível carregar a prévia.');
+        }
+
+        const p = data.data;
+        if (p.nome_filial) {
+            document.getElementById('zerar-estoque-filial-nome').textContent = p.nome_filial;
+        }
+
+        const previewEl = document.getElementById('zerar-estoque-preview');
+        if ((p.total_itens || 0) === 0) {
+            previewEl.innerHTML = '<span class="text-success">Nenhum material com estoque &gt; 0 nesta clínica.</span>';
+            document.getElementById('btn-confirmar-zerar-estoque').disabled = true;
+        } else {
+            previewEl.innerHTML =
+                '<strong>' + p.total_itens + '</strong> material(is) serão zerados<br>' +
+                'Quantidade total em estoque: <strong>' + Number(p.quantidade_total).toLocaleString('pt-BR') + '</strong><br>' +
+                'Valor estimado: <strong>' + formatarMoedaBRL(p.valor_total) + '</strong>';
+        }
+    } catch (err) {
+        document.getElementById('zerar-estoque-preview').innerHTML =
+            '<span class="text-danger">' + (err.message || String(err)) + '</span>';
+        document.getElementById('btn-confirmar-zerar-estoque').disabled = true;
+    }
+}
+
+async function confirmarZerarEstoqueFilial() {
+    const idFilial = obterFilialIdInventario();
+    const confirmacao = (document.getElementById('zerar-estoque-confirmacao')?.value || '').trim().toUpperCase();
+    const observacoes = (document.getElementById('zerar-estoque-observacoes')?.value || '').trim();
+    const btn = document.getElementById('btn-confirmar-zerar-estoque');
+
+    if (!idFilial || confirmacao !== 'ZERAR') {
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('api/inventario.php?action=zerar_estoque_filial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                id_filial: idFilial,
+                confirmacao: 'ZERAR',
+                observacoes: observacoes,
+            }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || data.message || 'Erro ao zerar estoque.');
+        }
+
+        modalZerarEstoqueInstancia?.hide();
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Estoque zerado',
+            text: data.message || 'Operação concluída.',
+            confirmButtonText: 'OK',
+        });
+    } catch (err) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: err.message || String(err),
+        });
+    } finally {
+        if (btn) {
+            const ok = (document.getElementById('zerar-estoque-confirmacao')?.value || '').trim().toUpperCase() === 'ZERAR';
+            btn.disabled = !ok;
+        }
+    }
 } 

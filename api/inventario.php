@@ -19,6 +19,8 @@ require_once '../models/Inventario.php';
 require_once '../models/ItemInventario.php';
 // require_once '../models/Material.php'; // Não mais necessário com nova estrutura
 require_once '../models/Filial.php';
+require_once '../models/EstoqueFilial.php';
+require_once '../config/filiais_usuario.php';
 
 // Verificar se o usuário está logado
 if (!isLoggedIn()) {
@@ -209,6 +211,10 @@ function handleGet($inventario, $itemInventario, $filial, $action) {
             echo json_encode(['success' => true, 'data' => $filiais]);
             break;
             
+        case 'preview_zerar_estoque':
+            previewZerarEstoqueFilial($pdo);
+            break;
+
         case 'stats':
             // Obter filial da requisição ou usar a do usuário logado
             $idFilial = $_GET['id_filial'] ?? getCurrentUserFilialId();
@@ -248,10 +254,16 @@ function handleGet($inventario, $itemInventario, $filial, $action) {
 }
 
 function handlePost($inventario, $itemInventario, $action) {
+    global $pdo;
     $input = json_decode(file_get_contents('php://input'), true);
     
     switch ($action) {
+        case 'zerar_estoque_filial':
+            executarZerarEstoqueFilial($pdo, $inventario, is_array($input) ? $input : []);
+            break;
+
         case 'create':
+            global $pdo;
             // Obter filial do usuário logado se não fornecida
             if (empty($input['id_filial'])) {
                 $input['id_filial'] = getCurrentUserFilialId();
@@ -613,4 +625,98 @@ function handleDelete($inventario, $action) {
             echo json_encode(['error' => 'Ação não especificada']);
             break;
     }
-} 
+}
+
+/**
+ * Resolve ID da filial para operações de estoque (localStorage / sessão / parâmetro).
+ */
+function resolverIdFilialInventario(?int $idInformado = null): ?int {
+    $id = (int) ($idInformado ?? 0);
+    if ($id <= 0) {
+        $id = (int) ($_GET['id_filial'] ?? getCurrentUserFilialId() ?? 0);
+    }
+    if ($id <= 0) {
+        return null;
+    }
+    if (!usuarioPodeAcessarFilial($id)) {
+        return null;
+    }
+    return $id;
+}
+
+function previewZerarEstoqueFilial(PDO $pdo): void {
+    $idFilial = resolverIdFilialInventario(isset($_GET['id_filial']) ? (int) $_GET['id_filial'] : null);
+    if ($idFilial === null) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Informe uma clínica válida (selecione no Dashboard).']);
+        return;
+    }
+
+    $inventario = new Inventario($pdo);
+    if ($inventario->countEmAndamento($idFilial) > 0) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Existe inventário em andamento nesta clínica. Finalize ou cancele antes de zerar o estoque.',
+        ]);
+        return;
+    }
+
+    $estoque = new EstoqueFilial();
+    $preview = $estoque->previewZerarEstoquePorFilial($idFilial);
+
+    $stmt = $pdo->prepare('SELECT nome_filial FROM tbl_filiais WHERE id_filial = ?');
+    $stmt->execute([$idFilial]);
+    $nomeFilial = $stmt->fetchColumn() ?: '';
+
+    echo json_encode([
+        'success' => true,
+        'data' => array_merge($preview, [
+            'id_filial' => $idFilial,
+            'nome_filial' => $nomeFilial,
+        ]),
+    ]);
+}
+
+function executarZerarEstoqueFilial(PDO $pdo, Inventario $inventario, array $input): void {
+    if (!isGerente() && !isAdmin()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Apenas administradores ou gerentes podem zerar o estoque da clínica.']);
+        return;
+    }
+
+    $idFilial = resolverIdFilialInventario(isset($input['id_filial']) ? (int) $input['id_filial'] : null);
+    if ($idFilial === null) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Clínica inválida ou sem permissão de acesso.']);
+        return;
+    }
+
+    if ($inventario->countEmAndamento($idFilial) > 0) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Existe inventário em andamento nesta clínica. Finalize ou cancele antes de zerar o estoque.',
+        ]);
+        return;
+    }
+
+    $confirmacao = strtoupper(trim((string) ($input['confirmacao'] ?? '')));
+    if ($confirmacao !== 'ZERAR') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Digite ZERAR para confirmar a operação.']);
+        return;
+    }
+
+    try {
+        $estoque = new EstoqueFilial();
+        $observacoes = trim((string) ($input['observacoes'] ?? ''));
+        $idUsuario = isset($_SESSION['usuario_id']) ? (int) $_SESSION['usuario_id'] : null;
+        $resultado = $estoque->zerarEstoquePorFilial($idFilial, $idUsuario, $observacoes);
+        echo json_encode($resultado);
+    } catch (Throwable $e) {
+        error_log('zerar_estoque_filial: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erro ao zerar estoque: ' . $e->getMessage()]);
+    }
+}

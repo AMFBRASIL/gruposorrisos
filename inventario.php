@@ -48,6 +48,11 @@ $filialId = getCurrentUserFilialId();
         <button class="btn btn-outline-light btn-action" onclick="imprimir()"><i class="bi bi-printer me-1"></i> Imprimir</button>
         <button class="btn btn-duplicate btn-action" onclick="duplicarSelecionados()"><i class="bi bi-files me-1"></i> Duplicar</button>
         <button class="btn btn-primary btn-action" onclick="abrirModalNovoInventario()" type="button"><i class="bi bi-plus-lg me-1"></i> Novo Inventário</button>
+        <?php if (isAdmin() || isGerente()): ?>
+        <button class="btn btn-outline-danger btn-action" type="button" onclick="abrirModalZerarEstoqueFilial()" title="Zera o estoque de todos os materiais da clínica selecionada">
+            <i class="bi bi-x-octagon me-1"></i> Zerar estoque da clínica
+        </button>
+        <?php endif; ?>
     </div>
     
     <!-- Cards de Resumo -->
@@ -362,6 +367,46 @@ $filialId = getCurrentUserFilialId();
 </div>
 
 <!-- Modal de Confirmação -->
+<!-- Modal Zerar estoque da clínica -->
+<div class="modal fade" id="modalZerarEstoqueFilial" tabindex="-1" aria-labelledby="modalZerarEstoqueFilialLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="modalZerarEstoqueFilialLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Zerar estoque da clínica
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning small mb-3">
+                    <strong>Atenção:</strong> esta ação define <strong>estoque atual = 0</strong> para todos os materiais com saldo na clínica selecionada.
+                    Serão geradas movimentações de ajuste para auditoria. <strong>Não pode ser desfeita automaticamente.</strong>
+                </div>
+                <p class="mb-2"><strong>Clínica:</strong> <span id="zerar-estoque-filial-nome">—</span></p>
+                <div id="zerar-estoque-preview" class="small text-muted mb-3">Carregando prévia...</div>
+                <div class="mb-3">
+                    <label class="form-label" for="zerar-estoque-observacoes">Motivo / observações</label>
+                    <textarea class="form-control" id="zerar-estoque-observacoes" rows="3" maxlength="2000"
+                              placeholder="Ex.: troca de sistema, recontagem geral, encerramento de unidade..."></textarea>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="zerar-estoque-confirmacao">
+                        Digite <strong>ZERAR</strong> para confirmar
+                    </label>
+                    <input type="text" class="form-control text-uppercase" id="zerar-estoque-confirmacao"
+                           autocomplete="off" placeholder="ZERAR">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btn-confirmar-zerar-estoque" onclick="confirmarZerarEstoqueFilial()" disabled>
+                    <i class="bi bi-x-octagon me-1"></i> Zerar estoque
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="confirmModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -404,9 +449,10 @@ $filialId = getCurrentUserFilialId();
 <script>
 // Informações do usuário logado
 const USER_INFO = {
-    id: <?php echo $user['id_usuario'] ?? 1; ?>,
-    filial_id: <?php echo $filialId ?? 1; ?>,
-    nome: '<?php echo addslashes($user['nome_completo'] ?? 'Usuário'); ?>'
+    id: <?php echo (int) ($user['id'] ?? $_SESSION['usuario_id'] ?? 0); ?>,
+    filial_id: <?php echo $filialId ? (int) $filialId : 'null'; ?>,
+    nome: <?php echo json_encode($user['nome'] ?? $_SESSION['usuario_nome'] ?? 'Usuário', JSON_UNESCAPED_UNICODE); ?>,
+    pode_zerar_estoque: <?php echo (isAdmin() || isGerente()) ? 'true' : 'false'; ?>
 };
 
 // Função para obter ID da filial do usuário
@@ -422,7 +468,7 @@ function getCurrentUserId() {
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
-<script src="assets/js/inventario.js?v=2.0"></script>
+<script src="assets/js/inventario.js?v=2.1"></script>
 
 </body>
 </html>
