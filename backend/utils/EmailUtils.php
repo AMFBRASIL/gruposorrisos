@@ -712,7 +712,12 @@ class EmailUtils {
             ? '<p><strong>Nota fiscal:</strong> <a href="' . htmlspecialchars($urlNf, ENT_QUOTES, 'UTF-8') . '">Abrir arquivo</a></p>'
             : '<p><strong>Nota fiscal:</strong> não foi anexada neste envio (opcional).</p>';
 
-        $subject = "Pedido {$numero} — Fornecedor aprovou faturamento (Em trânsito)";
+        $subject = trim((string)($ctx['subject'] ?? ''));
+        if ($subject === '') {
+            $subject = "Pedido {$numero} — Fornecedor aprovou faturamento (Em trânsito)";
+        }
+        $tituloEmail = htmlspecialchars(trim((string)($ctx['titulo_email'] ?? 'Aprovação de faturamento')), ENT_QUOTES, 'UTF-8');
+        $introEmail = (string)($ctx['intro_email'] ?? 'O fornecedor confirmou a aprovação do faturamento e o pedido foi atualizado para <strong>Em trânsito</strong>.');
 
         $htmlBody = "
         <!DOCTYPE html>
@@ -720,8 +725,8 @@ class EmailUtils {
         <head><meta charset=\"UTF-8\"><title>{$subject}</title></head>
         <body style=\"font-family:Segoe UI,Tahoma,sans-serif;line-height:1.6;color:#111827;background:#f9fafb;padding:24px;\">
             <div style=\"max-width:640px;margin:0 auto;background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb;\">
-                <h2 style=\"margin:0 0 12px;color:#059669;\">Aprovação de faturamento</h2>
-                <p style=\"margin:0 0 16px;color:#374151;\">O fornecedor confirmou a aprovação do faturamento e o pedido foi atualizado para <strong>Em trânsito</strong>.</p>
+                <h2 style=\"margin:0 0 12px;color:#059669;\">{$tituloEmail}</h2>
+                <p style=\"margin:0 0 16px;color:#374151;\">{$introEmail}</p>
                 <table style=\"width:100%;border-collapse:collapse;margin-bottom:16px;font-size:14px;\">
                     <tr><td style=\"padding:6px 0;color:#6b7280;\">Pedido</td><td style=\"padding:6px 0;\"><strong>{$numero}</strong> (ID {$idPedido})</td></tr>
                     <tr><td style=\"padding:6px 0;color:#6b7280;\">Clínica / filial</td><td style=\"padding:6px 0;\">{$filial}</td></tr>

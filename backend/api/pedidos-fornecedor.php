@@ -202,6 +202,16 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
             }
             break;
+
+        case 'informar_transporte_frete':
+            require_once __DIR__ . '/../../models/PedidoCompra.php';
+            require_once __DIR__ . '/../utils/EmailUtils.php';
+            $resultado = informarTransporteFreteFornecedor($pdo, $input, $fornecedor_id, $usuario);
+            if (empty($resultado['success'])) {
+                http_response_code(400);
+            }
+            echo json_encode($resultado);
+            break;
             
         default:
             http_response_code(400);
@@ -837,7 +847,99 @@ function aprovarFaturamentoFornecedorMultipart(PDO $pdo, int $fornecedor_id, arr
 
     return [
         'success' => true,
-        'message' => 'Faturamento aprovado. O pedido foi atualizado para Em trânsito.',
+        'message' => 'Faturamento registrado. O pedido está em Em Faturamento.',
+        'email_enviado' => $emailEnviado,
+    ];
+}
+
+/**
+ * Fornecedor informa transporte/frete: observação em observacoes_fornecedor e status → em_transito.
+ *
+ * @param array{id_usuario:int, razao_social?:string|null} $usuarioRow
+ * @return array{success: bool, message?: string, error?: string, email_enviado?: bool}
+ */
+function informarTransporteFreteFornecedor(PDO $pdo, array $input, int $fornecedor_id, array $usuarioRow): array {
+    $pedidoId = (int)($input['pedido_id'] ?? 0);
+    $observacao = trim((string)($input['observacao_transporte'] ?? ''));
+
+    if ($pedidoId <= 0) {
+        return ['success' => false, 'error' => 'Pedido inválido'];
+    }
+    if ($observacao === '') {
+        return ['success' => false, 'error' => 'Informe as observações sobre transporte / frete.'];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT p.*,
+               fn.razao_social AS nome_fornecedor,
+               COALESCE(fil.nome_filial, fil.razao_social, '') AS nome_filial
+        FROM tbl_pedidos_compra p
+        LEFT JOIN tbl_fornecedores fn ON fn.id_fornecedor = p.id_fornecedor
+        LEFT JOIN tbl_filiais fil ON fil.id_filial = p.id_filial
+        WHERE p.id_pedido = ? AND p.id_fornecedor = ?
+          AND (p.ativo = 1 OR p.ativo IS NULL)
+    ");
+    $stmt->execute([$pedidoId, $fornecedor_id]);
+    $pedidoRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$pedidoRow) {
+        return ['success' => false, 'error' => 'Pedido não encontrado ou não pertence ao fornecedor'];
+    }
+
+    require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
+    $statusAtual = fluxoPedidoNormalizarStatus($pedidoRow['status'] ?? '');
+    if ($statusAtual !== 'em_faturamento') {
+        return [
+            'success' => false,
+            'error' => 'Informe o transporte apenas quando o pedido estiver em Em Faturamento. Status atual: '
+                . fluxoPedidoLabelStatus($pedidoRow['status'] ?? ''),
+        ];
+    }
+
+    $nomeFornecedor = $pedidoRow['nome_fornecedor'] ?? ($usuarioRow['razao_social'] ?? 'Fornecedor');
+    $obsHist = "[Fornecedor] Transporte / frete.\n\n" . $observacao;
+
+    try {
+        $pedidoModel = new PedidoCompra();
+        $pedidoModel->atualizarStatus($pedidoId, 'em_transito', $obsHist);
+    } catch (Throwable $e) {
+        error_log('informarTransporteFreteFornecedor atualizarStatus: ' . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+
+    $obsFornAtual = trim((string)($pedidoRow['observacoes_fornecedor'] ?? ''));
+    $bloco = "\n\n[" . date('d/m/Y H:i') . "] Transporte / frete:\n" . $observacao;
+    $novaObsForn = trim($obsFornAtual . $bloco);
+    try {
+        $stObs = $pdo->prepare('UPDATE tbl_pedidos_compra SET observacoes_fornecedor = ?, data_atualizacao = NOW() WHERE id_pedido = ?');
+        $stObs->execute([$novaObsForn, $pedidoId]);
+    } catch (Throwable $e) {
+        error_log('informarTransporteFreteFornecedor observacoes_fornecedor: ' . $e->getMessage());
+    }
+
+    $destinatarios = coletarEmailsNotificacaoCompras(
+        $pdo,
+        (int)($pedidoRow['id_filial'] ?? 0),
+        (int)($pedidoRow['id_usuario_solicitante'] ?? 0)
+    );
+
+    $urlNf = trim((string)($pedidoRow['url_nota_fiscal'] ?? ''));
+    $emailEnviado = EmailUtils::enviarEmailComprasPedidoEmTransito([
+        'numero_pedido' => $pedidoRow['numero_pedido'] ?? ('#' . $pedidoId),
+        'id_pedido' => $pedidoId,
+        'nome_filial' => $pedidoRow['nome_filial'] ?? '',
+        'nome_fornecedor' => $nomeFornecedor,
+        'detalhes' => $observacao,
+        'url_nota_fiscal' => $urlNf !== '' ? $urlNf : null,
+        'destinatarios' => $destinatarios,
+        'subject' => 'Pedido ' . ($pedidoRow['numero_pedido'] ?? ('#' . $pedidoId)) . ' — Em trânsito (transporte/frete)',
+        'titulo_email' => 'Pedido em trânsito',
+        'intro_email' => 'O fornecedor informou os dados de transporte/frete e o pedido foi atualizado para <strong>Em trânsito</strong>.',
+    ]);
+
+    return [
+        'success' => true,
+        'message' => 'Transporte registrado. O pedido foi atualizado para Em trânsito.',
         'email_enviado' => $emailEnviado,
     ];
 }

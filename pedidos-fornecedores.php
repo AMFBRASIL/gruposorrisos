@@ -239,30 +239,35 @@ $menuActive = 'pedidos_fornecedores';
             color: #2d3748;
         }
         
-        /* Modal Aprovar Faturamento — largura extra em telas grandes */
-        #modalAprovarFaturamento .modal-dialog {
+        /* Modais fornecedor (faturamento / transporte) — largura extra em telas grandes */
+        #modalAprovarFaturamento .modal-dialog,
+        #modalTransporteFrete .modal-dialog {
             max-width: min(1320px, calc(100vw - 2rem));
             width: 100%;
             margin-left: auto;
             margin-right: auto;
         }
         @media (max-width: 575.98px) {
-            #modalAprovarFaturamento .modal-dialog {
+            #modalAprovarFaturamento .modal-dialog,
+            #modalTransporteFrete .modal-dialog {
                 max-width: calc(100vw - 1rem);
             }
         }
 
-        /* Modal Aprovar Faturamento — resumo */
-        #modalAprovarFaturamento .aprovar-fat-resumo {
+        /* Modais fornecedor — resumo e formulário */
+        #modalAprovarFaturamento .aprovar-fat-resumo,
+        #modalTransporteFrete .aprovar-fat-resumo {
             background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
             border: 1px solid rgba(102, 126, 234, 0.25);
             border-radius: 14px;
             padding: 1rem 1.25rem;
         }
-        #modalAprovarFaturamento .aprovar-fat-resumo dl {
+        #modalAprovarFaturamento .aprovar-fat-resumo dl,
+        #modalTransporteFrete .aprovar-fat-resumo dl {
             margin-bottom: 0;
         }
-        #modalAprovarFaturamento .aprovar-fat-resumo dt {
+        #modalAprovarFaturamento .aprovar-fat-resumo dt,
+        #modalTransporteFrete .aprovar-fat-resumo dt {
             font-size: 0.72rem;
             text-transform: uppercase;
             letter-spacing: 0.04em;
@@ -270,16 +275,19 @@ $menuActive = 'pedidos_fornecedores';
             font-weight: 600;
             margin-bottom: 0.15rem;
         }
-        #modalAprovarFaturamento .aprovar-fat-resumo dd {
+        #modalAprovarFaturamento .aprovar-fat-resumo dd,
+        #modalTransporteFrete .aprovar-fat-resumo dd {
             font-size: 0.92rem;
             color: #1e293b;
             margin-bottom: 0.75rem;
             word-break: break-word;
         }
-        #modalAprovarFaturamento .aprovar-fat-resumo dd:last-child {
+        #modalAprovarFaturamento .aprovar-fat-resumo dd:last-child,
+        #modalTransporteFrete .aprovar-fat-resumo dd:last-child {
             margin-bottom: 0;
         }
-        #modalAprovarFaturamento .aprovar-fat-resumo .aprovar-fat-icon {
+        #modalAprovarFaturamento .aprovar-fat-resumo .aprovar-fat-icon,
+        #modalTransporteFrete .aprovar-fat-resumo .aprovar-fat-icon {
             width: 44px;
             height: 44px;
             border-radius: 12px;
@@ -291,7 +299,8 @@ $menuActive = 'pedidos_fornecedores';
             font-size: 1.35rem;
             flex-shrink: 0;
         }
-        #modalAprovarFaturamento .aprovar-fat-form-card {
+        #modalAprovarFaturamento .aprovar-fat-form-card,
+        #modalTransporteFrete .aprovar-fat-form-card {
             border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: #fff;
@@ -303,10 +312,18 @@ $menuActive = 'pedidos_fornecedores';
             border-bottom: none;
             border-radius: 0;
         }
-        #modalAprovarFaturamento .modal-header .btn-close {
+        #modalTransporteFrete .modal-header {
+            background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);
+            color: #fff;
+            border-bottom: none;
+            border-radius: 0;
+        }
+        #modalAprovarFaturamento .modal-header .btn-close,
+        #modalTransporteFrete .modal-header .btn-close {
             filter: invert(1);
         }
-        #modalAprovarFaturamento .modal-content {
+        #modalAprovarFaturamento .modal-content,
+        #modalTransporteFrete .modal-content {
             border: none;
             border-radius: 16px;
             overflow: hidden;
@@ -675,7 +692,7 @@ $menuActive = 'pedidos_fornecedores';
                 <div class="alert alert-primary border-0 d-flex gap-2 mb-3 py-2 px-3" role="alert" style="background: rgba(102, 126, 234, 0.12); color: #3730a3;">
                     <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
                     <div class="small mb-0">
-                        Ao confirmar, o pedido passa para <strong>Em trânsito</strong>, as informações abaixo ficam registradas no histórico e o setor de <strong>compras</strong> recebe um e-mail com seus detalhes. A Nota Fiscal neste passo é <strong>opcional</strong>.
+                        Ao confirmar, o pedido passa para <strong>Em Faturamento</strong>, as informações abaixo ficam registradas nas <strong>observações do fornecedor</strong> e no histórico. A Nota Fiscal neste passo é <strong>opcional</strong>.
                     </div>
                 </div>
 
@@ -753,6 +770,92 @@ $menuActive = 'pedidos_fornecedores';
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-success px-4" id="btn-confirmar-aprovacao-faturamento" onclick="confirmarAprovacaoFaturamento()">
                     <i class="bi bi-check-lg me-1"></i>Confirmar e enviar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Transporte / Frete (fornecedor → Em trânsito) -->
+<div class="modal fade" id="modalTransporteFrete" tabindex="-1" aria-labelledby="modalTransporteFreteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="modalTransporteFreteLabel">
+                    <i class="bi bi-truck"></i>
+                    <span>Transporte / Frete</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body bg-light-subtle">
+                <div class="alert alert-info border-0 d-flex gap-2 mb-3 py-2 px-3" role="alert" style="background: rgba(13, 148, 136, 0.12); color: #0f766e;">
+                    <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
+                    <div class="small mb-0">
+                        Informe os dados do envio (transportadora, rastreio, previsão de entrega, volumes, etc.). Ao confirmar, o pedido passa para <strong>Em trânsito</strong> e o texto é salvo nas <strong>observações do fornecedor</strong> e no histórico.
+                    </div>
+                </div>
+
+                <div class="aprovar-fat-resumo mb-3">
+                    <div class="d-flex gap-3 align-items-start">
+                        <div class="aprovar-fat-icon d-none d-sm-flex">
+                            <i class="bi bi-truck"></i>
+                        </div>
+                        <div class="flex-grow-1 min-w-0">
+                            <p class="small fw-semibold text-secondary mb-2 text-uppercase" style="letter-spacing: 0.06em;">Resumo do envio</p>
+                            <dl class="row small g-2 mb-0">
+                                <div class="col-sm-6">
+                                    <dt>Pedido</dt>
+                                    <dd id="transp-fat-pedido-numero" class="fw-semibold">—</dd>
+                                </div>
+                                <div class="col-sm-6">
+                                    <dt>Cliente (comprador)</dt>
+                                    <dd id="transp-fat-pedido-cliente">—</dd>
+                                </div>
+                                <div class="col-sm-6">
+                                    <dt>Informado por</dt>
+                                    <dd>
+                                        <span id="transp-fat-usuario-nome"><?php echo htmlspecialchars($_SESSION['usuario_nome'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></span>
+                                        <?php if (!empty($_SESSION['usuario_email'])): ?>
+                                            <br><span class="text-muted" id="transp-fat-usuario-email"><?php echo htmlspecialchars($_SESSION['usuario_email'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                        <?php else: ?>
+                                            <span id="transp-fat-usuario-email" class="d-none"></span>
+                                        <?php endif; ?>
+                                    </dd>
+                                </div>
+                                <div class="col-sm-6">
+                                    <dt>Fornecedor (empresa)</dt>
+                                    <dd id="transp-fat-fornecedor-razao"><?php echo htmlspecialchars($razaoSocialFornecedorSessao !== '' ? $razaoSocialFornecedorSessao : '—', ENT_QUOTES, 'UTF-8'); ?></dd>
+                                </div>
+                                <div class="col-12">
+                                    <dt>Data e hora desta informação</dt>
+                                    <dd class="mb-0">
+                                        <span id="transp-fat-data-hora" class="fw-medium text-primary">—</span>
+                                        <span class="text-muted small d-block mt-1">Referência do momento em que você abriu esta janela; o servidor registra o horário oficial ao confirmar.</span>
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="aprovar-fat-form-card mb-0">
+                    <label class="form-label fw-semibold" for="observacao-transporte-frete">
+                        Observações sobre transporte / frete <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control" id="observacao-transporte-frete" rows="5" maxlength="4000"
+                              placeholder="Ex.: transportadora, código de rastreio, data prevista de entrega, tipo de frete, volumes, contato do motorista..."></textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <small class="text-muted">Máximo 4.000 caracteres. Este texto é salvo em <strong>observações do fornecedor</strong> e no <strong>histórico do pedido</strong>.</small>
+                        <small class="text-muted"><span id="transp-fat-char-count">0</span>/4000</small>
+                    </div>
+                </div>
+
+                <div id="transp-fat-message" class="alert d-none mt-3 mb-0"></div>
+            </div>
+            <div class="modal-footer bg-white border-top">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary px-4" id="btn-confirmar-transporte-frete" onclick="confirmarTransporteFrete()">
+                    <i class="bi bi-truck me-1"></i>Confirmar e enviar
                 </button>
             </div>
         </div>
@@ -1019,6 +1122,10 @@ function pedidoFornecedorPodeResponder(status) {
 
 function pedidoFornecedorPodeFaturar(status) {
     return ['em_faturamento', 'aguardando_faturamento'].includes(normalizarStatusFornecedor(status));
+}
+
+function pedidoFornecedorPodeInformarTransporte(status) {
+    return normalizarStatusFornecedor(status) === 'em_faturamento';
 }
 
 /** Item que ainda exige preenchimento pelo fornecedor (lista / cartão). */
@@ -1356,6 +1463,11 @@ function renderizarPedidos() {
                         <i class="bi bi-file-earmark-pdf me-2"></i>Enviar NF
                     </button>
                 ` : ''}
+                ${pedidoFornecedorPodeInformarTransporte(pedido.status) ? `
+                    <button class="btn btn-primary btn-action" onclick="abrirModalTransporteFrete(${pedido.id})">
+                        <i class="bi bi-truck me-2"></i>Transporte / Frete
+                    </button>
+                ` : ''}
             </div>
         </div>
     `;
@@ -1543,6 +1655,23 @@ function visualizarPedido(pedidoId) {
                         <p class="text-muted small mb-2">Após aprovação do sócio, confirme o faturamento e anexe a NF. O pedido seguirá em <strong>Em Faturamento</strong> até a clínica confirmar o recebimento.</p>
                         <button class="btn btn-success btn-sm" onclick="abrirModalAprovarFaturamento(${pedido.id})">
                             <i class="bi bi-check2-circle me-2"></i>Aprovar Faturamento
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+        ${pedidoFornecedorPodeInformarTransporte(pedido.status) ? `
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary-subtle">
+                        <h6 class="mb-0"><i class="bi bi-truck me-2"></i>Transporte / Frete</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">Informe transportadora, rastreio e demais dados do envio. O pedido passará para <strong>Em trânsito</strong>.</p>
+                        <button class="btn btn-primary btn-sm" onclick="abrirModalTransporteFrete(${pedido.id})">
+                            <i class="bi bi-truck me-2"></i>Informar transporte / frete
                         </button>
                     </div>
                 </div>
@@ -3212,6 +3341,21 @@ document.addEventListener('DOMContentLoaded', function() {
             nfPrevEl.classList.remove('d-none');
         });
     }
+
+    const modalTransp = document.getElementById('modalTransporteFrete');
+    if (modalTransp) {
+        modalTransp.addEventListener('shown.bs.modal', function () {
+            const elDh = document.getElementById('transp-fat-data-hora');
+            if (elDh && typeof formatarDataHoraReferenciaAprovacaoFat === 'function') {
+                elDh.textContent = formatarDataHoraReferenciaAprovacaoFat(new Date());
+            }
+        });
+    }
+
+    const taTransp = document.getElementById('observacao-transporte-frete');
+    if (taTransp) {
+        taTransp.addEventListener('input', atualizarContadorTransporteFrete);
+    }
 });
 
 // ===== APROVAR FATURAMENTO (→ Em trânsito + e-mail compras) =====
@@ -3326,9 +3470,106 @@ async function confirmarAprovacaoFaturamento() {
         const modalEl = document.getElementById('modalAprovarFaturamento');
         bootstrap.Modal.getInstance(modalEl)?.hide();
 
-        let texto = data.message || 'Pedido atualizado para Em trânsito.';
+        let texto = data.message || 'Faturamento registrado.';
         if (data.email_enviado === false) {
             texto += ' Não foi possível enviar e-mail ao setor de compras (confira SMTP nas configurações e se há usuários com e-mail na tela Pedidos de Compra).';
+        }
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Concluído',
+            text: texto,
+            confirmButtonText: 'OK'
+        });
+        await carregarPedidos();
+    } catch (err) {
+        if (msgEl) {
+            msgEl.className = 'alert alert-danger';
+            msgEl.textContent = err.message || String(err);
+            msgEl.classList.remove('d-none');
+        } else {
+            Swal.fire('Erro', err.message || String(err), 'error');
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// ===== TRANSPORTE / FRETE (→ Em trânsito) =====
+let pedidoIdTransporteFrete = null;
+
+function atualizarContadorTransporteFrete() {
+    const ta = document.getElementById('observacao-transporte-frete');
+    const ctr = document.getElementById('transp-fat-char-count');
+    if (!ta || !ctr) return;
+    ctr.textContent = String((ta.value || '').length);
+}
+
+function abrirModalTransporteFrete(pedidoId) {
+    pedidoIdTransporteFrete = pedidoId;
+    const ta = document.getElementById('observacao-transporte-frete');
+    const msg = document.getElementById('transp-fat-message');
+
+    const pedido = (typeof pedidosData !== 'undefined' && pedidosData && pedidosData.length)
+        ? pedidosData.find(p => Number(p.id) === Number(pedidoId))
+        : null;
+
+    const elNum = document.getElementById('transp-fat-pedido-numero');
+    const elCli = document.getElementById('transp-fat-pedido-cliente');
+    const elDh = document.getElementById('transp-fat-data-hora');
+    if (elNum) elNum.textContent = pedido?.numero ? String(pedido.numero) : ('#' + pedidoId);
+    if (elCli) elCli.textContent = pedido?.cliente ? String(pedido.cliente) : '—';
+    if (elDh) elDh.textContent = formatarDataHoraReferenciaAprovacaoFat(new Date());
+
+    if (ta) ta.value = '';
+    atualizarContadorTransporteFrete();
+
+    if (msg) {
+        msg.classList.add('d-none');
+        msg.textContent = '';
+    }
+    const btn = document.getElementById('btn-confirmar-transporte-frete');
+    if (btn) btn.disabled = false;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalTransporteFrete')).show();
+}
+
+async function confirmarTransporteFrete() {
+    const observacao = (document.getElementById('observacao-transporte-frete')?.value || '').trim();
+    if (!pedidoIdTransporteFrete) {
+        Swal.fire('Erro', 'Pedido não identificado.', 'error');
+        return;
+    }
+    if (!observacao) {
+        Swal.fire('Atenção', 'Informe as observações sobre transporte / frete.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btn-confirmar-transporte-frete');
+    const msgEl = document.getElementById('transp-fat-message');
+    if (btn) btn.disabled = true;
+    if (msgEl) msgEl.classList.add('d-none');
+
+    try {
+        const res = await fetch('backend/api/pedidos-fornecedor.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                action: 'informar_transporte_frete',
+                pedido_id: pedidoIdTransporteFrete,
+                observacao_transporte: observacao
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || data.message || ('Erro HTTP ' + res.status));
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('modalTransporteFrete'))?.hide();
+
+        let texto = data.message || 'Pedido atualizado para Em trânsito.';
+        if (data.email_enviado === false) {
+            texto += ' Não foi possível enviar e-mail ao setor de compras.';
         }
 
         await Swal.fire({
