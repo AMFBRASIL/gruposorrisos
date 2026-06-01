@@ -663,6 +663,11 @@ $usuarioEhAdmin = isAdmin();
                             <i class="bi bi-clock-history me-2"></i>Histórico
                         </button>
                     </li>
+                    <li class="nav-item d-none" role="presentation" id="fiscal-tab-item">
+                        <button class="nav-link" id="fiscal-tab" data-bs-toggle="tab" data-bs-target="#fiscal" type="button" role="tab">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>Fiscal
+                        </button>
+                    </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link position-relative" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab">
                             <i class="bi bi-chat-dots me-2"></i>Chat
@@ -808,37 +813,6 @@ $usuarioEhAdmin = isAdmin();
                     </div>
                 </div>
 
-                <div class="row g-3 mt-1">
-                    <div class="col-12">
-                        <!-- Nota Fiscal -->
-                        <div class="card border-0 shadow-sm" id="card-nota-fiscal" style="display: none;">
-                            <div class="card-header bg-light border-0">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-file-earmark-pdf me-2 text-danger"></i>
-                                    <h6 class="mb-0">Nota Fiscal</h6>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div id="nf-status-container">
-                                    <p class="text-muted mb-3 small">Registro do último envio da Nota Fiscal pelo fornecedor.</p>
-                                    <dl class="row small mb-3 g-2" id="nf-detalhes-lista">
-                                        <dt class="col-sm-4 text-muted">Enviado em</dt>
-                                        <dd class="col-sm-8 mb-1" id="view-nf-data-envio">—</dd>
-                                        <dt class="col-sm-4 text-muted">Enviado por</dt>
-                                        <dd class="col-sm-8 mb-1" id="view-nf-enviado-por">—</dd>
-                                        <dt class="col-sm-4 text-muted">Nome do arquivo</dt>
-                                        <dd class="col-sm-8 mb-1 text-break" id="view-nf-nome-arquivo">—</dd>
-                                        <dt class="col-sm-4 text-muted">Tamanho</dt>
-                                        <dd class="col-sm-8 mb-0" id="view-nf-tamanho">—</dd>
-                                    </dl>
-                                    <button type="button" class="btn btn-primary btn-sm" id="btn-visualizar-nf" onclick="visualizarNFPedido()">
-                                        <i class="bi bi-eye me-2"></i>Visualizar Nota Fiscal
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                         </div>
                     </div>
 
@@ -851,6 +825,38 @@ $usuarioEhAdmin = isAdmin();
                                 </div>
                                 <div class="card-body observacoes-pedido-conteudo" id="view_observacoes">
                                     <p class="text-muted mb-0">Nenhuma observação registrada.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aba Fiscal (Nota Fiscal) — visível só quando houver NF -->
+                    <div class="tab-pane fade" id="fiscal" role="tabpanel">
+                        <div class="mt-3">
+                            <div class="card border-0 shadow-sm" id="card-nota-fiscal">
+                                <div class="card-header bg-light border-0">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-file-earmark-pdf me-2 text-danger"></i>
+                                        <h6 class="mb-0">Nota Fiscal</h6>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div id="nf-status-container">
+                                        <p class="text-muted mb-3 small">Registro do último envio da Nota Fiscal pelo fornecedor.</p>
+                                        <dl class="row small mb-3 g-2" id="nf-detalhes-lista">
+                                            <dt class="col-sm-4 text-muted">Enviado em</dt>
+                                            <dd class="col-sm-8 mb-1" id="view-nf-data-envio">—</dd>
+                                            <dt class="col-sm-4 text-muted">Enviado por</dt>
+                                            <dd class="col-sm-8 mb-1" id="view-nf-enviado-por">—</dd>
+                                            <dt class="col-sm-4 text-muted">Nome do arquivo</dt>
+                                            <dd class="col-sm-8 mb-1 text-break" id="view-nf-nome-arquivo">—</dd>
+                                            <dt class="col-sm-4 text-muted">Tamanho</dt>
+                                            <dd class="col-sm-8 mb-0" id="view-nf-tamanho">—</dd>
+                                        </dl>
+                                        <button type="button" class="btn btn-primary btn-sm" id="btn-visualizar-nf" onclick="visualizarNFPedido()">
+                                            <i class="bi bi-eye me-2"></i>Visualizar Nota Fiscal
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

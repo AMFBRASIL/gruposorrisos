@@ -2310,24 +2310,8 @@ async function visualizarPedido(id) {
                 atualizarIndicadorAbaObservacoes(!!(observacaoSolicitante || observacaoFornecedor));
             }
             
-            // Nota Fiscal (metadados do último envio + visualização)
-            const cardNotaFiscal = document.getElementById('card-nota-fiscal');
-            if (cardNotaFiscal) {
-                const urlNF = pedido.url_nota_fiscal;
-                const temNF = urlNF !== null && urlNF !== undefined && String(urlNF).trim() !== '';
-
-                if (temNF) {
-                    cardNotaFiscal.style.display = 'block';
-                    preencherDetalhesNfPedidoCompra(pedido);
-                    const btnVisualizarNF = document.getElementById('btn-visualizar-nf');
-                    if (btnVisualizarNF) {
-                        btnVisualizarNF.setAttribute('data-nf-url', String(urlNF).trim());
-                    }
-                } else {
-                    limparDetalhesNfPedidoCompra();
-                    cardNotaFiscal.style.display = 'none';
-                }
-            }
+            // Nota Fiscal — aba Fiscal (só quando houver arquivo)
+            atualizarAbaFiscalPedido(pedidoTemNotaFiscal(pedido), pedido);
             
             // Histórico
             const dataCriacaoElement = document.getElementById('view-data-criacao');
@@ -4283,6 +4267,40 @@ function formatarDataEnvioNfCompra(val) {
     return formatarDataHora(val);
 }
 
+function pedidoTemNotaFiscal(pedido) {
+    const urlNF = pedido?.url_nota_fiscal;
+    return urlNF !== null && urlNF !== undefined && String(urlNF).trim() !== '';
+}
+
+function atualizarAbaFiscalPedido(temNF, pedido = null) {
+    const tabItem = document.getElementById('fiscal-tab-item');
+    const fiscalPane = document.getElementById('fiscal');
+    const btnVisualizarNF = document.getElementById('btn-visualizar-nf');
+
+    if (temNF && pedido) {
+        preencherDetalhesNfPedidoCompra(pedido);
+        const urlStr = String(pedido.url_nota_fiscal).trim();
+        if (btnVisualizarNF) {
+            btnVisualizarNF.setAttribute('data-nf-url', urlStr);
+        }
+    } else {
+        limparDetalhesNfPedidoCompra();
+        if (btnVisualizarNF) {
+            btnVisualizarNF.removeAttribute('data-nf-url');
+        }
+        if (fiscalPane?.classList.contains('active')) {
+            const detalhesTab = document.getElementById('detalhes-tab');
+            if (detalhesTab) {
+                bootstrap.Tab.getOrCreateInstance(detalhesTab).show();
+            }
+        }
+    }
+
+    if (tabItem) {
+        tabItem.classList.toggle('d-none', !temNF);
+    }
+}
+
 function limparDetalhesNfPedidoCompra() {
     ['view-nf-data-envio', 'view-nf-enviado-por', 'view-nf-nome-arquivo', 'view-nf-tamanho'].forEach(id => {
         const el = document.getElementById(id);
@@ -5519,6 +5537,8 @@ document.addEventListener('DOMContentLoaded', function() {
             pararPollingChatBadge();
             pedidoIdAtual = null;
             atualizarAvisoChatTab(0);
+            atualizarAbaFiscalPedido(false);
+            ativarAbaDetalhesPedido();
         });
     }
 });
