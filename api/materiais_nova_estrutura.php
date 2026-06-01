@@ -40,6 +40,7 @@ require_once __DIR__ . '/../models/CatalogoMaterial.php';
 require_once __DIR__ . '/../models/EstoqueFilial.php';
 require_once __DIR__ . '/../models/Categoria.php';
 require_once __DIR__ . '/../models/Fornecedor.php';
+require_once __DIR__ . '/../config/filiais_usuario.php';
 
 // Verificar se o usuário está logado
 if (!isLoggedIn()) {
@@ -155,15 +156,53 @@ function handleGet($catalogo, $estoque, $categoria, $fornecedor, $action) {
 }
 
 /**
+ * Resolve a filial para listagem de materiais/estoque.
+ * Sem filial definida, a consulta retorna um registro por clínica (tbl_estoque_filiais) — aparenta duplicação.
+ */
+function resolverFilialIdListagemMateriais(): ?int {
+    if (isset($_GET['filial_id']) && $_GET['filial_id'] !== '') {
+        $id = (int) $_GET['filial_id'];
+        if ($id > 0 && usuarioPodeAcessarFilial($id)) {
+            return $id;
+        }
+        return null;
+    }
+
+    $sessao = (int) (getCurrentUserFilialId() ?? 0);
+    if ($sessao > 0 && usuarioPodeAcessarFilial($sessao)) {
+        return $sessao;
+    }
+
+    $permitidas = obterFiliaisPermitidasUsuario();
+    if (count($permitidas) === 1) {
+        return (int) ($permitidas[0]['id_filial'] ?? 0) ?: null;
+    }
+
+    return null;
+}
+
+/**
  * Lista materiais com estoque (por filial)
  */
 function listarMateriais($estoque) {
-    $page = $_GET['page'] ?? 1;
-    $limit = $_GET['limit'] ?? 10;
-    
-    // Obter filial do parâmetro ou usar a do usuário logado
-    $filialId = $_GET['filial_id'] ?? getCurrentUserFilialId();
-    
+    $page = (int) ($_GET['page'] ?? 1);
+    $limit = (int) ($_GET['limit'] ?? 10);
+
+    $filialId = resolverFilialIdListagemMateriais();
+    if ($filialId === null) {
+        echo json_encode([
+            'success' => true,
+            'data' => [],
+            'total' => 0,
+            'page' => $page,
+            'limit' => $limit,
+            'total_pages' => 0,
+            'filial_required' => true,
+            'message' => 'Selecione uma clínica no Dashboard para listar os materiais. Sem filtro de clínica, o mesmo material aparece uma vez para cada filial do estoque.',
+        ]);
+        return;
+    }
+
     // Busca genérica - procura em código, nome e descrição
     $busca = $_GET['busca'] ?? $_GET['codigo'] ?? null;
     
@@ -268,7 +307,21 @@ function listarFornecedores($fornecedor) {
  */
 function buscarEstatisticas($estoque) {
     try {
-        $filialId = $_GET['filial_id'] ?? getCurrentUserFilialId();
+        $filialId = resolverFilialIdListagemMateriais();
+        if ($filialId === null) {
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'total' => 0,
+                    'em_estoque' => 0,
+                    'estoque_baixo' => 0,
+                    'sem_estoque' => 0,
+                    'precisa_ressuprimento' => 0,
+                ],
+                'filial_required' => true,
+            ]);
+            return;
+        }
         $stats = $estoque->getEstatisticasPorFilial($filialId);
         
         echo json_encode([

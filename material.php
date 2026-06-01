@@ -286,8 +286,8 @@ $user = getCurrentUser();
                     
                     <!-- Sem dados -->
                     <div id="sem-dados" class="text-center py-4" style="display: none;">
-                        <i class="bi bi-inbox fs-1 text-muted"></i>
-                        <p class="mt-2">Nenhum material encontrado</p>
+                        <i class="bi bi-inbox fs-1 text-muted" id="sem-dados-icon"></i>
+                        <p class="mt-2" id="sem-dados-mensagem">Nenhum material encontrado</p>
                         <button class="btn btn-primary" onclick="window.location.href='addMaterial'">
                             <i class="bi bi-plus-lg me-1"></i> Adicionar Primeiro Material
                         </button>
@@ -630,6 +630,16 @@ $user = getCurrentUser();
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+const USUARIO_FILIAL_ID = <?php echo json_encode(getCurrentUserFilialId() ? (int) getCurrentUserFilialId() : null); ?>;
+
+/** Filial para consultas: localStorage (Dashboard) ou filial vinculada ao usuário. */
+function obterFilialIdParaConsulta() {
+    const salva = localStorage.getItem('filialSelecionada');
+    if (salva) return salva;
+    if (USUARIO_FILIAL_ID) return String(USUARIO_FILIAL_ID);
+    return null;
+}
+
 // Variáveis globais
 let paginaAtual = 1;
 let limitePorPagina = parseInt(localStorage.getItem('materiais_limite_por_pagina')) || 10;
@@ -669,7 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Funções de carregamento
 async function carregarFilialSelecionada() {
-    const filialId = localStorage.getItem('filialSelecionada');
+    const filialId = obterFilialIdParaConsulta();
     const indicator = document.getElementById('filial-indicator');
     const filialNome = document.getElementById('filial-nome');
     
@@ -696,12 +706,26 @@ async function carregarFilialSelecionada() {
             indicator.style.display = 'none';
         }
     } else {
-        // Nenhuma filial selecionada
-        filialNome.textContent = 'Nenhuma filial selecionada';
+        filialNome.textContent = 'Nenhuma clínica selecionada';
         indicator.style.display = 'flex';
         indicator.className = 'alert alert-warning d-flex align-items-center mb-3';
+        const sub = indicator.querySelector('small');
+        if (sub) {
+            sub.textContent = 'Selecione uma clínica no Dashboard. Sem isso, o mesmo material pode aparecer repetido para cada filial.';
+        }
         console.log('⚠️ Nenhuma filial selecionada');
     }
+}
+
+function exibirMensagemSemDados(mensagem, iconeClasse) {
+    const semDados = document.getElementById('sem-dados');
+    const msgEl = document.getElementById('sem-dados-mensagem');
+    const iconEl = document.getElementById('sem-dados-icon');
+    if (msgEl) msgEl.textContent = mensagem;
+    if (iconEl) {
+        iconEl.className = iconeClasse || 'bi bi-inbox fs-1 text-muted';
+    }
+    if (semDados) semDados.style.display = 'block';
 }
 
 async function carregarEstatisticas() {
@@ -709,7 +733,7 @@ async function carregarEstatisticas() {
         console.log('Carregando estatísticas...');
         
         // Obter filial selecionada do localStorage
-        const filialId = localStorage.getItem('filialSelecionada');
+        const filialId = obterFilialIdParaConsulta();
         console.log('🔍 Filial selecionada para estatísticas:', filialId);
         
         const params = new URLSearchParams({
@@ -837,7 +861,7 @@ async function carregarMateriais() {
     
     try {
         // Obter filial selecionada do localStorage
-        const filialId = localStorage.getItem('filialSelecionada');
+        const filialId = obterFilialIdParaConsulta();
         console.log('🔍 Filial selecionada para filtro:', filialId);
         
         const params = new URLSearchParams({
@@ -885,9 +909,15 @@ async function carregarMateriais() {
             renderizarPaginacao(data);
             
             tabela.style.display = 'block';
+        } else if (data.filial_required) {
+            console.log('⚠️ Clínica não selecionada:', data.message);
+            exibirMensagemSemDados(
+                data.message || 'Selecione uma clínica no Dashboard para visualizar os materiais.',
+                'bi bi-building fs-1 text-warning'
+            );
         } else {
             console.log('❌ Nenhum material encontrado ou erro:', data);
-            semDados.style.display = 'block';
+            exibirMensagemSemDados('Nenhum material encontrado', 'bi bi-inbox fs-1 text-muted');
         }
     } catch (error) {
         console.error('Erro ao carregar materiais:', error);
