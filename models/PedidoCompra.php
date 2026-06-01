@@ -721,84 +721,134 @@ class PedidoCompra extends BaseModel {
     }
     
     /**
-     * Processar entrada automática no estoque quando recebido
+     * Quantidade a entrar no estoque (mesma regra da tela de visualização do pedido).
+     */
+    private function quantidadeEntradaItemPedido(array $item): float {
+        $disponivel = isset($item['disponivel']) ? (int) $item['disponivel'] : null;
+        if ($disponivel === 0) {
+            return 0.0;
+        }
+        $qtdSolicitada = (float) ($item['quantidade'] ?? 0);
+        $qtdDispRaw = $item['quantidade_disponivel'] ?? null;
+        if ($qtdDispRaw !== null && $qtdDispRaw !== '' && is_numeric($qtdDispRaw)) {
+            $qtdDisp = (float) $qtdDispRaw;
+            if ($qtdDisp > 0) {
+                return $qtdDisp;
+            }
+        }
+        return $qtdSolicitada > 0 ? $qtdSolicitada : 0.0;
+    }
+
+    private function precoUnitarioEntradaItemPedido(array $item): float {
+        $precoForn = $item['preco_fornecedor'] ?? null;
+        if ($precoForn !== null && $precoForn !== '' && (float) $precoForn > 0) {
+            return (float) $precoForn;
+        }
+        return (float) ($item['preco_unitario'] ?? 0);
+    }
+
+    /**
+     * Processar entrada automática no estoque quando finalizado
      */
     private function processarEntradaEstoque($idPedido) {
-        // Buscar itens do pedido
         $itens = $this->buscarItens($idPedido);
         $pedido = $this->findById($idPedido);
-        
+        if (!$pedido) {
+            throw new Exception('Pedido não encontrado para entrada em estoque.');
+        }
+
+        $temColunaPedidoCompra = $this->colunaExiste('tbl_movimentacoes_estoque', 'id_pedido_compra');
+
         foreach ($itens as $item) {
-            // Log para debug
-            error_log("Processando item para entrada: " . json_encode($item));
-            
-            // Verificar se o registro existe na tbl_estoque_filiais
-            $sqlVerifica = "SELECT id_estoque FROM tbl_estoque_filiais 
+            $qtdEntrada = $this->quantidadeEntradaItemPedido($item);
+            if ($qtdEntrada <= 0) {
+                continue;
+            }
+
+            $idCatalogo = (int) ($item['id_catalogo'] ?? $item['id_material'] ?? 0);
+            $idFilial = (int) $pedido['id_filial'];
+            if ($idCatalogo <= 0 || $idFilial <= 0) {
+                continue;
+            }
+
+            $sqlVerifica = "SELECT id_estoque, estoque_atual, preco_unitario
+                           FROM tbl_estoque_filiais
                            WHERE id_catalogo = ? AND id_filial = ?";
             $stmtVerifica = $this->pdo->prepare($sqlVerifica);
-            $stmtVerifica->execute([$item['id_catalogo'], $pedido['id_filial']]);
-            
+            $stmtVerifica->execute([$idCatalogo, $idFilial]);
+            $estoqueExistente = $stmtVerifica->fetch(PDO::FETCH_ASSOC);
+
+            $quantidadeAnterior = 0.0;
             $idEstoque = null;
-            
-            if ($stmtVerifica->rowCount() > 0) {
-                // Buscar o id_estoque existente
-                $estoqueExistente = $stmtVerifica->fetch(PDO::FETCH_ASSOC);
-                $idEstoque = $estoqueExistente['id_estoque'];
-                
-                // Atualizar estoque existente
-                $sqlEstoque = "UPDATE tbl_estoque_filiais 
-                              SET estoque_atual = estoque_atual + ?
-                              WHERE id_catalogo = ? AND id_filial = ?";
-                
-                $stmt = $this->pdo->prepare($sqlEstoque);
-                $stmt->execute([
-                    $item['quantidade'],
-                    $item['id_catalogo'],
-                    $pedido['id_filial']
-                ]);
-                
-                error_log("Estoque atualizado: material {$item['id_catalogo']}, filial {$pedido['id_filial']}, +{$item['quantidade']}");
+            $precoUnitario = $this->precoUnitarioEntradaItemPedido($item);
+
+            if ($estoqueExistente) {
+                $idEstoque = (int) $estoqueExistente['id_estoque'];
+                $quantidadeAnterior = (float) ($estoqueExistente['estoque_atual'] ?? 0);
+                if ($precoUnitario <= 0 && !empty($estoqueExistente['preco_unitario'])) {
+                    $precoUnitario = (float) $estoqueExistente['preco_unitario'];
+                }
+
+                $stmt = $this->pdo->prepare("
+                    UPDATE tbl_estoque_filiais
+                    SET estoque_atual = estoque_atual + ?,
+                        preco_unitario = CASE WHEN ? > 0 THEN ? ELSE preco_unitario END
+                    WHERE id_estoque = ?
+                ");
+                $stmt->execute([$qtdEntrada, $precoUnitario, $precoUnitario, $idEstoque]);
             } else {
-                // Criar novo registro de estoque
-                $sqlInsert = "INSERT INTO tbl_estoque_filiais 
-                             (id_catalogo, id_filial, estoque_atual, estoque_minimo, estoque_maximo, 
-                              preco_unitario, ativo, data_criacao)
-                             VALUES (?, ?, ?, 0, 0, 0, 1, NOW())";
-                
-                $stmt = $this->pdo->prepare($sqlInsert);
-                $stmt->execute([
-                    $item['id_catalogo'],
-                    $pedido['id_filial'],
-                    $item['quantidade']
-                ]);
-                
-                // Buscar o id_estoque recém-criado
-                $idEstoque = $this->pdo->lastInsertId();
-                
-                error_log("Novo estoque criado: material {$item['id_catalogo']}, filial {$pedido['id_filial']}, quantidade {$item['quantidade']}, id_estoque: {$idEstoque}");
+                $stmt = $this->pdo->prepare("
+                    INSERT INTO tbl_estoque_filiais
+                    (id_catalogo, id_filial, estoque_atual, estoque_minimo, estoque_maximo,
+                     preco_unitario, ativo, data_criacao)
+                    VALUES (?, ?, ?, 0, 0, ?, 1, NOW())
+                ");
+                $stmt->execute([$idCatalogo, $idFilial, $qtdEntrada, $precoUnitario]);
+                $idEstoque = (int) $this->pdo->lastInsertId();
+                $quantidadeAnterior = 0.0;
             }
-            
-            // Registrar movimentação de estoque (incluindo id_estoque)
-            $sqlMovimentacao = "INSERT INTO tbl_movimentacoes_estoque 
-                               (id_estoque, id_catalogo, id_filial, tipo_movimentacao, quantidade, 
-                                observacoes, data_movimentacao, id_usuario, id_pedido_compra)
-                               VALUES (?, ?, ?, 'entrada', ?, ?, NOW(), ?, ?)";
-            
+
+            $quantidadeNova = $quantidadeAnterior + $qtdEntrada;
+            $valorTotal = round($qtdEntrada * $precoUnitario, 2);
             $observacoes = "Entrada automática - Pedido #{$pedido['numero_pedido']} finalizado";
             $idUsuario = $_SESSION['usuario_id'] ?? null;
-            
+            $documentoRef = $pedido['numero_pedido'] ?? ('PED-' . $idPedido);
+
+            $campos = [
+                'id_estoque', 'id_catalogo', 'id_filial', 'tipo_movimentacao', 'quantidade',
+                'quantidade_anterior', 'quantidade_nova', 'valor_unitario', 'valor_total',
+                'motivo', 'documento_referencia', 'observacoes', 'data_movimentacao', 'id_usuario',
+            ];
+            $valores = [
+                $idEstoque, $idCatalogo, $idFilial, 'entrada', $qtdEntrada,
+                $quantidadeAnterior, $quantidadeNova, $precoUnitario, $valorTotal,
+                'Entrada pedido compra', $documentoRef, $observacoes, date('Y-m-d H:i:s'), $idUsuario,
+            ];
+
+            if ($temColunaPedidoCompra) {
+                $campos[] = 'id_pedido_compra';
+                $valores[] = $idPedido;
+            }
+
+            $placeholders = implode(', ', array_fill(0, count($valores), '?'));
+            $sqlMovimentacao = 'INSERT INTO tbl_movimentacoes_estoque (' . implode(', ', $campos) . ') VALUES (' . $placeholders . ')';
             $stmt = $this->pdo->prepare($sqlMovimentacao);
-            $stmt->execute([
-                $idEstoque,
-                $item['id_catalogo'],
-                $pedido['id_filial'],
-                $item['quantidade'],
-                $observacoes,
-                $idUsuario,
-                $idPedido
-            ]);
-            
-            error_log("Movimentação registrada para material {$item['id_catalogo']}, id_estoque: {$idEstoque}");
+            $stmt->execute($valores);
+        }
+    }
+
+    private function colunaExiste(string $tabela, string $coluna): bool {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND COLUMN_NAME = ?
+            ");
+            $stmt->execute([$tabela, $coluna]);
+            return ((int) $stmt->fetchColumn()) > 0;
+        } catch (Exception $e) {
+            return false;
         }
     }
     
