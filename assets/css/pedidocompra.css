@@ -930,8 +930,13 @@ body { background: #f7f9fb; }
     width: 32px;
     height: 32px;
     margin: 0 0 6px 0;
-    font-size: 14px;
+    font-size: 1rem;
     flex-shrink: 0;
+}
+
+.status-flow--horizontal .status-step .status-icon:empty {
+    min-width: 32px;
+    min-height: 32px;
 }
 
 .status-flow--horizontal .status-step-body {
@@ -1044,8 +1049,13 @@ body { background: #f7f9fb; }
     align-items: center;
     justify-content: center;
     margin-right: 10px;
-    font-size: 12px;
-    font-weight: bold;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.status-icon:empty {
+    min-width: 20px;
+    min-height: 20px;
 }
 
 .status-step.completed .status-icon {

@@ -3919,7 +3919,7 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
     fluxoStatus.forEach((status, index) => {
         const historicoDeste = historicoMap[status.key];
         let classe = 'status-step';
-        let icone = status.icon;
+        let iconeHtml = '';
         let dataTexto = '';
         
         const passouEtapa = historicoDeste
@@ -3928,10 +3928,10 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
 
         if (passouEtapa && !historicoDeste && status.key === 'aprovado_socio' && statusAtualNorm !== 'aprovado_socio') {
             classe += ' completed';
-            icone = '✓';
+            iconeHtml = '<i class="bi bi-check-lg" aria-hidden="true"></i>';
         } else if (historicoDeste) {
             classe += ' completed';
-            icone = '✓';
+            iconeHtml = '<i class="bi bi-check-lg" aria-hidden="true"></i>';
             dataTexto = `<div class="status-date">${formatarDataHora(historicoDeste.data_alteracao)}</div>`;
         } else if (status.key === statusAtualNorm) {
             classe += ' current';
@@ -3947,7 +3947,7 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
         
         html += `
             <div class="${classe}" ${onClick} title="${status.nome}">
-                <div class="status-icon">${icone}</div>
+                <div class="status-icon">${iconeHtml}</div>
                 <div class="status-step-body">
                     <div class="status-text">${status.nome}</div>
                     ${dataTexto}
