@@ -109,6 +109,10 @@ try {
                     if ($pedido) {
                         $itens = $pedidoCompra->buscarItens($id);
                         $pedido['itens'] = $itens;
+
+                        require_once __DIR__ . '/../helpers/pedido_compra_config.php';
+                        $pedido['desconto_cotacao_percentual'] = obterDescontoCotacaoPedido($pedido);
+                        $pedido['desconto_fornecedor_percentual_config'] = obterDescontoFornecedorPercentual();
                         
                         // Debug: verificar se url_nota_fiscal existe
                         error_log("Pedido ID {$id} - url_nota_fiscal: " . ($pedido['url_nota_fiscal'] ?? 'NÃO EXISTE'));
@@ -409,71 +413,46 @@ try {
                     break;
                     
                 case 'update-status':
-                    $id = $_GET['id'] ?? null;
-                    if (!$id) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'ID não fornecido']);
-                        break;
-                    }
-                    
-                    $input = json_decode(file_get_contents('php://input'), true);
-                    
-                    if (!$input) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'Dados inválidos']);
-                        break;
-                    }
-                    
-                    $novoStatus = $input['status'] ?? null;
-                    $observacao = $input['observacao'] ?? '';
-                    
-                    if (!$novoStatus) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'Novo status não fornecido']);
-                        break;
-                    }
-                    
-                    // Validar se o status é válido conforme novo fluxo
-                    $statusValidos = ['rascunho', 'aguardando_aprovacao', 'aprovado_cotacao', 'aprovado_para_faturar', 'cancelado'];
-                    if (!in_array($novoStatus, $statusValidos)) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'Status inválido']);
-                        break;
-                    }
-                    
-                    // Buscar status atual do pedido para o histórico
-                    $pedidoAtual = $pedidoCompra->findById($id);
-                    if (!$pedidoAtual) {
-                        http_response_code(404);
-                        echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
-                        break;
-                    }
-                    
-                    $statusAnterior = $pedidoAtual['status'];
-                    
-                    // Atualizar apenas o status do pedido
-                    $pedidoCompra->atualizarStatus($id, $novoStatus, $observacao);
-                    
-                    // Registrar no histórico de status
                     try {
-                        $queryHistorico = "INSERT INTO tbl_historico_status_pedidos 
-                                          (id_pedido, status, observacao, data_alteracao, id_usuario) 
-                                          VALUES (:pedido_id, :status_novo, :observacao, NOW(), :usuario_id)";
-
-                        $stmtHistorico = $db->prepare($queryHistorico);
-                        $stmtHistorico->bindParam(':pedido_id', $id, PDO::PARAM_INT);
-                        $stmtHistorico->bindParam(':status_novo', $novoStatus);
-                        $stmtHistorico->bindParam(':observacao', $observacao);
-                        $stmtHistorico->bindParam(':usuario_id', $_SESSION['usuario_id'], PDO::PARAM_INT);
-                        
-                        if (!$stmtHistorico->execute()) {
-                            error_log("Erro ao registrar histórico de status");
+                        $id = $_GET['id'] ?? null;
+                        if (!$id) {
+                            http_response_code(400);
+                            echo json_encode(['success' => false, 'error' => 'ID não fornecido']);
+                            break;
                         }
+
+                        $input = json_decode(file_get_contents('php://input'), true);
+
+                        if (!$input) {
+                            http_response_code(400);
+                            echo json_encode(['success' => false, 'error' => 'Dados inválidos']);
+                            break;
+                        }
+
+                        $novoStatus = fluxoPedidoNormalizarStatus($input['status'] ?? '');
+                        $observacao = trim((string) ($input['observacao'] ?? ''));
+
+                        if ($novoStatus === '') {
+                            http_response_code(400);
+                            echo json_encode(['success' => false, 'error' => 'Novo status não fornecido']);
+                            break;
+                        }
+
+                        $pedidoAtual = $pedidoCompra->findById($id);
+                        if (!$pedidoAtual) {
+                            http_response_code(404);
+                            echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                            break;
+                        }
+
+                        // Validação e histórico ficam em PedidoCompra::atualizarStatus()
+                        $pedidoCompra->atualizarStatus($id, $novoStatus, $observacao);
+
+                        echo json_encode(['success' => true, 'message' => 'Status do pedido atualizado com sucesso']);
                     } catch (Exception $e) {
-                        error_log("Erro ao registrar histórico de status: " . $e->getMessage());
+                        http_response_code(500);
+                        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                     }
-                    
-                    echo json_encode(['success' => true, 'message' => 'Status do pedido atualizado com sucesso']);
                     break;
                     
                 case 'enviar-email':

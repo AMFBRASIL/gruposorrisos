@@ -15,6 +15,14 @@ define('DB_USER', getenv('DB_USER') ?: 'gruposorrisos');
 define('DB_PASS', getenv('DB_PASS') ?: 'YeKcbHEBYnittDWc');
 
 
+#define('DB_HOST', getenv('DB_HOST') ?: '72.61.59.152');
+#define('DB_NAME', getenv('DB_NAME') ?: 'gruposhomolog');
+#define('DB_USER', getenv('DB_USER') ?: 'GrupoSHomolog');#
+define('DB_PASS', getenv('DB_PASS') ?: 'n2Ga3bPPDBr5Wn4e');
+
+
+
+
 #PRODUCAO
 #define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 #define('DB_NAME', getenv('DB_NAME') ?: 'gruposorrisos');
@@ -24,6 +32,9 @@ define('DB_PASS', getenv('DB_PASS') ?: 'YeKcbHEBYnittDWc');
 // Application Settings
 define('APP_NAME', 'Grupo Sorrisos - Estoque');
 define('APP_VERSION', '3.0.0');
+
+/** Fallback se tbl_configuracoes não tiver a chave pedidos_desconto_fornecedor_percentual */
+define('PEDIDOS_DESCONTO_FORNECEDOR_PERCENTUAL', 5);
 
 // AI Analysis Settings
 define('AI_MODEL', 'o4-mini-2025-04-16');

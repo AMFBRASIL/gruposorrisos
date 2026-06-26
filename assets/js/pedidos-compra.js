@@ -10,6 +10,137 @@ let itensOriginaisEdicao = new Map();
 let itensRemovidosEdicao = new Set();
 let modalProcessandoPedidoInstance = null;
 
+let descontoFornecedorPercentual = (window.PEDIDOS_CONFIG && Number.isFinite(window.PEDIDOS_CONFIG.descontoFornecedorPercentual))
+    ? Number(window.PEDIDOS_CONFIG.descontoFornecedorPercentual)
+    : 5;
+
+function obterPercentualDescontoCotacaoPedido(pedido) {
+    if (pedido && pedido.desconto_cotacao_percentual != null && pedido.desconto_cotacao_percentual !== '') {
+        const pct = parseFloat(pedido.desconto_cotacao_percentual);
+        if (!Number.isNaN(pct) && pct >= 0 && pct <= 100) {
+            return pct;
+        }
+    }
+    return descontoFornecedorPercentual;
+}
+
+function formatarPercentualDescontoCotacao(pct) {
+    const n = parseFloat(pct) || 0;
+    return Number.isInteger(n)
+        ? String(n)
+        : n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function precoBrutoCotacaoAPartirDoLiquido(precoLiquido, pctDesconto) {
+    const liquido = parseFloat(precoLiquido);
+    const pct = parseFloat(pctDesconto) || 0;
+    if (!Number.isFinite(liquido) || liquido <= 0) {
+        return liquido || 0;
+    }
+    if (pct <= 0) {
+        return liquido;
+    }
+    const fator = 1 - (pct / 100);
+    if (fator <= 0) {
+        return liquido;
+    }
+    return liquido / fator;
+}
+
+function calcularResumoDescontoCotacaoPedido(itens, pctDesconto) {
+    const pct = parseFloat(pctDesconto) || 0;
+    let subtotalBruto = 0;
+    let subtotalLiquido = 0;
+    let temRespostaFornecedor = false;
+
+    (itens || []).forEach((item) => {
+        const quantidadeSolicitada = parseFloat(item.quantidade) || 0;
+        const quantidadeDisponivelRaw = item.quantidade_disponivel;
+        const quantidadeDisponivel = (quantidadeDisponivelRaw !== null && quantidadeDisponivelRaw !== undefined && quantidadeDisponivelRaw !== '')
+            ? parseFloat(quantidadeDisponivelRaw)
+            : null;
+        const precoUnitario = parseFloat(item.preco_unitario) || 0;
+        const precoFornecedorRaw = item.preco_fornecedor;
+        const precoFornecedor = (precoFornecedorRaw !== null && precoFornecedorRaw !== undefined && precoFornecedorRaw !== '')
+            ? parseFloat(precoFornecedorRaw)
+            : null;
+        const disponivelRaw = item.disponivel;
+        const disponivel = (disponivelRaw !== null && disponivelRaw !== undefined && disponivelRaw !== '')
+            ? parseInt(disponivelRaw, 10)
+            : null;
+
+        if (disponivel === 0) {
+            return;
+        }
+
+        const quantidadeBase = (quantidadeDisponivel !== null && quantidadeDisponivel > 0)
+            ? quantidadeDisponivel
+            : quantidadeSolicitada;
+        const precoLiquido = (precoFornecedor !== null && precoFornecedor > 0) ? precoFornecedor : precoUnitario;
+
+        if (precoFornecedor !== null && precoFornecedor > 0) {
+            temRespostaFornecedor = true;
+        }
+
+        const precoBruto = (precoFornecedor !== null && precoFornecedor > 0 && pct > 0)
+            ? precoBrutoCotacaoAPartirDoLiquido(precoFornecedor, pct)
+            : precoLiquido;
+
+        subtotalBruto += quantidadeBase * precoBruto;
+        subtotalLiquido += quantidadeBase * precoLiquido;
+    });
+
+    const descontoTotal = Math.max(subtotalBruto - subtotalLiquido, 0);
+
+    return {
+        subtotalBruto,
+        descontoTotal,
+        subtotalLiquido,
+        temRespostaFornecedor,
+        exibirDesconto: temRespostaFornecedor && pct > 0 && descontoTotal > 0.009
+    };
+}
+
+function atualizarExibicaoDescontoCotacaoView(pedido, resumo) {
+    const pct = obterPercentualDescontoCotacaoPedido(pedido);
+    const pctLabel = formatarPercentualDescontoCotacao(pct);
+    const exibir = !!(resumo && resumo.exibirDesconto);
+    const labelDesc = `Desconto fornecedor (${pctLabel}%)`;
+
+    const toggle = (el, show) => {
+        if (el) {
+            el.classList.toggle('d-none', !show);
+        }
+    };
+
+    toggle(document.getElementById('view-chip-subtotal-bruto-wrap'), exibir);
+    toggle(document.getElementById('view-chip-desconto-wrap'), exibir);
+    toggle(document.getElementById('view-row-subtotal-bruto'), exibir);
+    toggle(document.getElementById('view-row-desconto-cotacao'), exibir);
+
+    if (!exibir) {
+        return;
+    }
+
+    const setText = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = text;
+        }
+    };
+
+    setText('view-subtotal-bruto', formatarMoeda(resumo.subtotalBruto));
+    setText('view-desconto-cotacao', formatarMoeda(resumo.descontoTotal));
+    setText('view_itens_subtotal_bruto', formatarMoeda(resumo.subtotalBruto));
+    setText('view_itens_desconto_cotacao', formatarMoeda(resumo.descontoTotal));
+    setText('view-label-desconto-cotacao', labelDesc);
+
+    const elLabelFoot = document.getElementById('view_itens_label_desconto');
+    if (elLabelFoot) {
+        elLabelFoot.textContent = labelDesc + ':';
+    }
+}
+
 function mostrarModalProcessandoPedido(mensagem = 'Processando dados...') {
     const modalElement = document.getElementById('modalProcessandoPedido');
     const textoElement = document.getElementById('texto-modal-processando-pedido');
@@ -1138,6 +1269,7 @@ function getDataEntregaComIndicador(dataEntrega, status) {
         return 'N/A';
     }
     
+    const statusNorm = normalizarStatusPedido(status);
     const dataFormatada = formatarData(dataEntrega);
     const atrasada = verificarEntregaAtrasada(dataEntrega, status);
     
@@ -2163,6 +2295,7 @@ async function visualizarPedido(id) {
             let quantidadeTotal = 0;
             let valorTotal = 0;
             let precoMedio = 0;
+            const pctDescontoCotacao = obterPercentualDescontoCotacaoPedido(pedido);
             
             // Renderizar itens e calcular métricas
             const tbody = document.getElementById('view_itens_tbody');
@@ -2211,6 +2344,13 @@ async function visualizarPedido(id) {
                     
                     // Determinar qual preço mostrar (fornecedor se disponível, senão unitário)
                     const precoExibir = precoParaCalculo;
+                    const temPrecoFornecedor = precoFornecedor !== null && precoFornecedor > 0;
+                    const precoBrutoExibir = temPrecoFornecedor && pctDescontoCotacao > 0
+                        ? precoBrutoCotacaoAPartirDoLiquido(precoFornecedor, pctDescontoCotacao)
+                        : precoExibir;
+                    const precoColunaHtml = (temPrecoFornecedor && pctDescontoCotacao > 0 && precoBrutoExibir > precoExibir)
+                        ? `<div><small class="text-muted text-decoration-line-through">${formatarMoeda(precoBrutoExibir)}</small><br><strong>${formatarMoeda(precoExibir)}</strong></div>`
+                        : formatarMoeda(precoExibir);
                     
                     // Determinar quantidade disponível a exibir
                     let qtdDisponivelHtml = '';
@@ -2248,7 +2388,7 @@ async function visualizarPedido(id) {
                                 ${qtdDisponivelHtml}
                             </td>
                             <td class="text-center">
-                                ${formatarMoeda(precoExibir)}
+                                ${precoColunaHtml}
                             </td>
                             <td class="text-center">
                                 <strong class="text-success">${formatarMoeda(valorItem)}</strong>
@@ -2271,6 +2411,9 @@ async function visualizarPedido(id) {
                 }
             }
             
+            const resumoDescontoCotacao = calcularResumoDescontoCotacaoPedido(pedido.itens || [], pctDescontoCotacao);
+            atualizarExibicaoDescontoCotacaoView(pedido, resumoDescontoCotacao);
+
             // Atualizar métricas - com verificação individual
             const totalItensElement = document.getElementById('view-total-itens');
             const quantidadeTotalElement = document.getElementById('view-quantidade-total');
@@ -2280,7 +2423,7 @@ async function visualizarPedido(id) {
             if (totalItensElement) totalItensElement.textContent = totalItens;
             if (quantidadeTotalElement) quantidadeTotalElement.textContent = quantidadeTotal;
             if (precoMedioElement) precoMedioElement.textContent = formatarMoeda(precoMedio);
-            const valorTotalOficial = parseFloat(pedido.valor_total) || valorTotal;
+            const valorTotalOficial = parseFloat(pedido.valor_total) || resumoDescontoCotacao.subtotalLiquido || valorTotal;
             if (valorTotalElement) valorTotalElement.textContent = formatarMoeda(valorTotalOficial);
             
             // Atualizar total no rodapé da tabela
@@ -3725,7 +3868,7 @@ async function atualizarStatusPedido(novoStatus, observacao = null) {
             await carregarEstatisticas();
             
         } else {
-            mostrarErro(data.message || 'Erro ao atualizar status do pedido');
+            mostrarErro(data.error || data.message || 'Erro ao atualizar status do pedido');
         }
         
     } catch (error) {
@@ -4709,79 +4852,9 @@ async function marcarComoRecebido() {
     }
 }
 
-// Cancelar pedido
+// Cancelar pedido (usa o fluxo padrão de atualização de status)
 async function cancelarPedido() {
-    try {
-        const modal = document.getElementById('modalVisualizarPedido');
-        const pedidoId = modal.getAttribute('data-pedido-id');
-        
-        if (!pedidoId) {
-            mostrarErro('ID do pedido não encontrado');
-            return;
-        }
-        
-        const result = await Swal.fire({
-            title: 'Cancelar Pedido',
-            text: 'Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sim, Cancelar!',
-            cancelButtonText: 'Não'
-        });
-        
-        if (result.isConfirmed) {
-            console.log('🔄 Cancelando pedido ID:', pedidoId);
-            
-            const response = await fetch(`backend/api/pedidos_compra.php?action=update-status&id=${pedidoId}`, {
-                method: 'PUT',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    status: 'cancelado',
-                    observacao: 'Pedido cancelado pelo usuário'
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                Swal.fire({
-                    title: 'Pedido Cancelado!',
-                    text: 'O pedido foi cancelado com sucesso.',
-                    icon: 'error',
-                    confirmButtonText: 'OK'
-                });
-                
-                // Atualizar status no modal
-                const statusBadge = document.getElementById('view-status-badge');
-                const statusText = document.getElementById('view-status-text');
-                const statusCard = document.getElementById('view-status-card');
-                const statusAtivo = document.getElementById('view-status-ativo');
-                
-                if (statusBadge && statusText && statusCard && statusAtivo) {
-                    configurarStatusPedido(statusBadge, statusText, statusCard, statusAtivo, 'cancelado');
-                }
-                
-                // Reconfigurar botões de ação
-                configurarBotoesAcao('cancelado');
-                
-                // Recarregar dados
-                carregarPedidos();
-                carregarEstatisticas();
-                
-            } else {
-                mostrarErro(data.error || 'Erro ao cancelar pedido');
-            }
-        }
-        
-    } catch (error) {
-        console.error('Erro ao cancelar pedido:', error);
-        mostrarErro('Erro ao cancelar pedido');
-    }
+    await atualizarStatusPedido('cancelado', 'Pedido cancelado pelo usuário');
 }
 
 // Limpar modal quando fechado
@@ -4916,7 +4989,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-enviar-producao')?.addEventListener('click', enviarParaProducao);
     document.getElementById('btn-marcar-enviado')?.addEventListener('click', marcarComoEnviado);
     document.getElementById('btn-marcar-recebido')?.addEventListener('click', marcarComoRecebido);
-    document.getElementById('btn-cancelar')?.addEventListener('click', cancelarPedido);
 });
 
 // Excluir pedido

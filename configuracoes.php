@@ -2,6 +2,8 @@
 require_once 'config/session.php';
 require_once 'config/config.php';
 requireLogin();
+require_once __DIR__ . '/backend/helpers/pedido_compra_config.php';
+garantirConfigDescontoFornecedor();
 $menuActive = 'configuracoes';
 ?>
 <!DOCTYPE html>
@@ -133,6 +135,9 @@ $menuActive = 'configuracoes';
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="tab-hor-btn" data-bs-toggle="tab" data-bs-target="#tab-hor" type="button" role="tab" aria-controls="tab-hor" aria-selected="false"><i class="bi bi-clock"></i> Horários</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-pedidos-btn" data-bs-toggle="tab" data-bs-target="#tab-pedidos" type="button" role="tab" aria-controls="tab-pedidos" aria-selected="false"><i class="bi bi-cart-check"></i> Pedidos</button>
                     </li>
                 </ul>
 
@@ -469,6 +474,30 @@ $menuActive = 'configuracoes';
                                             <input type="time" class="form-control" id="horario_fim_domingo" name="horario_fim_domingo" data-chave="horario_fim_domingo">
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aba Pedidos -->
+                    <div class="tab-pane fade" id="tab-pedidos" role="tabpanel" aria-labelledby="tab-pedidos-btn" tabindex="0">
+                        <div class="tab-subcard">
+                            <div class="section-title mb-3"><i class="bi bi-percent"></i> Cotação do fornecedor</div>
+                            <p class="text-muted small mb-3">
+                                Percentual aplicado automaticamente na tela <strong>Pedidos para Fornecedor</strong> sobre o preço bruto informado em cada item.
+                                O valor líquido (com desconto) é o que aparece em <strong>Pedidos de Compra</strong>.
+                            </p>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="pedidos_desconto_fornecedor_percentual">Desconto padrão (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="pedidos_desconto_fornecedor_percentual"
+                                               name="pedidos_desconto_fornecedor_percentual"
+                                               data-chave="pedidos_desconto_fornecedor_percentual"
+                                               min="0" max="100" step="0.01" placeholder="5">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <div class="form-text">Ex.: 5 para 5%, 8 para 8%. Use 0 para desativar o desconto automático.</div>
                                 </div>
                             </div>
                         </div>

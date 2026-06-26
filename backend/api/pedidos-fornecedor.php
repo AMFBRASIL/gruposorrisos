@@ -410,6 +410,10 @@ function responderPedido($pdo, $input, $fornecedor_id) {
     $data_entrega_prevista = $input['data_entrega_prevista'] ?? '';
     $condicoes_pagamento = $input['condicoes_pagamento'] ?? '';
     $itens = $input['itens'] ?? [];
+    $total_final_input = isset($input['total_final']) ? floatval($input['total_final']) : null;
+    $subtotal_bruto_input = floatval($input['subtotal_bruto'] ?? 0);
+    $desconto_itens_input = floatval($input['desconto_itens_total'] ?? 0);
+    $desconto_final_total_input = floatval($input['desconto_final_total'] ?? 0);
     
     // Validar dados obrigatórios
     if (!$pedido_id) {
@@ -556,6 +560,11 @@ function responderPedido($pdo, $input, $fornecedor_id) {
         $stmt_total->execute([$pedido_id]);
         $novo_total = floatval($stmt_total->fetchColumn() ?: 0);
 
+        // Usar total final informado pelo fornecedor (inclui desconto de itens + desconto final)
+        if ($total_final_input !== null && $total_final_input >= 0) {
+            $novo_total = round($total_final_input, 2);
+        }
+
         $sql_update_total = "UPDATE tbl_pedidos_compra 
                              SET valor_total = ?,
                                  data_atualizacao = NOW()
@@ -563,6 +572,9 @@ function responderPedido($pdo, $input, $fornecedor_id) {
         $stmt_update_total = $pdo->prepare($sql_update_total);
         $stmt_update_total->execute([$novo_total, $pedido_id]);
         error_log("Pedido {$pedido_id}: valor_total recalculado para {$novo_total}");
+
+        require_once __DIR__ . '/../helpers/pedido_compra_config.php';
+        salvarDescontoCotacaoPedido($pdo, (int) $pedido_id, obterDescontoFornecedorPercentual($pdo));
         
         // Registrar log da resposta
         // Usar o ID do usuário logado (da sessão), não o ID do fornecedor
@@ -576,6 +588,10 @@ function responderPedido($pdo, $input, $fornecedor_id) {
             'prazo_entrega' => $prazo_entrega,
             'data_entrega_prevista' => $data_entrega_prevista,
             'condicoes_pagamento' => $condicoes_pagamento,
+            'subtotal_bruto' => $subtotal_bruto_input,
+            'desconto_itens_total' => $desconto_itens_input,
+            'desconto_final_total' => $desconto_final_total_input,
+            'total_final' => $novo_total,
             'itens_respondidos' => count($itens)
         ];
         

@@ -67,6 +67,9 @@ try {
 }
 
 $menuActive = 'pedidos_fornecedores';
+
+require_once __DIR__ . '/backend/helpers/pedido_compra_config.php';
+$descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -96,68 +99,225 @@ $menuActive = 'pedidos_fornecedores';
         .page-header {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-radius: 14px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .page-header-inner {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .page-header-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+        }
+
+        .page-header-text {
+            min-width: 0;
+            flex: 1;
         }
         
         .page-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 0.5rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.15rem;
+            line-height: 1.3;
+            letter-spacing: -0.02em;
         }
         
         .page-subtitle {
-            font-size: 1.1rem;
-            color: #718096;
+            font-size: 0.82rem;
+            color: #64748b;
             margin-bottom: 0;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 575.98px) {
+            .page-header {
+                padding: 0.85rem 1rem;
+            }
+            .page-title {
+                font-size: 1.1rem;
+            }
+            .page-header-icon {
+                width: 38px;
+                height: 38px;
+                font-size: 1rem;
+            }
         }
         
         .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
             margin-bottom: 2rem;
         }
         
         .stat-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 1.5rem;
+            border-radius: 12px;
+            padding: 0.85rem 0.65rem;
             text-align: center;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            flex: 1 1 130px;
+            min-width: 120px;
+            max-width: 165px;
+            cursor: pointer;
+            border: 2px solid transparent;
         }
         
         .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .stat-card.stat-card-ativo {
+            border-color: #667eea;
+            box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.25);
         }
         
         .stat-icon {
-            width: 60px;
-            height: 60px;
+            width: 42px;
+            height: 42px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 1rem;
-            font-size: 1.5rem;
+            margin: 0 auto 0.5rem;
+            font-size: 1.1rem;
             color: white;
         }
         
         .stat-value {
-            font-size: 2rem;
+            font-size: 1.45rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
+            line-height: 1.1;
         }
         
         .stat-label {
             color: #718096;
-            font-size: 0.9rem;
+            font-size: 0.72rem;
+            line-height: 1.25;
+        }
+
+        .stats-section-label {
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.75rem;
+        }
+
+        .stats-kpi-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-status-section {
+            margin-bottom: 2rem;
+        }
+
+        .stats-kpi-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.97);
+            backdrop-filter: blur(10px);
+            border-radius: 14px;
+            padding: 1rem 1.1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            flex: 1 1 175px;
+            min-width: 155px;
+            max-width: 240px;
+            border: 2px solid transparent;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .kpi-card.kpi-card-destaque {
+            flex: 1 1 210px;
+            max-width: 280px;
+            border-color: rgba(5, 150, 105, 0.25);
+        }
+
+        .kpi-card.kpi-card-acao {
+            cursor: pointer;
+        }
+
+        .kpi-card.kpi-card-alerta {
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+
+        .kpi-header {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            margin-bottom: 0.65rem;
+        }
+
+        .kpi-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .kpi-title {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            line-height: 1.2;
+        }
+
+        .kpi-value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.15;
+            margin-bottom: 0.2rem;
+        }
+
+        .kpi-value.kpi-valor-destaque {
+            font-size: 1.55rem;
+            color: #059669;
+        }
+
+        .kpi-sub {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            line-height: 1.3;
         }
         
         .pedidos-container {
@@ -505,47 +665,35 @@ $menuActive = 'pedidos_fornecedores';
 <main class="main-content">
     <!-- Header da Página -->
     <div class="page-header">
-        <h1 class="page-title">
-            <i class="bi bi-truck me-3"></i>
-            Pedidos para Fornecedor
-        </h1>
-        <p class="page-subtitle">
-            Visualize e responda aos pedidos de compra enviados para sua empresa
-        </p>
+        <div class="page-header-inner">
+            <div class="page-header-icon" aria-hidden="true">
+                <i class="bi bi-truck"></i>
+            </div>
+            <div class="page-header-text">
+                <h1 class="page-title mb-0">Pedidos para Fornecedor</h1>
+                <p class="page-subtitle mb-0">
+                    <?php if ($razaoSocialFornecedorSessao !== ''): ?>
+                        <?php echo htmlspecialchars($razaoSocialFornecedorSessao); ?> ·
+                    <?php endif; ?>
+                    Cotações, faturamento e acompanhamento dos pedidos
+                </p>
+            </div>
+        </div>
     </div>
 
-    <!-- Cards de Estatísticas -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
-                <i class="bi bi-inbox"></i>
-            </div>
-            <div class="stat-value" id="total-pedidos">0</div>
-            <div class="stat-label">Total de Pedidos</div>
+    <!-- Resumo financeiro / KPIs -->
+    <div class="stats-kpi-section">
+        <div class="stats-section-label"><i class="bi bi-graph-up-arrow me-1"></i> Resumo Geral</div>
+        <div class="stats-kpi-grid" id="stats-resumo-kpi">
+            <!-- Preenchido via JavaScript -->
         </div>
-        
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
-                <i class="bi bi-clock"></i>
-            </div>
-            <div class="stat-value" id="pedidos-pendentes">0</div>
-            <div class="stat-label">Aguardando Resposta</div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">
-                <i class="bi bi-check-circle"></i>
-            </div>
-            <div class="stat-value" id="pedidos-respondidos">0</div>
-            <div class="stat-label">Respondidos</div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b, #38f9d7);">
-                <i class="bi bi-currency-dollar"></i>
-            </div>
-            <div class="stat-value" id="valor-total">R$ 0,00</div>
-            <div class="stat-label">Valor Total</div>
+    </div>
+
+    <!-- Cards por status -->
+    <div class="stats-status-section">
+        <div class="stats-section-label"><i class="bi bi-ui-checks-grid me-1"></i> Por Status</div>
+        <div class="stats-grid" id="stats-por-status">
+            <!-- Preenchido via JavaScript -->
         </div>
     </div>
 
@@ -571,10 +719,6 @@ $menuActive = 'pedidos_fornecedores';
             <div class="col-md-3">
                 <select class="form-select" id="filtro-status">
                     <option value="">Todos os Status</option>
-                    <option value="aguardando_cotacao">Aguardando Cotação</option>
-                    <option value="em_cotacao">Em Cotação</option>
-                    <option value="em_faturamento">Em Faturamento</option>
-                    <option value="aguardando_faturamento">Aguard. Faturamento</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -612,56 +756,8 @@ $menuActive = 'pedidos_fornecedores';
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <!-- Navegação por abas -->
-                <ul class="nav nav-tabs" id="pedidoTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="detalhes-tab" data-bs-toggle="tab" data-bs-target="#detalhes" type="button" role="tab">
-                            <i class="bi bi-info-circle me-2"></i>Detalhes do Pedido
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab" onclick="carregarChat()">
-                            <i class="bi bi-chat-dots me-2"></i>Chat
-                            <span class="badge bg-danger ms-1 d-none" id="chat-badge">0</span>
-                        </button>
-                    </li>
-                </ul>
-                
-                <!-- Conteúdo das abas -->
-                <div class="tab-content" id="pedidoTabContent">
-                    <!-- Aba Detalhes -->
-                    <div class="tab-pane fade show active" id="detalhes" role="tabpanel">
-                        <div class="mt-3" id="modal-pedido-content">
-                            <!-- Conteúdo será carregado via JavaScript -->
-                        </div>
-                    </div>
-                    
-                    <!-- Aba Chat -->
-                    <div class="tab-pane fade" id="chat" role="tabpanel">
-                        <div class="mt-3">
-                            <!-- Container do Chat -->
-                            <div class="chat-container" style="height: 400px; border: 1px solid #dee2e6; border-radius: 8px; display: flex; flex-direction: column;">
-                                <!-- Área de mensagens -->
-                                <div class="chat-messages" id="chat-messages" style="flex: 1; overflow-y: auto; padding: 15px; background-color: #f8f9fa;">
-                                    <div class="text-center text-muted">
-                                        <i class="bi bi-chat-dots fs-1"></i>
-                                        <p>Carregando mensagens...</p>
-                                    </div>
-                                </div>
-                                
-                                <!-- Área de digitação -->
-                                <div class="chat-input" style="border-top: 1px solid #dee2e6; padding: 15px; background-color: white;">
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="nova-mensagem" placeholder="Digite sua mensagem..." maxlength="500">
-                                        <button class="btn btn-primary" type="button" onclick="enviarMensagem()">
-                                            <i class="bi bi-send"></i>
-                                        </button>
-                                    </div>
-                                    <small class="text-muted">Pressione Enter para enviar</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div id="modal-pedido-content">
+                    <!-- Conteúdo será carregado via JavaScript -->
                 </div>
             </div>
             <div class="modal-footer">
@@ -997,8 +1093,20 @@ $menuActive = 'pedidos_fornecedores';
                 </div>
 
                 <div class="resumo-final-box mt-4">
+                    <div class="alert alert-light border small py-2 mb-3" id="alerta-desconto-padrao-resposta">
+                        <i class="bi bi-percent me-1"></i>
+                        Desconto padrão de <strong id="texto-desconto-padrao-percentual"><?php echo htmlspecialchars((string) $descontoFornecedorPercentual); ?>%</strong> aplicado automaticamente em cada item sobre o preço informado.
+                    </div>
                     <div class="row g-3 align-items-end">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label mb-1"><strong>Subtotal (bruto)</strong></label>
+                            <input type="text" class="form-control" id="subtotal-bruto-resposta" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label mb-1"><strong id="label-desconto-itens-resposta">Desconto itens (<?php echo htmlspecialchars((string) $descontoFornecedorPercentual); ?>%)</strong></label>
+                            <input type="text" class="form-control" id="desconto-itens-resposta" readonly>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label mb-1"><strong>Subtotal dos Itens</strong></label>
                             <input type="text" class="form-control" id="subtotal-itens-resposta" readonly>
                         </div>
@@ -1027,44 +1135,6 @@ $menuActive = 'pedidos_fornecedores';
                     <i class="bi bi-check-lg me-2" id="icon-salvar-resposta"></i>
                     <span id="text-salvar-resposta">Salvar Resposta</span>
                 </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal do Chat -->
-<div class="modal fade" id="modalChatPedido" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-chat-dots me-2"></i>
-                    Chat - Pedido <span id="chat-pedido-numero"></span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <!-- Container do Chat -->
-                <div class="chat-container" style="height: 500px; display: flex; flex-direction: column;">
-                    <!-- Área de mensagens -->
-                    <div class="chat-messages" id="chat-messages-modal" style="flex: 1; overflow-y: auto; padding: 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
-                        <div class="text-center text-muted">
-                            <i class="bi bi-chat-dots fs-1"></i>
-                            <p>Carregando mensagens...</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Área de digitação -->
-                    <div class="chat-input" style="padding: 20px; background-color: white;">
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="nova-mensagem-modal" placeholder="Digite sua mensagem..." maxlength="500">
-                            <button class="btn btn-primary" type="button" onclick="enviarMensagemModal()">
-                                <i class="bi bi-send"></i>
-                            </button>
-                        </div>
-                        <small class="text-muted">Pressione Enter para enviar</small>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -1110,6 +1180,111 @@ const LABELS_STATUS_FORNECEDOR = {
     finalizado: 'Finalizado',
     cancelado: 'Cancelado'
 };
+
+/** Desconto comercial padrão — valor vindo de Configurações > Pedidos */
+const DESCONTO_PADRAO_ITEM_PERCENTUAL = <?php echo json_encode((float) $descontoFornecedorPercentual); ?>;
+
+const STATUS_FORNECEDOR_ORDEM = [
+    'aguardando_cotacao',
+    'em_cotacao',
+    'aguardando_aprovacao_socio',
+    'aprovado_socio',
+    'aguardando_faturamento',
+    'em_faturamento',
+    'em_transito',
+    'em_conferencia',
+    'finalizado',
+    'cancelado'
+];
+
+const ICONES_STATUS_FORNECEDOR = {
+    aguardando_cotacao: 'bi-inbox',
+    em_cotacao: 'bi-pencil-square',
+    aguardando_aprovacao_socio: 'bi-person-check',
+    aprovado_socio: 'bi-check-circle',
+    aguardando_faturamento: 'bi-hourglass-split',
+    em_faturamento: 'bi-receipt',
+    em_transito: 'bi-truck',
+    em_conferencia: 'bi-clipboard-check',
+    finalizado: 'bi-flag-fill',
+    cancelado: 'bi-x-circle'
+};
+
+const CORES_STATUS_FORNECEDOR = {
+    aguardando_cotacao: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+    em_cotacao: 'linear-gradient(135deg, #60a5fa, #3b82f6)',
+    aguardando_aprovacao_socio: 'linear-gradient(135deg, #fcd34d, #d97706)',
+    aprovado_socio: 'linear-gradient(135deg, #34d399, #059669)',
+    aguardando_faturamento: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
+    em_faturamento: 'linear-gradient(135deg, #38bdf8, #0284c7)',
+    em_transito: 'linear-gradient(135deg, #22d3ee, #0891b2)',
+    em_conferencia: 'linear-gradient(135deg, #4ade80, #16a34a)',
+    finalizado: 'linear-gradient(135deg, #86efac, #15803d)',
+    cancelado: 'linear-gradient(135deg, #f87171, #dc2626)'
+};
+
+let filtroStatusCardAtivo = '';
+
+function popularFiltroStatusFornecedor() {
+    const sel = document.getElementById('filtro-status');
+    if (!sel) return;
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">Todos os Status</option>';
+    STATUS_FORNECEDOR_ORDEM.forEach((key) => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = LABELS_STATUS_FORNECEDOR[key] || key;
+        sel.appendChild(opt);
+    });
+    if (atual && [...sel.options].some(o => o.value === atual)) {
+        sel.value = atual;
+    }
+}
+
+function filtrarPorCardStatus(status) {
+    filtroStatusCardAtivo = status || '';
+    const sel = document.getElementById('filtro-status');
+    if (sel) sel.value = status || '';
+    renderizarCardsStatusFornecedor();
+    aplicarFiltros();
+}
+
+function renderizarCardsStatusFornecedor() {
+    const container = document.getElementById('stats-por-status');
+    if (!container) return;
+
+    const total = pedidosData.length;
+    const cards = [];
+
+    const totalAtivo = filtroStatusCardAtivo === '' ? ' stat-card-ativo' : '';
+    cards.push(`
+        <div class="stat-card${totalAtivo}" data-status="" onclick="filtrarPorCardStatus('')" title="Ver todos">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <i class="bi bi-collection"></i>
+            </div>
+            <div class="stat-value">${total}</div>
+            <div class="stat-label">Total</div>
+        </div>
+    `);
+
+    STATUS_FORNECEDOR_ORDEM.forEach((status) => {
+        const count = pedidosData.filter(p => normalizarStatusFornecedor(p.status) === status).length;
+        const ativo = filtroStatusCardAtivo === status ? ' stat-card-ativo' : '';
+        const icon = ICONES_STATUS_FORNECEDOR[status] || 'bi-circle';
+        const cor = CORES_STATUS_FORNECEDOR[status] || 'linear-gradient(135deg, #94a3b8, #64748b)';
+        cards.push(`
+            <div class="stat-card${ativo}" data-status="${status}" onclick="filtrarPorCardStatus('${status}')" title="Filtrar: ${LABELS_STATUS_FORNECEDOR[status]}">
+                <div class="stat-icon" style="background: ${cor};">
+                    <i class="bi ${icon}"></i>
+                </div>
+                <div class="stat-value">${count}</div>
+                <div class="stat-label">${LABELS_STATUS_FORNECEDOR[status]}</div>
+            </div>
+        `);
+    });
+
+    container.innerHTML = cards.join('');
+}
 
 function labelStatusFornecedor(status) {
     const norm = normalizarStatusFornecedor(status);
@@ -1284,8 +1459,174 @@ function calcularValorTotalPedido(pedido) {
     return parseFloat(pedido?.valor_total) || 0;
 }
 
+function formatarMoedaResumoFornecedor(valor) {
+    return (parseFloat(valor) || 0).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
+}
+
+const STATUS_PEDIDO_ENCERRADO_FORNECEDOR = ['finalizado', 'cancelado'];
+
+function calcularMetricasResumoFornecedor() {
+    const agora = new Date();
+    const mesAtual = agora.getMonth();
+    const anoAtual = agora.getFullYear();
+
+    let valorTotal = 0;
+    let valorEmAndamento = 0;
+    let valorMesAtual = 0;
+    let pedidosMesAtual = 0;
+    let aguardandoCotacao = 0;
+    let emFaturamento = 0;
+    let emTransito = 0;
+    let itensPendentesResposta = 0;
+    let pedidosComValor = 0;
+
+    pedidosData.forEach((pedido) => {
+        const valor = calcularValorTotalPedido(pedido);
+        const status = normalizarStatusFornecedor(pedido.status);
+
+        valorTotal += valor;
+
+        if (!STATUS_PEDIDO_ENCERRADO_FORNECEDOR.includes(status)) {
+            valorEmAndamento += valor;
+        }
+
+        const dataPedido = pedido.data ? new Date(pedido.data) : null;
+        if (dataPedido && !Number.isNaN(dataPedido.getTime())
+            && dataPedido.getMonth() === mesAtual
+            && dataPedido.getFullYear() === anoAtual) {
+            pedidosMesAtual++;
+            valorMesAtual += valor;
+        }
+
+        if (status === 'aguardando_cotacao') aguardandoCotacao++;
+        if (status === 'em_faturamento' || status === 'aguardando_faturamento') emFaturamento++;
+        if (status === 'em_transito') emTransito++;
+
+        if (pedidoFornecedorPodeResponder(pedido.status)) {
+            itensPendentesResposta += contarItensSemRespostaFornecedor(pedido);
+        }
+
+        if (valor > 0) pedidosComValor++;
+    });
+
+    const ticketMedio = pedidosComValor > 0 ? valorTotal / pedidosComValor : 0;
+
+    return {
+        valorTotal,
+        valorEmAndamento,
+        valorMesAtual,
+        pedidosMesAtual,
+        aguardandoCotacao,
+        emFaturamento,
+        emTransito,
+        itensPendentesResposta,
+        ticketMedio,
+        totalPedidos: pedidosData.length
+    };
+}
+
+function renderizarCardsResumoKpiFornecedor() {
+    const container = document.getElementById('stats-resumo-kpi');
+    if (!container) return;
+
+    const m = calcularMetricasResumoFornecedor();
+    const alertaItens = m.itensPendentesResposta > 0;
+
+    const cards = [
+        {
+            destaque: true,
+            icon: 'bi-currency-dollar',
+            cor: 'linear-gradient(135deg, #34d399, #059669)',
+            titulo: 'Valor Total',
+            valor: formatarMoedaResumoFornecedor(m.valorTotal),
+            sub: `${m.totalPedidos} pedido(s) no total`,
+            classeExtra: 'kpi-valor-destaque'
+        },
+        {
+            icon: 'bi-arrow-repeat',
+            cor: 'linear-gradient(135deg, #60a5fa, #2563eb)',
+            titulo: 'Em Andamento',
+            valor: formatarMoedaResumoFornecedor(m.valorEmAndamento),
+            sub: 'Pedidos ainda não finalizados'
+        },
+        {
+            icon: 'bi-calculator',
+            cor: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
+            titulo: 'Ticket Médio',
+            valor: formatarMoedaResumoFornecedor(m.ticketMedio),
+            sub: 'Valor médio por pedido'
+        },
+        {
+            icon: 'bi-calendar-month',
+            cor: 'linear-gradient(135deg, #38bdf8, #0284c7)',
+            titulo: 'Este Mês',
+            valor: String(m.pedidosMesAtual),
+            sub: formatarMoedaResumoFornecedor(m.valorMesAtual) + ' em pedidos'
+        },
+        {
+            acao: true,
+            icon: 'bi-inbox',
+            cor: 'linear-gradient(135deg, #fbbf24, #d97706)',
+            titulo: 'Aguard. Cotação',
+            valor: String(m.aguardandoCotacao),
+            sub: 'Clique para filtrar',
+            onclick: "filtrarPorCardStatus('aguardando_cotacao')"
+        },
+        {
+            alerta: alertaItens,
+            icon: 'bi-exclamation-circle',
+            cor: 'linear-gradient(135deg, #fb923c, #ea580c)',
+            titulo: 'Itens p/ Responder',
+            valor: String(m.itensPendentesResposta),
+            sub: alertaItens ? 'Itens aguardando sua cotação' : 'Nenhum item pendente'
+        },
+        {
+            icon: 'bi-receipt',
+            cor: 'linear-gradient(135deg, #22d3ee, #0891b2)',
+            titulo: 'Faturamento',
+            valor: String(m.emFaturamento),
+            sub: 'Pedidos em faturamento'
+        },
+        {
+            icon: 'bi-truck',
+            cor: 'linear-gradient(135deg, #4ade80, #16a34a)',
+            titulo: 'Em Trânsito',
+            valor: String(m.emTransito),
+            sub: 'Pedidos a caminho'
+        }
+    ];
+
+    container.innerHTML = cards.map((card) => {
+        const classes = [
+            'kpi-card',
+            card.destaque ? 'kpi-card-destaque' : '',
+            card.acao ? 'kpi-card-acao' : '',
+            card.alerta ? 'kpi-card-alerta' : ''
+        ].filter(Boolean).join(' ');
+
+        const clickAttr = card.onclick ? ` onclick="${card.onclick}" title="${card.sub}"` : '';
+
+        return `
+            <div class="${classes}"${clickAttr}>
+                <div class="kpi-header">
+                    <div class="kpi-icon" style="background: ${card.cor};">
+                        <i class="bi ${card.icon}"></i>
+                    </div>
+                    <div class="kpi-title">${card.titulo}</div>
+                </div>
+                <div class="kpi-value${card.classeExtra ? ' ' + card.classeExtra : ''}">${card.valor}</div>
+                <div class="kpi-sub">${card.sub}</div>
+            </div>
+        `;
+    }).join('');
+}
+
 // Inicializar página
 document.addEventListener('DOMContentLoaded', function() {
+    popularFiltroStatusFornecedor();
     carregarPedidos();
     configurarFiltros();
 });
@@ -1293,7 +1634,11 @@ document.addEventListener('DOMContentLoaded', function() {
 // Configurar filtros
 function configurarFiltros() {
     document.getElementById('filtro-busca').addEventListener('input', aplicarFiltros);
-    document.getElementById('filtro-status').addEventListener('change', aplicarFiltros);
+    document.getElementById('filtro-status').addEventListener('change', function () {
+        filtroStatusCardAtivo = this.value || '';
+        renderizarCardsStatusFornecedor();
+        aplicarFiltros();
+    });
     document.getElementById('filtro-data').addEventListener('change', aplicarFiltros);
 }
 
@@ -1347,17 +1692,10 @@ async function carregarPedidos() {
 }
 
 
-// Atualizar estatísticas
+// Atualizar estatísticas (KPIs + cards por status)
 function atualizarEstatisticas() {
-    const total = pedidosData.length;
-    const pendentes = pedidosData.filter(p => pedidoFornecedorPodeResponder(p.status)).length;
-    const respondidos = pedidosData.filter(p => !pedidoFornecedorPodeResponder(p.status) && normalizarStatusFornecedor(p.status) !== 'cancelado').length;
-    const valorTotal = pedidosData.reduce((sum, p) => sum + calcularValorTotalPedido(p), 0);
-    
-    document.getElementById('total-pedidos').textContent = total;
-    document.getElementById('pedidos-pendentes').textContent = pendentes;
-    document.getElementById('pedidos-respondidos').textContent = respondidos;
-    document.getElementById('valor-total').textContent = `R$ ${valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    renderizarCardsResumoKpiFornecedor();
+    renderizarCardsStatusFornecedor();
 }
 
 // Renderizar pedidos
@@ -1444,9 +1782,6 @@ function renderizarPedidos() {
             <div class="pedido-actions">
                 <button class="btn btn-outline-primary btn-action" onclick="visualizarPedido(${pedido.id})">
                     <i class="bi bi-eye me-2"></i>Visualizar
-                </button>
-                <button class="btn btn-outline-info btn-action" onclick="abrirChatPedido(${pedido.id}, '${pedido.numero}')">
-                    <i class="bi bi-chat-dots me-2"></i>Chat
                 </button>
                 ${pedidoFornecedorPodeResponder(pedido.status) ? `
                     <button class="btn btn-success btn-action" onclick="responderPedido(${pedido.id})">
@@ -1587,34 +1922,6 @@ function visualizarPedido(pedidoId) {
         </div>
         ` : ''}
         
-        <!-- Seção do Chat -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Conversa do Pedido</h6>
-                    </div>
-                    <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                        <div id="chat-conversa-${pedido.id}" class="chat-conversa">
-                            <div class="text-center text-muted">
-                                <i class="bi bi-chat-dots fs-4"></i>
-                                <p class="mb-0">Carregando conversa...</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="nova-mensagem-${pedido.id}" placeholder="Digite sua mensagem..." maxlength="500">
-                            <button class="btn btn-primary" type="button" onclick="enviarMensagemDetalhes(${pedido.id})">
-                                <i class="bi bi-send"></i>
-                            </button>
-                        </div>
-                        <small class="text-muted">Pressione Enter para enviar</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
         <h6 class="mb-3">Itens do Pedido</h6>
         <div class="table-responsive">
             <table class="table table-striped">
@@ -1723,6 +2030,10 @@ function responderPedido(pedidoId = null) {
     document.getElementById('desconto-final-valor').value = '';
     document.getElementById('desconto-final-valor').placeholder = '0,00';
     document.getElementById('subtotal-itens-resposta').value = 'R$ 0,00';
+    const subBrutoEl = document.getElementById('subtotal-bruto-resposta');
+    const descItensEl = document.getElementById('desconto-itens-resposta');
+    if (subBrutoEl) subBrutoEl.value = 'R$ 0,00';
+    if (descItensEl) descItensEl.value = 'R$ 0,00';
     document.getElementById('valor-final-resposta').textContent = 'R$ 0,00';
     document.getElementById('filtro-itens-resposta').value = '';
     atualizarBadgeCsvFornecedor(0);
@@ -1775,16 +2086,17 @@ function responderPedido(pedidoId = null) {
                             <div class="text-muted compact-help">Máx: ${item.quantidade} ${item.unidade}</div>
                         </div>
                         <div class="col-6 col-md-2 compact-field">
-                            <label class="form-label" for="preco-${index}">Preço</label>
+                            <label class="form-label" for="preco-${index}">Preço (bruto)</label>
                             <input type="text" class="form-control form-control-sm price-input" 
                                    id="preco-${index}" 
                                    placeholder="R$ 0,00" 
                                    oninput="aplicarMascaraMoeda(this, ${index})"
                                    onblur="calcularTotalItem(${index})"
                                    onfocus="this.select()">
+                            <div class="text-muted compact-help" id="hint-desconto-item-percentual">−<?php echo htmlspecialchars((string) $descontoFornecedorPercentual); ?>% no total</div>
                         </div>
                         <div class="col-6 col-md-2 compact-field">
-                            <label class="form-label" for="total-${index}">Total</label>
+                            <label class="form-label" for="total-${index}">Total c/ desc.</label>
                             <input type="text" class="form-control form-control-sm" id="total-${index}" readonly>
                         </div>
                         <div class="col-6 col-md-2 compact-field">
@@ -1851,12 +2163,16 @@ function responderPedido(pedidoId = null) {
             }
 
             if (precoInput) {
-                // Priorizar preço já respondido pelo fornecedor, com fallback para preço original
+                // Priorizar preço já respondido (líquido) e converter para bruto no campo
                 const precoRespondido = parseFloat(item.preco_fornecedor);
                 const precoOriginal = parseFloat(item.preco_unitario);
-                const precoParaPreencher = (!Number.isNaN(precoRespondido) && precoRespondido > 0)
-                    ? precoRespondido
-                    : ((!Number.isNaN(precoOriginal) && precoOriginal > 0) ? precoOriginal : 0);
+                let precoParaPreencher = 0;
+
+                if (!Number.isNaN(precoRespondido) && precoRespondido > 0) {
+                    precoParaPreencher = precoBrutoAPartirDoLiquido(precoRespondido);
+                } else if (!Number.isNaN(precoOriginal) && precoOriginal > 0) {
+                    precoParaPreencher = precoOriginal;
+                }
 
                 if (precoParaPreencher > 0) {
                     const valorFormatado = precoParaPreencher.toLocaleString('pt-BR', {
@@ -2283,7 +2599,7 @@ function processarCsvRespostaFornecedor(textoCsv) {
         totalColuna: totalCsvColunaTotal,
         totalCalculado: totalCsvCalculado,
         totalSistema: totalAplicadoSistema,
-        desconto: resumo?.desconto_final_total || 0,
+        desconto: (resumo?.desconto_itens_total || 0) + (resumo?.desconto_final_total || 0),
         valorFinal: resumo?.total_final || totalAplicadoSistema,
         itensAjustados: itensAjustadosSistema
     });
@@ -2391,14 +2707,26 @@ function removerMascaraPercentual(valorFormatado) {
 }
 
 function obterDescontoItem(index, precoUnitario) {
-    const precoFinalUnitario = Math.max(precoUnitario, 0);
+    const preco = Math.max(parseFloat(precoUnitario) || 0, 0);
+    const pct = DESCONTO_PADRAO_ITEM_PERCENTUAL;
+    const descontoUnitario = preco * (pct / 100);
+    const precoFinalUnitario = Math.max(preco - descontoUnitario, 0);
 
     return {
-        desconto_tipo: null,
-        desconto_valor: 0,
-        desconto_unitario: 0,
+        desconto_tipo: 'percentual',
+        desconto_valor: pct,
+        desconto_unitario: descontoUnitario,
         preco_final_unitario: precoFinalUnitario
     };
+}
+
+/** Converte preço líquido (já com desconto) para bruto para exibição no campo. */
+function precoBrutoAPartirDoLiquido(precoLiquido) {
+    const liquido = parseFloat(precoLiquido);
+    if (!Number.isFinite(liquido) || liquido <= 0) return 0;
+    const fator = 1 - (DESCONTO_PADRAO_ITEM_PERCENTUAL / 100);
+    if (fator <= 0) return liquido;
+    return liquido / fator;
 }
 
 function alterarTipoDescontoFinal() {
@@ -2458,10 +2786,14 @@ function aplicarMascaraDescontoFinal(input) {
     calcularResumoFinal();
 }
 
-function obterSubtotalAtualItensRespostaFornecedor(pedido) {
-    if (!pedido || !Array.isArray(pedido.itens)) return 0;
+function obterSubtotaisRespostaFornecedor(pedido) {
+    if (!pedido || !Array.isArray(pedido.itens)) {
+        return { subtotalBruto: 0, descontoItens: 0, subtotalLiquido: 0 };
+    }
 
-    let subtotal = 0;
+    let subtotalBruto = 0;
+    let subtotalLiquido = 0;
+
     for (let i = 0; i < pedido.itens.length; i++) {
         const quantidadeEl = document.getElementById(`quantidade-${i}`);
         const precoEl = document.getElementById(`preco-${i}`);
@@ -2475,10 +2807,19 @@ function obterSubtotalAtualItensRespostaFornecedor(pedido) {
         const quantidade = parseFloat(quantidadeEl.value) || 0;
         const preco = removerMascaraMoeda(precoEl.value);
         const desconto = obterDescontoItem(i, preco);
-        subtotal += quantidade * desconto.preco_final_unitario;
+        subtotalBruto += quantidade * preco;
+        subtotalLiquido += quantidade * desconto.preco_final_unitario;
     }
 
-    return subtotal;
+    return {
+        subtotalBruto,
+        descontoItens: Math.max(subtotalBruto - subtotalLiquido, 0),
+        subtotalLiquido
+    };
+}
+
+function obterSubtotalAtualItensRespostaFornecedor(pedido) {
+    return obterSubtotaisRespostaFornecedor(pedido).subtotalLiquido;
 }
 
 function calcularResumoFinal() {
@@ -2487,7 +2828,8 @@ function calcularResumoFinal() {
     const pedido = pedidosData.find(p => p.id === pedidoAtual.id);
     if (!pedido) return null;
 
-    const subtotal = obterSubtotalAtualItensRespostaFornecedor(pedido);
+    const subtotais = obterSubtotaisRespostaFornecedor(pedido);
+    const subtotal = subtotais.subtotalLiquido;
 
     const descontoFinalTipo = document.getElementById('desconto-final-tipo').value;
     const descontoFinalValorInput = document.getElementById('desconto-final-valor');
@@ -2518,16 +2860,26 @@ function calcularResumoFinal() {
 
     const totalFinal = Math.max(subtotal - descontoFinalTotal, 0);
 
-    document.getElementById('subtotal-itens-resposta').value = subtotal.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    });
+    const subtotalEl = document.getElementById('subtotal-itens-resposta');
+    if (subtotalEl) {
+        subtotalEl.value = subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    const subtotalBrutoEl = document.getElementById('subtotal-bruto-resposta');
+    if (subtotalBrutoEl) {
+        subtotalBrutoEl.value = subtotais.subtotalBruto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    const descontoItensEl = document.getElementById('desconto-itens-resposta');
+    if (descontoItensEl) {
+        descontoItensEl.value = subtotais.descontoItens.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
     document.getElementById('valor-final-resposta').textContent = totalFinal.toLocaleString('pt-BR', {
         style: 'currency',
         currency: 'BRL'
     });
 
     return {
+        subtotal_bruto: subtotais.subtotalBruto,
+        desconto_itens_total: subtotais.descontoItens,
         subtotal_itens: subtotal,
         desconto_final_tipo: descontoFinalTipo || null,
         desconto_final_valor: descontoFinalValor,
@@ -2637,6 +2989,8 @@ async function salvarResposta() {
                 prazo_entrega: prazoEntrega,
                 condicoes_pagamento: condicoesPagamento,
                 itens: itensResposta,
+                subtotal_bruto: resumoFinal?.subtotal_bruto || 0,
+                desconto_itens_total: resumoFinal?.desconto_itens_total || 0,
                 subtotal_itens: resumoFinal?.subtotal_itens || 0,
                 desconto_final_tipo: resumoFinal?.desconto_final_tipo || null,
                 desconto_final_valor: resumoFinal?.desconto_final_valor || 0,
@@ -2650,6 +3004,9 @@ async function salvarResposta() {
             if (data.success) {
                 pedido.status = 'em_cotacao';
                 pedido.observacoes_fornecedor = (observacoes || '').trim();
+                if (resumoFinal?.total_final != null) {
+                    pedido.valor_total = resumoFinal.total_final;
+                }
                 if (Array.isArray(pedido.itens)) {
                     pedido.itens.forEach((item) => {
                         item.novo_pos_resposta = 0;
@@ -2780,520 +3137,7 @@ function calcularValorTotalDetalhesPedido(pedido) {
     }, 0);
 }
 
-// ===== FUNÇÕES DO CHAT =====
-let chatInterval;
-let pedidoIdAtual;
-
-// Carregar mensagens do chat
-async function carregarChat() {
-    if (!pedidoAtual) return;
-    
-    pedidoIdAtual = pedidoAtual.id;
-    
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'listar_mensagens',
-                pedido_id: pedidoIdAtual
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            renderizarMensagens(data.mensagens);
-            marcarMensagensComoLidas();
-            
-            // Iniciar atualização automática
-            if (chatInterval) clearInterval(chatInterval);
-            chatInterval = setInterval(() => {
-                if (document.getElementById('chat').classList.contains('active')) {
-                    carregarNovasMensagens();
-                }
-            }, 3000);
-        }
-    } catch (error) {
-        console.error('Erro ao carregar chat:', error);
-        document.getElementById('chat-messages').innerHTML = `
-            <div class="text-center text-danger">
-                <i class="bi bi-exclamation-triangle fs-1"></i>
-                <p>Erro ao carregar mensagens</p>
-            </div>
-        `;
-    }
-}
-
-// Renderizar mensagens
-function renderizarMensagens(mensagens) {
-    const container = document.getElementById('chat-messages');
-    
-    if (!mensagens || mensagens.length === 0) {
-        container.innerHTML = `
-            <div class="text-center text-muted">
-                <i class="bi bi-chat-dots fs-1"></i>
-                <p>Nenhuma mensagem ainda. Inicie a conversa!</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = mensagens.map(msg => {
-        const isUsuario = msg.tipo_usuario === 'fornecedor';
-        const dataFormatada = new Date(msg.data_envio).toLocaleString('pt-BR');
-        
-        return `
-            <div class="message mb-3 ${isUsuario ? 'text-end' : 'text-start'}">
-                <div class="d-inline-block p-3 rounded ${isUsuario ? 'bg-primary text-white' : 'bg-light'}" style="max-width: 70%;">
-                    <div class="message-content">${msg.mensagem}</div>
-                    <small class="${isUsuario ? 'text-light' : 'text-muted'} d-block mt-1">
-                        ${isUsuario ? 'Você' : 'Cliente'} • ${dataFormatada}
-                    </small>
-                </div>
-            </div>
-        `;
-    }).join('');
-    
-    // Scroll para o final
-    container.scrollTop = container.scrollHeight;
-}
-
-// Carregar apenas novas mensagens
-async function carregarNovasMensagens() {
-    if (!pedidoIdAtual) return;
-    
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'listar_mensagens',
-                pedido_id: pedidoIdAtual
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            renderizarMensagens(data.mensagens);
-            marcarMensagensComoLidas();
-        }
-    } catch (error) {
-        console.error('Erro ao carregar novas mensagens:', error);
-    }
-}
-
-// Enviar mensagem
-async function enviarMensagem() {
-    const input = document.getElementById('nova-mensagem');
-    const mensagem = input.value.trim();
-    
-    if (!mensagem || !pedidoIdAtual) return;
-    
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'enviar_mensagem',
-                pedido_id: pedidoIdAtual,
-                mensagem: mensagem
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            input.value = '';
-            carregarNovasMensagens();
-        } else {
-            Swal.fire('Erro', data.message || 'Erro ao enviar mensagem', 'error');
-        }
-    } catch (error) {
-        console.error('Erro ao enviar mensagem:', error);
-        Swal.fire('Erro', 'Erro ao enviar mensagem. Tente novamente.', 'error');
-    }
-}
-
-// Marcar mensagens como lidas
-async function marcarMensagensComoLidas() {
-    if (!pedidoIdAtual) return;
-    
-    try {
-        await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'marcar_como_lida',
-                pedido_id: pedidoIdAtual
-            })
-        });
-    } catch (error) {
-        console.error('Erro ao marcar mensagens como lidas:', error);
-    }
-}
-
-// ===== FUNÇÕES DO CHAT MODAL =====
-let chatModalInterval;
-let pedidoIdChatModal;
-
-// Abrir chat do pedido
-function abrirChatPedido(pedidoId, numeroPedido) {
-    pedidoIdChatModal = pedidoId;
-    
-    // Atualizar título do modal
-    document.getElementById('chat-pedido-numero').textContent = numeroPedido;
-    
-    // Carregar chat automaticamente
-    setTimeout(() => {
-        carregarChatDetalhes(pedidoId);
-    }, 500);
-    
-    // Abrir modal
-    const modal = new bootstrap.Modal(document.getElementById('modalVisualizarPedido'));
-    modal.show();
-    
-    // Carregar mensagens
-    carregarChatModal();
-}
-
-// Carregar mensagens do chat modal
-async function carregarChatModal() {
-    if (!pedidoIdChatModal) return;
-    
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'listar_mensagens',
-                pedido_id: pedidoIdChatModal
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            renderizarMensagensModal(data.mensagens);
-            marcarMensagensComoLidasModal();
-            
-            // Iniciar atualização automática
-            if (chatModalInterval) clearInterval(chatModalInterval);
-            chatModalInterval = setInterval(() => {
-                carregarNovasMensagensModal();
-            }, 3000);
-        }
-    } catch (error) {
-        console.error('Erro ao carregar chat:', error);
-        document.getElementById('chat-messages-modal').innerHTML = `
-            <div class="text-center text-danger">
-                <i class="bi bi-exclamation-triangle fs-1"></i>
-                <p>Erro ao carregar mensagens</p>
-            </div>
-        `;
-    }
-}
-
-// Renderizar mensagens no modal
-function renderizarMensagensModal(mensagens) {
-    const container = document.getElementById('chat-messages-modal');
-    
-    if (!mensagens || mensagens.length === 0) {
-        container.innerHTML = `
-            <div class="text-center text-muted">
-                <i class="bi bi-chat-dots fs-1"></i>
-                <p>Nenhuma mensagem ainda. Inicie a conversa!</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = mensagens.map(msg => {
-        const isUsuario = msg.tipo_usuario === 'fornecedor';
-        const dataFormatada = new Date(msg.data_envio).toLocaleString('pt-BR');
-        
-        return `
-            <div class="message mb-3 ${isUsuario ? 'text-end' : 'text-start'}">
-                <div class="d-inline-block p-3 rounded ${isUsuario ? 'bg-primary text-white' : 'bg-light'}" style="max-width: 70%;">
-                    <div class="message-content">${msg.mensagem}</div>
-                    <small class="${isUsuario ? 'text-light' : 'text-muted'} d-block mt-1">
-                        ${isUsuario ? 'Você' : 'Cliente'} • ${dataFormatada}
-                    </small>
-                </div>
-            </div>
-        `;
-    }).join('');
-    
-    // Scroll para o final
-    container.scrollTop = container.scrollHeight;
-}
-
-// Carregar apenas novas mensagens no modal
-async function carregarNovasMensagensModal() {
-    if (!pedidoIdChatModal) return;
-    
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'listar_mensagens',
-                pedido_id: pedidoIdChatModal
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            renderizarMensagensModal(data.mensagens);
-            marcarMensagensComoLidasModal();
-        }
-    } catch (error) {
-        console.error('Erro ao carregar novas mensagens:', error);
-    }
-}
-
-// Enviar mensagem no modal
-async function enviarMensagemModal() {
-    const input = document.getElementById('nova-mensagem-modal');
-    const mensagem = input.value.trim();
-    
-    if (!mensagem || !pedidoIdChatModal) return;
-    
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'enviar_mensagem',
-                pedido_id: pedidoIdChatModal,
-                mensagem: mensagem
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            input.value = '';
-            carregarNovasMensagensModal();
-        } else {
-            Swal.fire('Erro', data.message || 'Erro ao enviar mensagem', 'error');
-        }
-    } catch (error) {
-        console.error('Erro ao enviar mensagem:', error);
-        Swal.fire('Erro', 'Erro ao enviar mensagem. Tente novamente.', 'error');
-    }
-}
-
-// Marcar mensagens como lidas no modal
-async function marcarMensagensComoLidasModal() {
-    if (!pedidoIdChatModal) return;
-    
-    try {
-        await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'marcar_como_lida',
-                pedido_id: pedidoIdChatModal
-            })
-        });
-    } catch (error) {
-        console.error('Erro ao marcar mensagens como lidas:', error);
-    }
-}
-
-// Carregar chat nos detalhes do pedido
-async function carregarChatDetalhes(pedidoId) {
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'listar_mensagens',
-                pedido_id: pedidoId
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            renderizarMensagensDetalhes(pedidoId, data.mensagens);
-        }
-    } catch (error) {
-        console.error('Erro ao carregar chat:', error);
-        document.getElementById(`chat-conversa-${pedidoId}`).innerHTML = `
-            <div class="text-center text-danger">
-                <i class="bi bi-exclamation-triangle fs-4"></i>
-                <p class="mb-0">Erro ao carregar conversa</p>
-            </div>
-        `;
-    }
-}
-
-// Renderizar mensagens nos detalhes
-function renderizarMensagensDetalhes(pedidoId, mensagens) {
-    const container = document.getElementById(`chat-conversa-${pedidoId}`);
-    
-    if (!mensagens || mensagens.length === 0) {
-        container.innerHTML = `
-            <div class="text-center text-muted">
-                <i class="bi bi-chat-dots fs-4"></i>
-                <p class="mb-0">Nenhuma mensagem ainda. Inicie a conversa!</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = mensagens.map(msg => {
-        const isUsuario = msg.tipo_usuario === 'fornecedor';
-        const dataFormatada = new Date(msg.data_envio).toLocaleString('pt-BR');
-        
-        return `
-            <div class="message ${isUsuario ? 'message-user' : 'message-other'} mb-2">
-                <div class="message-content p-2 rounded" style="background-color: ${isUsuario ? '#007bff' : '#f8f9fa'}; color: ${isUsuario ? 'white' : 'black'}; max-width: 80%; margin-left: ${isUsuario ? 'auto' : '0'}; margin-right: ${isUsuario ? '0' : 'auto'};">
-                    <div class="message-text">${msg.mensagem}</div>
-                    <div class="message-time small" style="opacity: 0.7; margin-top: 4px;">
-                        ${msg.nome_usuario} - ${dataFormatada}
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-    
-    // Scroll para o final
-    container.scrollTop = container.scrollHeight;
-}
-
-// Enviar mensagem nos detalhes
-async function enviarMensagemDetalhes(pedidoId) {
-    const input = document.getElementById(`nova-mensagem-${pedidoId}`);
-    const mensagem = input.value.trim();
-    
-    if (!mensagem) return;
-    
-    try {
-        const response = await fetch('backend/api/chat-pedidos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'enviar_mensagem',
-                pedido_id: pedidoId,
-                mensagem: mensagem
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            input.value = '';
-            carregarChatDetalhes(pedidoId); // Recarregar mensagens
-        } else {
-            Swal.fire('Erro', data.message || 'Erro ao enviar mensagem', 'error');
-        }
-    } catch (error) {
-        console.error('Erro ao enviar mensagem:', error);
-        Swal.fire('Erro', 'Erro ao enviar mensagem. Tente novamente.', 'error');
-    }
-}
-
-// Event listener para Enter no input de mensagem
 document.addEventListener('DOMContentLoaded', function() {
-    const inputMensagem = document.getElementById('nova-mensagem');
-    if (inputMensagem) {
-        inputMensagem.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                enviarMensagem();
-            }
-        });
-    }
-    
-    // Event listener para Enter no input do modal
-    const inputMensagemModal = document.getElementById('nova-mensagem-modal');
-    if (inputMensagemModal) {
-        inputMensagemModal.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                enviarMensagemModal();
-            }
-        });
-    }
-    
-    // Event listeners para Enter nos inputs de mensagem dos detalhes
-    document.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && e.target.id && e.target.id.startsWith('nova-mensagem-')) {
-            const pedidoId = e.target.id.replace('nova-mensagem-', '');
-            enviarMensagemDetalhes(parseInt(pedidoId));
-        }
-    });
-    
-    // Observer para detectar novos inputs de mensagem criados dinamicamente
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            mutation.addedNodes.forEach(function(node) {
-                if (node.nodeType === 1) { // Element node
-                    const inputs = node.querySelectorAll ? node.querySelectorAll('input[id^="nova-mensagem-"]') : [];
-                    inputs.forEach(function(input) {
-                        input.addEventListener('keypress', function(e) {
-                            if (e.key === 'Enter') {
-                                const pedidoId = input.id.replace('nova-mensagem-', '');
-                                enviarMensagemDetalhes(parseInt(pedidoId));
-                            }
-                        });
-                    });
-                }
-            });
-        });
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-    
-    // Limpar interval quando modal for fechado
-    const modal = document.getElementById('modalVisualizarPedido');
-    if (modal) {
-        modal.addEventListener('hidden.bs.modal', function() {
-            if (chatInterval) {
-                clearInterval(chatInterval);
-                chatInterval = null;
-            }
-        });
-    }
-    
-    // Limpar interval quando modal do chat for fechado
-    const modalChat = document.getElementById('modalChatPedido');
-    if (modalChat) {
-        modalChat.addEventListener('hidden.bs.modal', function() {
-            if (chatModalInterval) {
-                clearInterval(chatModalInterval);
-                chatModalInterval = null;
-            }
-            pedidoIdChatModal = null;
-        });
-    }
-
     const btnImportarCsvResposta = document.getElementById('btn-importar-csv-resposta-fornecedor');
     const inputCsvResposta = document.getElementById('input-csv-resposta-fornecedor');
     if (btnImportarCsvResposta && inputCsvResposta) {

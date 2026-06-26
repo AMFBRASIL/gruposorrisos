@@ -17,6 +17,9 @@ $controllerAcesso->registrarAcessoPagina();
 
 $menuActive = 'pedidos_compra';
 $usuarioEhAdmin = isAdmin();
+
+require_once __DIR__ . '/backend/helpers/pedido_compra_config.php';
+$descontoCotacaoPercentual = obterDescontoFornecedorPercentual();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -778,6 +781,14 @@ $usuarioEhAdmin = isAdmin();
                                 <div class="metric-label">Preço médio</div>
                                 <div class="metric-value" id="view-preco-medio">R$ 0,00</div>
                             </div>
+                            <div class="pedido-metrica-chip d-none" id="view-chip-subtotal-bruto-wrap">
+                                <div class="metric-label">Subtotal bruto</div>
+                                <div class="metric-value" id="view-subtotal-bruto">R$ 0,00</div>
+                            </div>
+                            <div class="pedido-metrica-chip d-none" id="view-chip-desconto-wrap">
+                                <div class="metric-label" id="view-label-desconto-cotacao">Desconto fornecedor</div>
+                                <div class="metric-value text-warning" id="view-desconto-cotacao">R$ 0,00</div>
+                            </div>
                             <div class="pedido-metrica-chip">
                                 <div class="metric-label">Valor total</div>
                                 <div class="metric-value text-success" id="view_valor_total">R$ 0,00</div>
@@ -803,9 +814,17 @@ $usuarioEhAdmin = isAdmin();
                                     <!-- Itens serão carregados aqui -->
                                 </tbody>
                                 <tfoot class="table-light">
+                                    <tr id="view-row-subtotal-bruto" class="d-none">
+                                        <th colspan="5" class="text-end text-muted">Subtotal bruto:</th>
+                                        <th class="text-center text-muted" id="view_itens_subtotal_bruto">R$ 0,00</th>
+                                    </tr>
+                                    <tr id="view-row-desconto-cotacao" class="d-none">
+                                        <th colspan="5" class="text-end text-warning" id="view_itens_label_desconto">Desconto fornecedor:</th>
+                                        <th class="text-center text-warning" id="view_itens_desconto_cotacao">R$ 0,00</th>
+                                    </tr>
                                     <tr>
-                                        <th colspan="5" class="text-end">Total:</th>
-                                        <th class="text-center" id="view_itens_total_footer">R$ 0,00</th>
+                                        <th colspan="5" class="text-end">Total líquido:</th>
+                                        <th class="text-center text-success" id="view_itens_total_footer">R$ 0,00</th>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -1468,6 +1487,9 @@ $usuarioEhAdmin = isAdmin();
 
 <script>
     window.usuarioEhAdmin = <?php echo $usuarioEhAdmin ? 'true' : 'false'; ?>;
+    window.PEDIDOS_CONFIG = {
+        descontoFornecedorPercentual: <?php echo json_encode((float) $descontoCotacaoPercentual); ?>
+    };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
