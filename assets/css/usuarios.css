@@ -480,3 +480,19 @@ body { background: #f7f9fb; }
 @media (max-width: 991px) {
   .row-cols-lg-2 > .col-lg-9, .row-cols-lg-2 > .col-lg-3 { flex: 0 0 100%; max-width: 100%; }
 }
+
+.filiais-usuario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem 1rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.filiais-usuario-grid .form-check {
+  margin-bottom: 0;
+}
+
+.filiais-usuario-grid .form-check-label {
+  font-size: 0.98rem;
+}

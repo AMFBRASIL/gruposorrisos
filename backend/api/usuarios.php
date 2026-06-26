@@ -13,6 +13,7 @@ require_once '../../config/conexao.php';
 require_once '../../models/Usuario.php';
 require_once '../../models/Perfil.php';
 require_once '../../models/Filial.php';
+require_once '../../config/usuario_filiais.php';
 
 try {
     $pdo = Conexao::getInstance()->getPdo();
@@ -47,8 +48,18 @@ try {
             }
             
             if (!empty($filial)) {
-                $where[] = "u.id_filial = ?";
-                $params[] = $filial;
+                $filialId = (int) $filial;
+                if (usuarioFiliaisTabelaExiste($pdo)) {
+                    $where[] = "(u.id_filial = ? OR EXISTS (
+                        SELECT 1 FROM tbl_usuario_filiais uf
+                        WHERE uf.id_usuario = u.id_usuario AND uf.id_filial = ?
+                    ))";
+                    $params[] = $filialId;
+                    $params[] = $filialId;
+                } else {
+                    $where[] = "u.id_filial = ?";
+                    $params[] = $filialId;
+                }
             }
             
             if ($status !== '') {
@@ -82,6 +93,12 @@ try {
             if (!$usuario) {
                 throw new Exception('Usuário não encontrado');
             }
+
+            $filiaisIds = obterIdsFiliaisDoUsuario((int) $id, $pdo);
+            if (empty($filiaisIds) && !empty($usuario['id_filial'])) {
+                $filiaisIds = [(int) $usuario['id_filial']];
+            }
+            $usuario['filiais_ids'] = $filiaisIds;
             
             echo json_encode([
                 'success' => true,
@@ -117,16 +134,9 @@ try {
             }
             
             $senhaOriginal = $input['senha'];
-            
-            $filialRaw = $input['id_filial'] ?? null;
-            if ($filialRaw === '' || $filialRaw === false || $filialRaw === null) {
-                $filialId = null;
-            } else {
-                $filialId = (int)$filialRaw;
-                if ($filialId <= 0) {
-                    $filialId = null;
-                }
-            }
+
+            $filiaisIds = normalizarFiliaisUsuarioInput($input);
+            $filialId = !empty($filiaisIds) ? $filiaisIds[0] : null;
             
             $cpf = isset($input['cpf']) && $input['cpf'] !== '' && $input['cpf'] !== null
                 ? trim((string)$input['cpf'])
@@ -150,6 +160,12 @@ try {
             ];
             
             $id = $usuarioModel->insert($dadosInsert);
+
+            try {
+                salvarFiliaisDoUsuario((int) $id, $filiaisIds, $pdo);
+            } catch (Throwable $e) {
+                error_log('usuarios create filiais: ' . $e->getMessage());
+            }
             
             $perfilNome = 'Usuário';
             $perfil = $perfilModel->findById($dadosInsert['id_perfil']);
@@ -208,14 +224,30 @@ try {
                 }
             }
             
+            $filiaisIds = normalizarFiliaisUsuarioInput($input);
+            unset($input['filiais_ids'], $input['id_filiais']);
+
+            if (array_key_exists('id_filial', $input) || !empty($filiaisIds)) {
+                $input['id_filial'] = !empty($filiaisIds) ? $filiaisIds[0] : null;
+            }
+
             // Se senha foi fornecida, fazer hash
             if (!empty($input['senha'])) {
                 $input['senha'] = password_hash($input['senha'], PASSWORD_DEFAULT);
             } else {
                 unset($input['senha']);
             }
+
+            $camposPermitidos = ['nome_completo', 'email', 'senha', 'cpf', 'telefone', 'id_perfil', 'id_filial', 'ativo'];
+            $dadosUpdate = array_intersect_key($input, array_flip($camposPermitidos));
             
-            $usuarioModel->update($id, $input);
+            $usuarioModel->update($id, $dadosUpdate);
+
+            try {
+                salvarFiliaisDoUsuario((int) $id, $filiaisIds, $pdo);
+            } catch (Throwable $e) {
+                error_log('usuarios update filiais: ' . $e->getMessage());
+            }
             
             echo json_encode([
                 'success' => true,

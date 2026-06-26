@@ -236,22 +236,32 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
 
         .stats-kpi-grid {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
             gap: 1rem;
+        }
+
+        @media (max-width: 991.98px) {
+            .stats-kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .stats-kpi-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .kpi-card {
             background: rgba(255, 255, 255, 0.97);
             backdrop-filter: blur(10px);
             border-radius: 14px;
-            padding: 1rem 1.1rem;
+            padding: 1.1rem 1.25rem;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            flex: 1 1 175px;
-            min-width: 155px;
-            max-width: 240px;
             border: 2px solid transparent;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            cursor: pointer;
         }
 
         .kpi-card:hover {
@@ -259,14 +269,9 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
         }
 
-        .kpi-card.kpi-card-destaque {
-            flex: 1 1 210px;
-            max-width: 280px;
-            border-color: rgba(5, 150, 105, 0.25);
-        }
-
-        .kpi-card.kpi-card-acao {
-            cursor: pointer;
+        .kpi-card.kpi-card-ativo {
+            border-color: #667eea;
+            box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.25);
         }
 
         .kpi-card.kpi-card-alerta {
@@ -681,18 +686,9 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         </div>
     </div>
 
-    <!-- Resumo financeiro / KPIs -->
+    <!-- Cards de ação -->
     <div class="stats-kpi-section">
-        <div class="stats-section-label"><i class="bi bi-graph-up-arrow me-1"></i> Resumo Geral</div>
         <div class="stats-kpi-grid" id="stats-resumo-kpi">
-            <!-- Preenchido via JavaScript -->
-        </div>
-    </div>
-
-    <!-- Cards por status -->
-    <div class="stats-status-section">
-        <div class="stats-section-label"><i class="bi bi-ui-checks-grid me-1"></i> Por Status</div>
-        <div class="stats-grid" id="stats-por-status">
             <!-- Preenchido via JavaScript -->
         </div>
     </div>
@@ -1223,7 +1219,13 @@ const CORES_STATUS_FORNECEDOR = {
     cancelado: 'linear-gradient(135deg, #f87171, #dc2626)'
 };
 
-let filtroStatusCardAtivo = '';
+let filtroGrupoCardAtivo = '';
+
+const GRUPOS_CARD_FORNECEDOR = {
+    a_responder: ['aguardando_cotacao', 'em_cotacao'],
+    a_faturar: ['aguardando_faturamento', 'em_faturamento'],
+    em_transporte: ['em_transito']
+};
 
 function popularFiltroStatusFornecedor() {
     const sel = document.getElementById('filtro-status');
@@ -1241,49 +1243,16 @@ function popularFiltroStatusFornecedor() {
     }
 }
 
-function filtrarPorCardStatus(status) {
-    filtroStatusCardAtivo = status || '';
+function filtrarPorCardGrupo(grupo) {
+    if (grupo === 'todos') {
+        filtroGrupoCardAtivo = '';
+    } else {
+        filtroGrupoCardAtivo = (filtroGrupoCardAtivo === grupo) ? '' : grupo;
+    }
     const sel = document.getElementById('filtro-status');
-    if (sel) sel.value = status || '';
-    renderizarCardsStatusFornecedor();
+    if (sel) sel.value = '';
+    renderizarCardsResumoKpiFornecedor();
     aplicarFiltros();
-}
-
-function renderizarCardsStatusFornecedor() {
-    const container = document.getElementById('stats-por-status');
-    if (!container) return;
-
-    const total = pedidosData.length;
-    const cards = [];
-
-    const totalAtivo = filtroStatusCardAtivo === '' ? ' stat-card-ativo' : '';
-    cards.push(`
-        <div class="stat-card${totalAtivo}" data-status="" onclick="filtrarPorCardStatus('')" title="Ver todos">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
-                <i class="bi bi-collection"></i>
-            </div>
-            <div class="stat-value">${total}</div>
-            <div class="stat-label">Total</div>
-        </div>
-    `);
-
-    STATUS_FORNECEDOR_ORDEM.forEach((status) => {
-        const count = pedidosData.filter(p => normalizarStatusFornecedor(p.status) === status).length;
-        const ativo = filtroStatusCardAtivo === status ? ' stat-card-ativo' : '';
-        const icon = ICONES_STATUS_FORNECEDOR[status] || 'bi-circle';
-        const cor = CORES_STATUS_FORNECEDOR[status] || 'linear-gradient(135deg, #94a3b8, #64748b)';
-        cards.push(`
-            <div class="stat-card${ativo}" data-status="${status}" onclick="filtrarPorCardStatus('${status}')" title="Filtrar: ${LABELS_STATUS_FORNECEDOR[status]}">
-                <div class="stat-icon" style="background: ${cor};">
-                    <i class="bi ${icon}"></i>
-                </div>
-                <div class="stat-value">${count}</div>
-                <div class="stat-label">${LABELS_STATUS_FORNECEDOR[status]}</div>
-            </div>
-        `);
-    });
-
-    container.innerHTML = cards.join('');
 }
 
 function labelStatusFornecedor(status) {
@@ -1459,73 +1428,19 @@ function calcularValorTotalPedido(pedido) {
     return parseFloat(pedido?.valor_total) || 0;
 }
 
-function formatarMoedaResumoFornecedor(valor) {
-    return (parseFloat(valor) || 0).toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    });
-}
-
-const STATUS_PEDIDO_ENCERRADO_FORNECEDOR = ['finalizado', 'cancelado'];
-
 function calcularMetricasResumoFornecedor() {
-    const agora = new Date();
-    const mesAtual = agora.getMonth();
-    const anoAtual = agora.getFullYear();
-
-    let valorTotal = 0;
-    let valorEmAndamento = 0;
-    let valorMesAtual = 0;
-    let pedidosMesAtual = 0;
-    let aguardandoCotacao = 0;
-    let emFaturamento = 0;
-    let emTransito = 0;
-    let itensPendentesResposta = 0;
-    let pedidosComValor = 0;
+    let aResponder = 0;
+    let aFaturar = 0;
+    let emTransporte = 0;
 
     pedidosData.forEach((pedido) => {
-        const valor = calcularValorTotalPedido(pedido);
         const status = normalizarStatusFornecedor(pedido.status);
-
-        valorTotal += valor;
-
-        if (!STATUS_PEDIDO_ENCERRADO_FORNECEDOR.includes(status)) {
-            valorEmAndamento += valor;
-        }
-
-        const dataPedido = pedido.data ? new Date(pedido.data) : null;
-        if (dataPedido && !Number.isNaN(dataPedido.getTime())
-            && dataPedido.getMonth() === mesAtual
-            && dataPedido.getFullYear() === anoAtual) {
-            pedidosMesAtual++;
-            valorMesAtual += valor;
-        }
-
-        if (status === 'aguardando_cotacao') aguardandoCotacao++;
-        if (status === 'em_faturamento' || status === 'aguardando_faturamento') emFaturamento++;
-        if (status === 'em_transito') emTransito++;
-
-        if (pedidoFornecedorPodeResponder(pedido.status)) {
-            itensPendentesResposta += contarItensSemRespostaFornecedor(pedido);
-        }
-
-        if (valor > 0) pedidosComValor++;
+        if (GRUPOS_CARD_FORNECEDOR.a_responder.includes(status)) aResponder++;
+        if (GRUPOS_CARD_FORNECEDOR.a_faturar.includes(status)) aFaturar++;
+        if (GRUPOS_CARD_FORNECEDOR.em_transporte.includes(status)) emTransporte++;
     });
 
-    const ticketMedio = pedidosComValor > 0 ? valorTotal / pedidosComValor : 0;
-
-    return {
-        valorTotal,
-        valorEmAndamento,
-        valorMesAtual,
-        pedidosMesAtual,
-        aguardandoCotacao,
-        emFaturamento,
-        emTransito,
-        itensPendentesResposta,
-        ticketMedio,
-        totalPedidos: pedidosData.length
-    };
+    return { total: pedidosData.length, aResponder, aFaturar, emTransporte };
 }
 
 function renderizarCardsResumoKpiFornecedor() {
@@ -1533,91 +1448,57 @@ function renderizarCardsResumoKpiFornecedor() {
     if (!container) return;
 
     const m = calcularMetricasResumoFornecedor();
-    const alertaItens = m.itensPendentesResposta > 0;
 
     const cards = [
         {
-            destaque: true,
-            icon: 'bi-currency-dollar',
-            cor: 'linear-gradient(135deg, #34d399, #059669)',
-            titulo: 'Valor Total',
-            valor: formatarMoedaResumoFornecedor(m.valorTotal),
-            sub: `${m.totalPedidos} pedido(s) no total`,
-            classeExtra: 'kpi-valor-destaque'
+            grupo: 'todos',
+            icon: 'bi-collection',
+            cor: 'linear-gradient(135deg, #667eea, #764ba2)',
+            titulo: 'Todos',
+            valor: String(m.total),
+            sub: 'Ver todos os pedidos'
         },
         {
-            icon: 'bi-arrow-repeat',
-            cor: 'linear-gradient(135deg, #60a5fa, #2563eb)',
-            titulo: 'Em Andamento',
-            valor: formatarMoedaResumoFornecedor(m.valorEmAndamento),
-            sub: 'Pedidos ainda não finalizados'
-        },
-        {
-            icon: 'bi-calculator',
-            cor: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
-            titulo: 'Ticket Médio',
-            valor: formatarMoedaResumoFornecedor(m.ticketMedio),
-            sub: 'Valor médio por pedido'
-        },
-        {
-            icon: 'bi-calendar-month',
-            cor: 'linear-gradient(135deg, #38bdf8, #0284c7)',
-            titulo: 'Este Mês',
-            valor: String(m.pedidosMesAtual),
-            sub: formatarMoedaResumoFornecedor(m.valorMesAtual) + ' em pedidos'
-        },
-        {
-            acao: true,
-            icon: 'bi-inbox',
+            grupo: 'a_responder',
+            icon: 'bi-pencil-square',
             cor: 'linear-gradient(135deg, #fbbf24, #d97706)',
-            titulo: 'Aguard. Cotação',
-            valor: String(m.aguardandoCotacao),
-            sub: 'Clique para filtrar',
-            onclick: "filtrarPorCardStatus('aguardando_cotacao')"
+            titulo: 'A responder',
+            valor: String(m.aResponder),
+            sub: 'Aguardando cotação ou em cotação'
         },
         {
-            alerta: alertaItens,
-            icon: 'bi-exclamation-circle',
-            cor: 'linear-gradient(135deg, #fb923c, #ea580c)',
-            titulo: 'Itens p/ Responder',
-            valor: String(m.itensPendentesResposta),
-            sub: alertaItens ? 'Itens aguardando sua cotação' : 'Nenhum item pendente'
-        },
-        {
+            grupo: 'a_faturar',
             icon: 'bi-receipt',
-            cor: 'linear-gradient(135deg, #22d3ee, #0891b2)',
-            titulo: 'Faturamento',
-            valor: String(m.emFaturamento),
-            sub: 'Pedidos em faturamento'
+            cor: 'linear-gradient(135deg, #38bdf8, #0284c7)',
+            titulo: 'A faturar',
+            valor: String(m.aFaturar),
+            sub: 'Aguardando ou em faturamento'
         },
         {
+            grupo: 'em_transporte',
             icon: 'bi-truck',
             cor: 'linear-gradient(135deg, #4ade80, #16a34a)',
-            titulo: 'Em Trânsito',
-            valor: String(m.emTransito),
+            titulo: 'Em transporte',
+            valor: String(m.emTransporte),
             sub: 'Pedidos a caminho'
         }
     ];
 
     container.innerHTML = cards.map((card) => {
-        const classes = [
-            'kpi-card',
-            card.destaque ? 'kpi-card-destaque' : '',
-            card.acao ? 'kpi-card-acao' : '',
-            card.alerta ? 'kpi-card-alerta' : ''
-        ].filter(Boolean).join(' ');
-
-        const clickAttr = card.onclick ? ` onclick="${card.onclick}" title="${card.sub}"` : '';
+        const ativo = (card.grupo === 'todos' && filtroGrupoCardAtivo === '') || filtroGrupoCardAtivo === card.grupo
+            ? ' kpi-card-ativo'
+            : '';
+        const alerta = card.grupo === 'a_responder' && m.aResponder > 0 ? ' kpi-card-alerta' : '';
 
         return `
-            <div class="${classes}"${clickAttr}>
+            <div class="kpi-card${ativo}${alerta}" onclick="filtrarPorCardGrupo('${card.grupo}')" title="Clique para filtrar">
                 <div class="kpi-header">
                     <div class="kpi-icon" style="background: ${card.cor};">
                         <i class="bi ${card.icon}"></i>
                     </div>
                     <div class="kpi-title">${card.titulo}</div>
                 </div>
-                <div class="kpi-value${card.classeExtra ? ' ' + card.classeExtra : ''}">${card.valor}</div>
+                <div class="kpi-value">${card.valor}</div>
                 <div class="kpi-sub">${card.sub}</div>
             </div>
         `;
@@ -1635,8 +1516,8 @@ document.addEventListener('DOMContentLoaded', function() {
 function configurarFiltros() {
     document.getElementById('filtro-busca').addEventListener('input', aplicarFiltros);
     document.getElementById('filtro-status').addEventListener('change', function () {
-        filtroStatusCardAtivo = this.value || '';
-        renderizarCardsStatusFornecedor();
+        filtroGrupoCardAtivo = '';
+        renderizarCardsResumoKpiFornecedor();
         aplicarFiltros();
     });
     document.getElementById('filtro-data').addEventListener('change', aplicarFiltros);
@@ -1692,10 +1573,9 @@ async function carregarPedidos() {
 }
 
 
-// Atualizar estatísticas (KPIs + cards por status)
+// Atualizar estatísticas (cards de ação)
 function atualizarEstatisticas() {
     renderizarCardsResumoKpiFornecedor();
-    renderizarCardsStatusFornecedor();
 }
 
 // Renderizar pedidos
@@ -1824,7 +1704,10 @@ function filtrarPedidos() {
         );
     }
     
-    if (status) {
+    if (filtroGrupoCardAtivo && GRUPOS_CARD_FORNECEDOR[filtroGrupoCardAtivo]) {
+        const statusesGrupo = GRUPOS_CARD_FORNECEDOR[filtroGrupoCardAtivo];
+        filtrados = filtrados.filter(p => statusesGrupo.includes(normalizarStatusFornecedor(p.status)));
+    } else if (status) {
         filtrados = filtrados.filter(p => normalizarStatusFornecedor(p.status) === status || p.status === status);
     }
     

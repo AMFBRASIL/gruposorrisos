@@ -241,13 +241,26 @@ try {
             <div class="fw-semibold mb-2" style="color:#2563eb;"><i class="bi bi-building me-2"></i>Dados do Departamento</div>
             <div class="row g-3 mb-2">
               <div class="col-md-12">
-                <label class="form-label">Filial</label>
-                <select class="form-select" id="filialUsuario">
-                    <option value="">Selecione a filial</option>
-                    <?php foreach ($filiais as $filial): ?>
-                        <option value="<?= $filial['id_filial'] ?>"><?= htmlspecialchars($filial['nome_filial']) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <label class="form-label">Unidades de acesso</label>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <small class="text-muted">Selecione uma ou mais unidades que o usuário poderá acessar</small>
+                  <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary" onclick="marcarTodasFiliaisUsuario('filiaisUsuarioContainer', true)">Marcar todas</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="marcarTodasFiliaisUsuario('filiaisUsuarioContainer', false)">Limpar</button>
+                  </div>
+                </div>
+                <div id="filiaisUsuarioContainer" class="filiais-usuario-grid border rounded p-3 bg-light">
+                  <?php foreach ($filiais as $filialItem): ?>
+                    <div class="form-check">
+                      <input class="form-check-input filial-usuario-check" type="checkbox"
+                             value="<?= (int) $filialItem['id_filial'] ?>"
+                             id="filial_novo_<?= (int) $filialItem['id_filial'] ?>">
+                      <label class="form-check-label" for="filial_novo_<?= (int) $filialItem['id_filial'] ?>">
+                        <?= htmlspecialchars($filialItem['nome_filial']) ?>
+                      </label>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
               </div>
             </div>
           </div>
@@ -342,13 +355,26 @@ try {
             <div class="fw-semibold mb-2" style="color:#2563eb;"><i class="bi bi-building me-2"></i>Dados do Departamento</div>
             <div class="row g-3 mb-2">
               <div class="col-md-12">
-                <label class="form-label">Filial</label>
-                <select class="form-select" id="editFilialUsuario">
-                    <option value="">Selecione a filial</option>
-                    <?php foreach ($filiais as $filial): ?>
-                        <option value="<?= $filial['id_filial'] ?>"><?= htmlspecialchars($filial['nome_filial']) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <label class="form-label">Unidades de acesso</label>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <small class="text-muted">Selecione uma ou mais unidades que o usuário poderá acessar</small>
+                  <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary" onclick="marcarTodasFiliaisUsuario('filiaisEditUsuarioContainer', true)">Marcar todas</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="marcarTodasFiliaisUsuario('filiaisEditUsuarioContainer', false)">Limpar</button>
+                  </div>
+                </div>
+                <div id="filiaisEditUsuarioContainer" class="filiais-usuario-grid border rounded p-3 bg-light">
+                  <?php foreach ($filiais as $filialItem): ?>
+                    <div class="form-check">
+                      <input class="form-check-input filial-usuario-check" type="checkbox"
+                             value="<?= (int) $filialItem['id_filial'] ?>"
+                             id="filial_edit_<?= (int) $filialItem['id_filial'] ?>">
+                      <label class="form-check-label" for="filial_edit_<?= (int) $filialItem['id_filial'] ?>">
+                        <?= htmlspecialchars($filialItem['nome_filial']) ?>
+                      </label>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
               </div>
             </div>
           </div>
@@ -367,9 +393,35 @@ try {
 
 <script>
 document.querySelector('.btn.btn-primary.btn-action').addEventListener('click', function() {
+  marcarTodasFiliaisUsuario('filiaisUsuarioContainer', false);
   var modal = new bootstrap.Modal(document.getElementById('modalNovoPerfil'));
   modal.show();
 });
+
+function obterFiliaisSelecionadasContainer(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('.filial-usuario-check:checked'))
+        .map(cb => parseInt(cb.value, 10))
+        .filter(id => id > 0);
+}
+
+function definirFiliaisSelecionadasContainer(containerId, ids) {
+    const selecionadas = new Set((ids || []).map(id => parseInt(id, 10)));
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.filial-usuario-check').forEach(cb => {
+        cb.checked = selecionadas.has(parseInt(cb.value, 10));
+    });
+}
+
+function marcarTodasFiliaisUsuario(containerId, marcar) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.filial-usuario-check').forEach(cb => {
+        cb.checked = marcar;
+    });
+}
 
 function atualizarTextoStat(id, valor) {
     const el = document.getElementById(id);
@@ -550,8 +602,12 @@ async function carregarDadosUsuario(id) {
             document.getElementById('editCpfUsuario').value = usuario.cpf || '';
             document.getElementById('editTelefoneUsuario').value = usuario.telefone || '';
             document.getElementById('editPerfilUsuario').value = usuario.id_perfil || '';
-            document.getElementById('editFilialUsuario').value = usuario.id_filial || '';
             document.getElementById('editStatusUsuario').value = usuario.ativo || '1';
+
+            const filiaisIds = (usuario.filiais_ids && usuario.filiais_ids.length)
+                ? usuario.filiais_ids
+                : (usuario.id_filial ? [usuario.id_filial] : []);
+            definirFiliaisSelecionadasContainer('filiaisEditUsuarioContainer', filiaisIds);
             
             // Limpar campos de senha
             document.getElementById('editSenhaUsuario').value = '';
@@ -616,7 +672,7 @@ async function atualizarUsuario(event) {
         cpf: document.getElementById('editCpfUsuario').value.trim() || null,
         telefone: document.getElementById('editTelefoneUsuario').value.trim() || null,
         id_perfil: perfil,
-        id_filial: document.getElementById('editFilialUsuario').value || null,
+        filiais_ids: obterFiliaisSelecionadasContainer('filiaisEditUsuarioContainer'),
         ativo: document.getElementById('editStatusUsuario').value
     };
     
@@ -765,7 +821,7 @@ async function salvarUsuario(event) {
         cpf: document.getElementById('cpfUsuario').value.trim() || null,
         telefone: document.getElementById('telefoneUsuario').value.trim() || null,
         id_perfil: perfil,
-        id_filial: document.getElementById('filialUsuario').value || null,
+        filiais_ids: obterFiliaisSelecionadasContainer('filiaisUsuarioContainer'),
         ativo: document.getElementById('statusUsuario').value
     };
     
@@ -818,6 +874,7 @@ async function salvarUsuario(event) {
             
             // Limpar formulário
             document.getElementById('formUsuario').reset();
+            marcarTodasFiliaisUsuario('filiaisUsuarioContainer', false);
             
             // Recarregar lista
             carregarUsuarios();

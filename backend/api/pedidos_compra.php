@@ -125,8 +125,14 @@ try {
                     break;
                     
                 case 'stats':
-                    $fidStats = isset($_GET['filial_id']) ? (int) $_GET['filial_id'] : 0;
-                    $stats = $pedidoCompra->getEstatisticas($fidStats > 0 ? $fidStats : null);
+                    try {
+                        $fidStats = resolverFilialIdRequisicao($pdoPedidos);
+                    } catch (Exception $e) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                        break;
+                    }
+                    $stats = $pedidoCompra->getEstatisticas($fidStats);
                     echo json_encode(['success' => true, 'stats' => $stats]);
                     break;
                     

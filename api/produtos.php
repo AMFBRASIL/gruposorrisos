@@ -7,6 +7,7 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 require_once '../config/config.php';
 require_once '../config/session.php';
 require_once '../config/conexao.php';
+require_once '../config/filiais_usuario.php';
 
 // Verificar se o usuário está logado
 if (!isLoggedIn()) {
@@ -63,11 +64,8 @@ try {
  * Obtém estatísticas do dashboard
  */
 function getDashboardStats($pdo) {
-    // IMPORTANTE: Priorizar filial_id da URL (filial selecionada pelo usuário) sobre a da sessão
-    $filialId = $_GET['filial_id'] ?? getCurrentUserFilialId();
-    if ($filialId) {
-        $filialId = (int)$filialId;
-    }
+    // Prioriza filial selecionada no index; valida contra unidades permitidas
+    $filialId = resolverFilialIdRequisicao($pdo);
     
     error_log('📊 getDashboardStats: Filial ID = ' . ($filialId ?? 'NULL'));
     
@@ -174,11 +172,7 @@ function getDashboardStats($pdo) {
  * Obtém produtos com estoque baixo
  */
 function getProdutosEstoqueBaixo($pdo) {
-    // IMPORTANTE: Priorizar filial_id da URL (filial selecionada pelo usuário) sobre a da sessão
-    $filialId = $_GET['filial_id'] ?? getCurrentUserFilialId();
-    if ($filialId) {
-        $filialId = (int)$filialId;
-    }
+    $filialId = resolverFilialIdRequisicao($pdo);
     error_log('🔍 getProdutosEstoqueBaixo: Filial ID = ' . ($filialId ?? 'NULL'));
     
     // IMPORTANTE: Usar COALESCE para priorizar estoque_minimo da filial sobre valores padrão

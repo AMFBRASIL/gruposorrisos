@@ -81,7 +81,6 @@ function listarFiliais() {
     
     // Verificar se é uma requisição do seletor (sem parâmetros de paginação)
     $isSelector = !isset($_GET['pagina']) && !isset($_GET['por_pagina']);
-    $filialUsuarioId = getCurrentUserFilialId();
     
     // Parâmetros de paginação e filtros
     $pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
@@ -121,12 +120,35 @@ function listarFiliais() {
         $params[] = $tipo;
     }
 
-    // Seletor do dashboard: mesma regra de filiais_usuario.php
-    if ($isSelector && !isAdmin()) {
-        $filialUsuarioId = (int) (getCurrentUserFilialId() ?? 0);
-        if ($filialUsuarioId > 0) {
-            $where[] = "id_filial = ?";
-            $params[] = $filialUsuarioId;
+    // Seletor do dashboard (index): unidades permitidas ao usuário (1 ou mais)
+    if ($isSelector) {
+        $permitidas = obterFiliaisPermitidasUsuario($pdo);
+        $idsPermitidos = array_values(array_unique(array_filter(array_map(function ($f) {
+            return (int) ($f['id_filial'] ?? 0);
+        }, $permitidas))));
+
+        if (empty($idsPermitidos)) {
+            echo json_encode([
+                'success' => true,
+                'filiais' => [],
+                'total' => 0,
+                'pagina' => 1,
+                'por_pagina' => 10,
+                'total_paginas' => 1,
+                'indicadores' => [
+                    'total' => 0,
+                    'ativas' => 0,
+                    'inativas' => 0,
+                    'funcionarios' => 0,
+                ],
+            ]);
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($idsPermitidos), '?'));
+        $where[] = "id_filial IN ($placeholders)";
+        foreach ($idsPermitidos as $idPermitido) {
+            $params[] = $idPermitido;
         }
     }
     

@@ -68,6 +68,20 @@ async function carregarSeletorFiliais() {
                     filialSelecionada = null;
                     localStorage.removeItem('filialSelecionada');
                 }
+
+                // Uma única unidade: seleciona automaticamente
+                if (filiais.length === 1 && !filialSelecionada) {
+                    filialSelecionada = filiais[0].id;
+                    localStorage.setItem('filialSelecionada', filialSelecionada);
+                }
+
+                // Filial principal da sessão, se estiver entre as permitidas
+                const filialSessao = typeof window.USUARIO_FILIAL_ID === 'number' ? window.USUARIO_FILIAL_ID : null;
+                if (!filialSelecionada && filialSessao && filiais.some(f => f.id === filialSessao)) {
+                    filialSelecionada = filialSessao;
+                    localStorage.setItem('filialSelecionada', filialSelecionada);
+                }
+
                 renderizarSeletorFiliais();
             } else {
                 console.error('❌ Erro na resposta:', data);
