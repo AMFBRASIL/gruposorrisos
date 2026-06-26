@@ -18,7 +18,7 @@ define('DB_PASS', getenv('DB_PASS') ?: 'YeKcbHEBYnittDWc');
 #define('DB_HOST', getenv('DB_HOST') ?: '72.61.59.152');
 #define('DB_NAME', getenv('DB_NAME') ?: 'gruposhomolog');
 #define('DB_USER', getenv('DB_USER') ?: 'GrupoSHomolog');#
-define('DB_PASS', getenv('DB_PASS') ?: 'n2Ga3bPPDBr5Wn4e');
+#define('DB_PASS', getenv('DB_PASS') ?: 'n2Ga3bPPDBr5Wn4e');
 
 
 
