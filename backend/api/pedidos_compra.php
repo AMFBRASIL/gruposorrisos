@@ -40,6 +40,7 @@ try {
         require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
         require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
         require_once __DIR__ . '/../../config/filiais_usuario.php';
+        require_once __DIR__ . '/../../config/pedido_permissoes.php';
     } else {
         require_once '../../config/conexao.php';
         require_once '../../config/session.php';
@@ -47,6 +48,7 @@ try {
         require_once __DIR__ . '/../helpers/nf_pedido_metadados.php';
         require_once __DIR__ . '/../helpers/fluxo_pedido_compra.php';
         require_once __DIR__ . '/../../config/filiais_usuario.php';
+        require_once __DIR__ . '/../../config/pedido_permissoes.php';
     }
 } catch (Exception $e) {
     http_response_code(500);
@@ -92,6 +94,23 @@ try {
                         'data_inicio' => $_GET['data_inicio'] ?? '',
                         'data_fim' => $_GET['data_fim'] ?? ''
                     ];
+
+                    $statusVisiveis = pedidoPermissoesStatusSqlVisiveis($pdoPedidos);
+                    if ($statusVisiveis !== null) {
+                        if (empty($statusVisiveis)) {
+                            echo json_encode([
+                                'success' => true,
+                                'data' => [
+                                    'pedidos' => [],
+                                    'total' => 0,
+                                    'paginas' => 0,
+                                    'pagina_atual' => (int) $pagina,
+                                ],
+                            ]);
+                            break;
+                        }
+                        $filtros['status_visiveis'] = $statusVisiveis;
+                    }
                     
                     $resultado = $pedidoCompra->findWithFilters($filtros, $pagina, $limit);
                     echo json_encode(['success' => true, 'data' => $resultado]);
@@ -107,6 +126,13 @@ try {
                     
                     $pedido = $pedidoCompra->findByIdWithRelations($id);
                     if ($pedido) {
+                        try {
+                            pedidoPermissoesExigirVer($pedido['status'] ?? '', $pdoPedidos);
+                        } catch (Exception $permEx) {
+                            http_response_code(403);
+                            echo json_encode(['success' => false, 'error' => $permEx->getMessage()]);
+                            break;
+                        }
                         $itens = $pedidoCompra->buscarItens($id);
                         $pedido['itens'] = $itens;
 
@@ -265,7 +291,15 @@ try {
                         echo json_encode(['success' => false, 'error' => 'Sem permissão para criar pedido nesta clínica']);
                         break;
                     }
-                    
+
+                    try {
+                        pedidoPermissoesExigirEditar('aguardando_cotacao', $pdoPedidos);
+                    } catch (Exception $permEx) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => $permEx->getMessage()]);
+                        break;
+                    }
+
                     $dados = [
                         'id_fornecedor' => $input['id_fornecedor'] ?? null,
                         'id_filial' => $idFilialPedido,
@@ -338,6 +372,21 @@ try {
                             echo json_encode(['success' => false, 'error' => 'ID do pedido e novo status são obrigatórios']);
                             break;
                         }
+
+                        $pedidoAtual = $pedidoCompra->findById($id_pedido);
+                        if (!$pedidoAtual) {
+                            http_response_code(404);
+                            echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                            break;
+                        }
+
+                        try {
+                            pedidoPermissoesValidarMudancaStatus($pedidoAtual['status'] ?? '', $novo_status, $pdoPedidos);
+                        } catch (Exception $permEx) {
+                            http_response_code(403);
+                            echo json_encode(['success' => false, 'error' => $permEx->getMessage()]);
+                            break;
+                        }
                         
                         $resultado = $pedidoCompra->atualizarStatus($id_pedido, $novo_status, $observacao);
                         
@@ -390,6 +439,14 @@ try {
                     if (!in_array($statusAtualNorm, ['aguardando_cotacao', 'em_cotacao'], true)) {
                         http_response_code(400);
                         echo json_encode(['success' => false, 'error' => 'Este pedido não pode mais ser editado na fase atual do fluxo']);
+                        break;
+                    }
+
+                    try {
+                        pedidoPermissoesExigirEditar($pedidoAtual['status'] ?? '', $pdoPedidos);
+                    } catch (Exception $permEx) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'error' => $permEx->getMessage()]);
                         break;
                     }
 
@@ -448,6 +505,14 @@ try {
                         if (!$pedidoAtual) {
                             http_response_code(404);
                             echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                            break;
+                        }
+
+                        try {
+                            pedidoPermissoesValidarMudancaStatus($pedidoAtual['status'] ?? '', $novoStatus, $pdoPedidos);
+                        } catch (Exception $permEx) {
+                            http_response_code(403);
+                            echo json_encode(['success' => false, 'error' => $permEx->getMessage()]);
                             break;
                         }
 

@@ -224,10 +224,79 @@ function normalizarStatusPedido(status) {
     return MAPA_STATUS_LEGADO[s] || s;
 }
 
+function pedidoPermissaoBypass() {
+    const p = window.PEDIDO_PERMISSOES || {};
+    return p.bypass === true || p.legacy_full === true;
+}
+
+function pedidoPermissaoFlag(status, flag) {
+    if (pedidoPermissaoBypass()) return true;
+    const s = normalizarStatusPedido(status);
+    const mapa = (window.PEDIDO_PERMISSOES && window.PEDIDO_PERMISSOES.status) ? window.PEDIDO_PERMISSOES.status : {};
+    const row = mapa[s];
+    if (!row) return false;
+    return !!row[flag];
+}
+
 function pedidoPodeSerEditado(status) {
     const s = normalizarStatusPedido(status);
-    const editaveis = ['aguardando_cotacao', 'em_cotacao'];
-    return editaveis.includes(s);
+    if (!pedidoPermissaoFlag(s, 'pode_ver')) return false;
+    if (!pedidoPermissaoFlag(s, 'pode_editar')) return false;
+    const editaveisFluxo = ['aguardando_cotacao', 'em_cotacao'];
+    return editaveisFluxo.includes(s);
+}
+
+function pedidoPodeCriarNovo() {
+    return pedidoPermissaoFlag('aguardando_cotacao', 'pode_editar');
+}
+
+function pedidoFluxoStatusSomenteLeitura(statusAtual) {
+    if (pedidoPermissaoBypass()) return false;
+    const s = normalizarStatusPedido(statusAtual);
+    return !pedidoPermissaoFlag(s, 'pode_avancar');
+}
+
+function pedidoAtualizarSubtituloFluxoStatus(statusAtual) {
+    const el = document.getElementById('fluxo-status-subtitulo');
+    if (!el) return;
+    el.textContent = pedidoFluxoStatusSomenteLeitura(statusAtual)
+        ? 'Somente visualização — sem permissão para alterar o andamento'
+        : 'Clique na próxima etapa para avançar ou use os botões abaixo';
+}
+
+function pedidoValidarMudancaStatus(statusAtual, statusNovo) {
+    const atual = normalizarStatusPedido(statusAtual);
+    const novo = normalizarStatusPedido(statusNovo);
+
+    if (novo === 'cancelado') {
+        if (!pedidoPermissaoFlag(atual, 'pode_cancelar')) {
+            return 'Sem permissão para cancelar pedidos nesta situação.';
+        }
+        return null;
+    }
+
+    const ordem = FLUXO_PEDIDO_ETAPAS.map(e => e.key);
+    const idxAtual = ordem.indexOf(atual);
+    const idxNovo = ordem.indexOf(novo);
+
+    if (idxAtual >= 0 && idxNovo >= 0 && idxNovo < idxAtual) {
+        if (!pedidoPermissaoFlag(atual, 'pode_voltar')) {
+            return 'Sem permissão para voltar o status nesta situação.';
+        }
+        return null;
+    }
+
+    if (!pedidoPermissaoFlag(atual, 'pode_avancar')) {
+        return 'Sem permissão para avançar pedidos nesta situação.';
+    }
+
+    return null;
+}
+
+function pedidoToggleVoltarStatusBotoes(visivel) {
+    ['btn-voltar-status', 'btn-voltar-status-historico', 'btn-voltar-status-historico-completo'].forEach(id => {
+        document.getElementById(id)?.classList.toggle('d-none', !visivel);
+    });
 }
 
 /** Admin pode reverter em qualquer status, inclusive recebido (estorna estoque e apaga o pedido). */
@@ -957,6 +1026,12 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarFornecedores();
     carregarFiliais();
     carregarMateriais();
+
+    if (!pedidoPodeCriarNovo()) {
+        document.querySelectorAll('[onclick*="abrirModalNovoPedido"]').forEach(btn => {
+            btn.style.display = 'none';
+        });
+    }
     
     // Event listeners
     document.getElementById('busca').addEventListener('input', debounce(function() {
@@ -1083,7 +1158,9 @@ function renderizarTabela(pedidos) {
             row.className = classeRow;
         }
         
-        const podeEditarPedido = pedidoPodeSerEditado(pedido.status);
+        const statusNorm = normalizarStatusPedido(pedido.status);
+        const temPermEditar = pedidoPermissaoFlag(statusNorm, 'pode_editar');
+        const podeEditarPedido = temPermEditar && pedidoPodeSerEditado(pedido.status);
         const clinicaComCnpj = [pedido.nome_filial || 'N/A', pedido.cnpj_filial || '']
             .filter(Boolean)
             .join(' - ');
@@ -1103,11 +1180,13 @@ function renderizarTabela(pedidos) {
                 <button class="btn btn-sm btn-outline-primary btn-action-simple" onclick="visualizarPedido(${pedido.id_pedido})" title="Visualizar">
                     <i class="bi bi-eye"></i>
                 </button>
+                ${temPermEditar ? `
                 <button class="btn btn-sm ${podeEditarPedido ? 'btn-outline-success' : 'btn-outline-warning'} btn-action-simple"
                         onclick="${podeEditarPedido ? `editarPedido(${pedido.id_pedido})` : `mostrarModalEdicaoBloqueada(${pedido.id_pedido})`}"
                         title="${podeEditarPedido ? 'Editar' : 'Edição bloqueada'}">
                     <i class="bi bi-pencil"></i>
                 </button>
+                ` : ''}
                 ${podeEditarPedido ? `
                 <button class="btn btn-sm btn-outline-danger btn-action-simple" onclick="excluirPedido(${pedido.id_pedido})" title="Excluir">
                     <i class="bi bi-trash"></i>
@@ -2478,9 +2557,10 @@ async function visualizarPedido(id) {
             
             const btnEditarPedido = document.getElementById('btn-editar-pedido');
             if (btnEditarPedido) {
-                btnEditarPedido.classList.remove('d-none');
+                const temPermEditar = pedidoPermissaoFlag(pedido.status, 'pode_editar');
+                btnEditarPedido.classList.toggle('d-none', !temPermEditar);
                 btnEditarPedido.classList.toggle('btn-primary', pedidoPodeSerEditado(pedido.status));
-                btnEditarPedido.classList.toggle('btn-warning', !pedidoPodeSerEditado(pedido.status));
+                btnEditarPedido.classList.toggle('btn-warning', temPermEditar && !pedidoPodeSerEditado(pedido.status));
             }
             
             // Carregar fluxo de status
@@ -3671,43 +3751,67 @@ function configurarBotoesAcao(status) {
             document.getElementById(id)?.classList.add('d-none');
         });
         
+        const podeVoltar = pedidoPermissaoFlag(s, 'pode_voltar');
+        pedidoToggleVoltarStatusBotoes(podeVoltar);
+
         switch (s) {
             case 'aguardando_cotacao':
-                document.getElementById('btn-iniciar-cotacao')?.classList.remove('d-none');
-                document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                if (pedidoPermissaoFlag(s, 'pode_avancar')) {
+                    document.getElementById('btn-iniciar-cotacao')?.classList.remove('d-none');
+                }
+                if (pedidoPermissaoFlag(s, 'pode_cancelar')) {
+                    document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                }
                 break;
             case 'em_cotacao':
-                document.getElementById('btn-enviar-aprovacao-socio')?.classList.remove('d-none');
-                document.getElementById('btn-cancelar')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
+                if (pedidoPermissaoFlag(s, 'pode_avancar')) {
+                    document.getElementById('btn-enviar-aprovacao-socio')?.classList.remove('d-none');
+                }
+                if (pedidoPermissaoFlag(s, 'pode_cancelar')) {
+                    document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                }
                 break;
             case 'aguardando_aprovacao_socio':
-                document.getElementById('btn-aprovar-socio')?.classList.remove('d-none');
-                document.getElementById('btn-cancelar')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
+                if (pedidoPermissaoFlag(s, 'pode_avancar')) {
+                    document.getElementById('btn-aprovar-socio')?.classList.remove('d-none');
+                }
+                if (pedidoPermissaoFlag(s, 'pode_cancelar')) {
+                    document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                }
                 break;
             case 'aprovado_socio':
             case 'aguardando_faturamento':
-                document.getElementById('btn-encaminhar-faturamento')?.classList.remove('d-none');
-                document.getElementById('btn-cancelar')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
+                if (pedidoPermissaoFlag(s, 'pode_avancar')) {
+                    document.getElementById('btn-encaminhar-faturamento')?.classList.remove('d-none');
+                }
+                if (pedidoPermissaoFlag(s, 'pode_cancelar')) {
+                    document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                }
                 break;
             case 'em_faturamento':
-                document.getElementById('btn-marcar-em-transito')?.classList.remove('d-none');
-                document.getElementById('btn-cancelar')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
+                if (pedidoPermissaoFlag(s, 'pode_avancar')) {
+                    document.getElementById('btn-marcar-em-transito')?.classList.remove('d-none');
+                }
+                if (pedidoPermissaoFlag(s, 'pode_cancelar')) {
+                    document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                }
                 break;
             case 'em_transito':
-                document.getElementById('btn-confirmar-recebimento')?.classList.remove('d-none');
-                document.getElementById('btn-cancelar')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
+                if (pedidoPermissaoFlag(s, 'pode_avancar')) {
+                    document.getElementById('btn-confirmar-recebimento')?.classList.remove('d-none');
+                }
+                if (pedidoPermissaoFlag(s, 'pode_cancelar')) {
+                    document.getElementById('btn-cancelar')?.classList.remove('d-none');
+                }
                 break;
             case 'em_conferencia':
-                document.getElementById('btn-finalizar-pedido')?.classList.remove('d-none');
-                document.getElementById('btn-voltar-status')?.classList.remove('d-none');
+                if (pedidoPermissaoFlag(s, 'pode_avancar')) {
+                    document.getElementById('btn-finalizar-pedido')?.classList.remove('d-none');
+                }
                 break;
             case 'finalizado':
             case 'cancelado':
+                pedidoToggleVoltarStatusBotoes(false);
                 break;
         }
 
@@ -3732,6 +3836,15 @@ async function atualizarStatusPedido(novoStatus, observacao = null) {
         
         if (!pedidoId) {
             mostrarErro('ID do pedido não encontrado');
+            return;
+        }
+
+        const statusAtual = modalElement?.getAttribute('data-pedido-status')
+            || document.getElementById('view_numero_pedido')?.dataset?.statusAtual
+            || '';
+        const erroPerm = pedidoValidarMudancaStatus(statusAtual, novoStatus);
+        if (erroPerm) {
+            mostrarErro(erroPerm);
             return;
         }
         
@@ -3886,6 +3999,11 @@ async function mostrarOpcoesVoltarStatus() {
     try {
         const pedidoId = document.getElementById('view_numero_pedido').dataset.pedidoId;
         const statusAtual = document.getElementById('view_numero_pedido').dataset.statusAtual;
+
+        if (!pedidoPermissaoFlag(statusAtual, 'pode_voltar')) {
+            mostrarErro('Sem permissão para voltar o status nesta situação');
+            return;
+        }
         
         // Definir opções de volta baseadas no status atual
         const s = normalizarStatusPedido(statusAtual);
@@ -4040,6 +4158,11 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
     });
     
     const indiceAtual = fluxoStatus.findIndex(s => s.key === statusAtualNorm);
+    const fluxoSomenteLeitura = pedidoFluxoStatusSomenteLeitura(statusAtualNorm);
+    const podeAvancarFluxo = !fluxoSomenteLeitura && pedidoPermissaoFlag(statusAtualNorm, 'pode_avancar');
+
+    container.classList.toggle('status-flow--readonly', fluxoSomenteLeitura);
+    pedidoAtualizarSubtituloFluxoStatus(statusAtualNorm);
     
     let html = '';
     
@@ -4062,18 +4185,18 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
             dataTexto = `<div class="status-date">${formatarDataHora(historicoDeste.data_alteracao)}</div>`;
         } else if (status.key === statusAtualNorm) {
             classe += ' current';
-        } else if (index === indiceAtual + 1) {
-            // Próximo status disponível
+        } else if (index === indiceAtual + 1 && podeAvancarFluxo) {
             classe += ' available';
         } else {
-            // Status não disponível
             classe += ' disabled';
         }
         
-        const onClick = (index === indiceAtual + 1) ? `onclick="alterarStatusPedido('${status.key}', ${pedidoId})"` : '';
+        const onClick = (index === indiceAtual + 1 && podeAvancarFluxo)
+            ? `onclick="alterarStatusPedido('${status.key}', ${pedidoId})"`
+            : '';
         
         html += `
-            <div class="${classe}" ${onClick} title="${status.nome}">
+            <div class="${classe}" ${onClick} title="${fluxoSomenteLeitura ? status.nome + ' (somente visualização)' : status.nome}"${fluxoSomenteLeitura ? ' aria-disabled="true"' : ''}>
                 <div class="status-icon">${iconeHtml}</div>
                 <div class="status-step-body">
                     <div class="status-text">${status.nome}</div>
@@ -4088,6 +4211,20 @@ function renderizarFluxoStatus(historico, statusAtual, pedidoId) {
 
 // Alterar status do pedido via fluxo
 async function alterarStatusPedido(novoStatus, pedidoId) {
+    const modalElement = document.getElementById('modalVisualizarPedido');
+    const statusAtual = modalElement?.getAttribute('data-pedido-status') || '';
+
+    if (pedidoFluxoStatusSomenteLeitura(statusAtual)) {
+        mostrarErro('Sem permissão para alterar o andamento nesta situação.');
+        return;
+    }
+
+    const erroPerm = pedidoValidarMudancaStatus(statusAtual, novoStatus);
+    if (erroPerm) {
+        mostrarErro(erroPerm);
+        return;
+    }
+
     const result = await Swal.fire({
         title: 'Confirmar Alteração',
         text: `Deseja alterar o status do pedido para "${getStatusNome(novoStatus)}"?`,

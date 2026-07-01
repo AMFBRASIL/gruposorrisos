@@ -3,6 +3,7 @@ require_once 'config/session.php';
 require_once 'config/config.php';
 require_once 'config/conexao.php';
 require_once 'models/Perfil.php';
+require_once 'config/pedido_permissoes.php';
 requireLogin();
 
 $menuActive = 'perfil-acesso';
@@ -13,6 +14,8 @@ try {
     
     $estatisticas = $perfil->getEstatisticas();
     $paginas = $perfil->getPaginas();
+    $statusPedidoAdmin = pedidoPermissoesStatusConfiguraveis();
+    $presetsPedidoAdmin = pedidoPermissoesPresets();
 } catch (Exception $e) {
     $estatisticas = [
         'total_perfis' => 0,
@@ -22,6 +25,57 @@ try {
         'perfis_em_uso' => 0
     ];
     $paginas = [];
+    $statusPedidoAdmin = [];
+    $presetsPedidoAdmin = [];
+}
+
+function renderMatrizPedidoStatus(string $tableId, string $secaoId, string $presetSelectId): void {
+    global $statusPedidoAdmin, $presetsPedidoAdmin;
+    ?>
+    <div class="mb-4 d-none" id="<?= htmlspecialchars($secaoId) ?>">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div>
+          <div class="fw-semibold" style="color:#2563eb;"><i class="bi bi-cart-check me-2"></i>Pedidos de Compra — por situação</div>
+          <small class="text-muted">Defina o que este perfil pode fazer em cada fase do fluxo. Vazio = acesso total (legado).</small>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <select class="form-select form-select-sm" id="<?= htmlspecialchars($presetSelectId) ?>" style="min-width: 180px;">
+            <option value="">Aplicar preset...</option>
+            <?php foreach ($presetsPedidoAdmin as $key => $preset): ?>
+              <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($preset['label']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="limparPermissoesPedidoStatus('<?= htmlspecialchars($tableId) ?>')">Limpar</button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle" id="<?= htmlspecialchars($tableId) ?>">
+          <thead class="table-light">
+            <tr>
+              <th>Situação</th>
+              <th class="text-center">Ver</th>
+              <th class="text-center">Editar</th>
+              <th class="text-center">Avançar</th>
+              <th class="text-center">Cancelar</th>
+              <th class="text-center">Voltar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($statusPedidoAdmin as $st): ?>
+              <tr data-status="<?= htmlspecialchars($st['key']) ?>">
+                <td><?= htmlspecialchars($st['nome']) ?></td>
+                <?php foreach (['pode_ver', 'pode_editar', 'pode_avancar', 'pode_cancelar', 'pode_voltar'] as $flag): ?>
+                  <td class="text-center">
+                    <input type="checkbox" class="form-check-input perm-pedido-check" data-flag="<?= $flag ?>">
+                  </td>
+                <?php endforeach; ?>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <?php
 }
 ?>
 <!DOCTYPE html>
@@ -183,7 +237,7 @@ try {
                 </thead>
                 <tbody>
                   <?php foreach ($paginas as $pagina): ?>
-                  <tr>
+                  <tr data-url-pagina="<?= htmlspecialchars($pagina['url_pagina'] ?? '') ?>">
                     <td><?= htmlspecialchars($pagina['nome_pagina']) ?></td>
                     <td class="text-center"><input type="checkbox" data-pagina="<?= htmlspecialchars($pagina['nome_pagina']) ?>" data-perm="create"></td>
                     <td class="text-center"><input type="checkbox" data-pagina="<?= htmlspecialchars($pagina['nome_pagina']) ?>" data-perm="read" checked></td>
@@ -195,6 +249,7 @@ try {
               </table>
             </div>
           </div>
+          <?php renderMatrizPedidoStatus('tabela-permissoes-pedido', 'secao-permissoes-pedido', 'presetPedidoNovo'); ?>
           <!-- Ações Permitidas -->
           <div class="mb-4">
             <div class="fw-semibold mb-2" style="color:#f59e42;"><i class="bi bi-lightning-charge-fill me-2"></i>Ações Permitidas</div>
@@ -321,7 +376,7 @@ try {
                 </thead>
                 <tbody>
                   <?php foreach ($paginas as $pagina): ?>
-                  <tr>
+                  <tr data-url-pagina="<?= htmlspecialchars($pagina['url_pagina'] ?? '') ?>">
                     <td><?= htmlspecialchars($pagina['nome_pagina']) ?></td>
                     <td class="text-center"><input type="checkbox" data-pagina="<?= htmlspecialchars($pagina['nome_pagina']) ?>" data-perm="create"></td>
                     <td class="text-center"><input type="checkbox" data-pagina="<?= htmlspecialchars($pagina['nome_pagina']) ?>" data-perm="read"></td>
@@ -333,6 +388,7 @@ try {
               </table>
             </div>
           </div>
+          <?php renderMatrizPedidoStatus('tabela-permissoes-pedido-edit', 'secao-permissoes-pedido-edit', 'presetPedidoEdit'); ?>
         </div>
         <div class="modal-footer border-0 pt-0 pb-4 px-4 d-flex justify-content-end gap-2">
           <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -347,12 +403,92 @@ try {
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+const PEDIDO_PRESETS = <?= json_encode($presetsPedidoAdmin, JSON_UNESCAPED_UNICODE) ?>;
+
 let currentPage = 1;
+
+function perfilTemAcessoPedidos(tabelaSelector) {
+    return Array.from(document.querySelectorAll(`${tabelaSelector} tbody tr`)).some(tr => {
+        const url = tr.getAttribute('data-url-pagina') || '';
+        if (!url.includes('pedidos-compra.php')) return false;
+        const read = tr.querySelector('input[data-perm="read"]');
+        return read && read.checked;
+    });
+}
+
+function atualizarSecaoPedido(tipo) {
+    const map = {
+        novo: ['#tabela-permissoes', '#secao-permissoes-pedido'],
+        edit: ['#tabela-permissoes-edit', '#secao-permissoes-pedido-edit']
+    };
+    const [tabPaginas, idSecao] = map[tipo] || [];
+    const secao = document.getElementById((idSecao || '').replace('#', ''));
+    if (!secao) return;
+    secao.classList.toggle('d-none', !perfilTemAcessoPedidos(tabPaginas));
+}
+
+function coletarPermissoesPedidoStatus(tableId) {
+    const out = {};
+    document.querySelectorAll(`#${tableId} tbody tr[data-status]`).forEach(tr => {
+        const status = tr.getAttribute('data-status');
+        const flags = {};
+        tr.querySelectorAll('.perm-pedido-check').forEach(cb => {
+            flags[cb.getAttribute('data-flag')] = cb.checked ? 1 : 0;
+        });
+        if (Object.values(flags).some(v => v === 1)) {
+            out[status] = flags;
+        }
+    });
+    return out;
+}
+
+function preencherPermissoesPedidoStatus(tableId, mapa) {
+    document.querySelectorAll(`#${tableId} tbody tr[data-status]`).forEach(tr => {
+        const status = tr.getAttribute('data-status');
+        const flags = (mapa && mapa[status]) ? mapa[status] : {};
+        tr.querySelectorAll('.perm-pedido-check').forEach(cb => {
+            const flag = cb.getAttribute('data-flag');
+            cb.checked = !!(flags[flag]);
+        });
+    });
+}
+
+function limparPermissoesPedidoStatus(tableId) {
+    document.querySelectorAll(`#${tableId} .perm-pedido-check`).forEach(cb => { cb.checked = false; });
+}
+
+function aplicarPresetPedidoStatus(presetKey, tableId) {
+    const preset = PEDIDO_PRESETS[presetKey];
+    if (!preset) return;
+    limparPermissoesPedidoStatus(tableId);
+    preencherPermissoesPedidoStatus(tableId, preset.permissoes || {});
+}
 
 // Carregar dados iniciais
 document.addEventListener('DOMContentLoaded', function() {
     carregarPerfis();
     inicializarBotoesPermissoes();
+
+    ['#tabela-permissoes', '#tabela-permissoes-edit'].forEach(sel => {
+        document.querySelectorAll(`${sel} tbody input[data-perm="read"]`).forEach(cb => {
+            cb.addEventListener('change', () => {
+                atualizarSecaoPedido(sel.includes('edit') ? 'edit' : 'novo');
+            });
+        });
+    });
+
+    document.getElementById('presetPedidoNovo')?.addEventListener('change', function() {
+        if (this.value) {
+            aplicarPresetPedidoStatus(this.value, 'tabela-permissoes-pedido');
+            this.value = '';
+        }
+    });
+    document.getElementById('presetPedidoEdit')?.addEventListener('change', function() {
+        if (this.value) {
+            aplicarPresetPedidoStatus(this.value, 'tabela-permissoes-pedido-edit');
+            this.value = '';
+        }
+    });
 });
 
 // Carregar perfis
@@ -529,6 +665,7 @@ async function salvarPerfil(event) {
         codigo_perfil: document.getElementById('codigoPerfil').value.trim() || null,
         descricao: descricaoPerfil,
         permissoes: permissoes,
+        permissoes_pedido_status: coletarPermissoesPedidoStatus('tabela-permissoes-pedido'),
         ativo: 1
     };
     
@@ -562,6 +699,8 @@ async function salvarPerfil(event) {
                     confirmButtonText: 'OK'
                 });
                 document.getElementById('formPerfil').reset();
+                limparPermissoesPedidoStatus('tabela-permissoes-pedido');
+                atualizarSecaoPedido('novo');
                 atualizarBotaoPermissoes('#tabela-permissoes', document.getElementById('btnAlternarPermissoes'));
                 carregarPerfis();
             };
@@ -606,10 +745,11 @@ async function editarPerfil(id) {
             document.getElementById('editCodigoPerfil').value = perfil.codigo_perfil || '';
             document.getElementById('editDescricaoPerfil').value = perfil.descricao || '';
             
-            // Limpar checkboxes
-            document.querySelectorAll('#tabela-permissoes-edit input[type=checkbox]').forEach(cb => {
+            // Limpar checkboxes de páginas
+            document.querySelectorAll('#tabela-permissoes-edit tbody input[data-perm]').forEach(cb => {
                 cb.checked = false;
             });
+            limparPermissoesPedidoStatus('tabela-permissoes-pedido-edit');
             
                          // Marcar permissões existentes
              if (perfil.permissoes) {
@@ -627,8 +767,13 @@ async function editarPerfil(id) {
                      if (checkbox4 && perm.permissao_excluir) checkbox4.checked = true;
                  });
              }
+
+            if (perfil.permissoes_pedido_status) {
+                preencherPermissoesPedidoStatus('tabela-permissoes-pedido-edit', perfil.permissoes_pedido_status);
+            }
             
             atualizarBotaoPermissoes('#tabela-permissoes-edit', document.getElementById('btnAlternarPermissoesEdit'));
+            atualizarSecaoPedido('edit');
             
             bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarPerfil')).show();
         } else {
@@ -685,7 +830,8 @@ async function atualizarPerfil(event) {
         nome_perfil: nomePerfil,
         codigo_perfil: document.getElementById('editCodigoPerfil').value.trim() || null,
         descricao: descricaoPerfil,
-        permissoes: permissoes
+        permissoes: permissoes,
+        permissoes_pedido_status: coletarPermissoesPedidoStatus('tabela-permissoes-pedido-edit')
     };
     
     // Mostrar loading

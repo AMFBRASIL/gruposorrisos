@@ -55,6 +55,19 @@ class Perfil extends BaseModel {
     }
     
     /**
+     * Permissões de pedidos por status (situação)
+     */
+    public function getPermissoesPedidoStatus($idPerfil) {
+        require_once __DIR__ . '/../config/pedido_permissoes.php';
+        return pedidoPermissoesObterPorPerfil((int) $idPerfil, $this->pdo);
+    }
+
+    public function salvarPermissoesPedidoStatus($idPerfil, array $permissoes) {
+        require_once __DIR__ . '/../config/pedido_permissoes.php';
+        pedidoPermissoesSalvarPerfil((int) $idPerfil, $permissoes, $this->pdo);
+    }
+
+    /**
      * Busca permissões de um perfil
      */
     public function getPermissoes($idPerfil) {

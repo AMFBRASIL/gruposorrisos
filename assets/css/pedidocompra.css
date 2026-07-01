@@ -998,6 +998,25 @@ body { background: #f7f9fb; }
     cursor: pointer;
 }
 
+.status-flow--readonly .status-step {
+    cursor: default !important;
+    pointer-events: none;
+}
+
+.status-flow--readonly .status-step:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.status-flow--readonly .status-step.available,
+.status-flow--readonly .status-step.current {
+    cursor: default !important;
+}
+
+.status-flow--readonly .status-step.current {
+    box-shadow: none;
+}
+
 .status-step:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);

@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once '../../config/config.php';
 require_once '../../config/conexao.php';
 require_once '../../models/Perfil.php';
+require_once '../../config/pedido_permissoes.php';
 
 try {
     $pdo = Conexao::getInstance()->getPdo();
@@ -63,6 +64,8 @@ try {
             // Buscar permissões do perfil
             $permissoes = $perfilModel->getPermissoes($id);
             $perfil['permissoes'] = $permissoes;
+            $perfil['permissoes_pedido_status'] = $perfilModel->getPermissoesPedidoStatus($id);
+            $perfil['pedido_status_configurado'] = pedidoPermissoesPerfilTemConfiguracao((int) $id, $pdo);
             
             echo json_encode([
                 'success' => true,
@@ -101,7 +104,11 @@ try {
             if (!empty($input['permissoes'])) {
                 $perfilModel->salvarPermissoes($id, $input['permissoes']);
             }
-            
+
+            if (array_key_exists('permissoes_pedido_status', $input)) {
+                $perfilModel->salvarPermissoesPedidoStatus($id, $input['permissoes_pedido_status'] ?? []);
+            }
+
             echo json_encode([
                 'success' => true,
                 'message' => 'Perfil criado com sucesso',
@@ -147,7 +154,11 @@ try {
             if (isset($input['permissoes'])) {
                 $perfilModel->salvarPermissoes($id, $input['permissoes']);
             }
-            
+
+            if (array_key_exists('permissoes_pedido_status', $input)) {
+                $perfilModel->salvarPermissoesPedidoStatus($id, $input['permissoes_pedido_status'] ?? []);
+            }
+
             echo json_encode([
                 'success' => true,
                 'message' => 'Perfil atualizado com sucesso'
@@ -230,6 +241,14 @@ try {
             ]);
             break;
             
+        case 'presets-pedido-status':
+            echo json_encode([
+                'success' => true,
+                'status' => pedidoPermissoesStatusConfiguraveis(),
+                'presets' => pedidoPermissoesPresets(),
+            ]);
+            break;
+
         default:
             throw new Exception('Ação não reconhecida');
     }

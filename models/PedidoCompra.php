@@ -111,6 +111,14 @@ class PedidoCompra extends BaseModel {
             $where .= " AND pc.data_solicitacao <= ?";
             $params[] = $filtros['data_fim'];
         }
+
+        if (!empty($filtros['status_visiveis']) && is_array($filtros['status_visiveis'])) {
+            $placeholders = implode(',', array_fill(0, count($filtros['status_visiveis']), '?'));
+            $where .= " AND pc.status IN ($placeholders)";
+            foreach ($filtros['status_visiveis'] as $st) {
+                $params[] = $st;
+            }
+        }
         
         return $this->findWithPagination($page, $limit, $where, $params);
     }

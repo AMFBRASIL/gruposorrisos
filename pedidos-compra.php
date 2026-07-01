@@ -19,7 +19,9 @@ $menuActive = 'pedidos_compra';
 $usuarioEhAdmin = isAdmin();
 
 require_once __DIR__ . '/backend/helpers/pedido_compra_config.php';
+require_once __DIR__ . '/config/pedido_permissoes.php';
 $descontoCotacaoPercentual = obterDescontoFornecedorPercentual();
+$pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -748,7 +750,7 @@ $descontoCotacaoPercentual = obterDescontoFornecedorPercentual();
                                 <i class="bi bi-diagram-3 me-2 text-primary"></i>
                                 <h6 class="mb-0 text-primary">Fluxo de Status</h6>
                             </div>
-                            <small class="text-muted">Acompanhe a evolução do pedido</small>
+                            <small class="text-muted" id="fluxo-status-subtitulo">Acompanhe a evolução do pedido</small>
                         </div>
                     </div>
                     <div class="card-body p-2 p-md-3">
@@ -897,7 +899,7 @@ $descontoCotacaoPercentual = obterDescontoFornecedorPercentual();
                                         <button type="button" class="btn btn-sm btn-outline-warning" onclick="abrirHistoricoModalCompleto()">
                                             <i class="bi bi-arrows-fullscreen me-1"></i>Abrir em tela maior
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="mostrarOpcoesVoltarStatus()">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 d-none" id="btn-voltar-status-historico" onclick="mostrarOpcoesVoltarStatus()">
                                             <i class="bi bi-arrow-left me-1"></i>Voltar status
                                         </button>
                                     </div>
@@ -1180,7 +1182,7 @@ $descontoCotacaoPercentual = obterDescontoFornecedorPercentual();
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Fechar
                 </button>
-                <button type="button" class="btn btn-outline-warning" onclick="mostrarOpcoesVoltarStatus(); $('#modalHistoricoCompleto').modal('hide');">
+                <button type="button" class="btn btn-outline-warning d-none" id="btn-voltar-status-historico-completo" onclick="mostrarOpcoesVoltarStatus(); $('#modalHistoricoCompleto').modal('hide');">
                     <i class="bi bi-arrow-left me-2"></i>Voltar Status
                 </button>
             </div>
@@ -1490,6 +1492,7 @@ $descontoCotacaoPercentual = obterDescontoFornecedorPercentual();
     window.PEDIDOS_CONFIG = {
         descontoFornecedorPercentual: <?php echo json_encode((float) $descontoCotacaoPercentual); ?>
     };
+    window.PEDIDO_PERMISSOES = <?php echo json_encode($pedidoPermissoesFrontend, JSON_UNESCAPED_UNICODE); ?>;
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
