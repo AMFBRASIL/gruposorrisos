@@ -79,13 +79,20 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
     <title><?php echo APP_NAME; ?> - Pedidos para Fornecedor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/index.css">
+    <link rel="stylesheet" href="assets/css/index.css?v=<?php echo @filemtime(__DIR__ . '/assets/css/index.css') ?: time(); ?>">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
+        :root {
+            --brand-orange: #f57c00;
+            --brand-red: #e53935;
+            --brand-gray: #757575;
+            --page-bg: #f5f7fa;
+        }
+
         .main-content {
             margin-left: 280px;
             padding: 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--page-bg);
             min-height: 100vh;
         }
         
@@ -97,33 +104,34 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
         
         .page-header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 14px;
-            padding: 1rem 1.25rem;
+            background: linear-gradient(90deg, #ff9800 0%, #f57c00 55%, #ef6c00 100%);
+            border-radius: 18px;
+            padding: 1.35rem 1.5rem;
             margin-bottom: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 10px 28px rgba(245, 124, 0, 0.28);
+            border: none;
+            color: #fff;
         }
 
         .page-header-inner {
             display: flex;
             align-items: center;
-            gap: 0.85rem;
+            gap: 0.95rem;
         }
 
         .page-header-icon {
-            width: 42px;
-            height: 42px;
+            width: 46px;
+            height: 46px;
             border-radius: 12px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: rgba(255, 255, 255, 0.2);
             color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.15rem;
+            font-size: 1.25rem;
             flex-shrink: 0;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+            box-shadow: none;
+            border: 1px solid rgba(255,255,255,0.25);
         }
 
         .page-header-text {
@@ -132,17 +140,17 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
         
         .page-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #1e293b;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
             margin-bottom: 0.15rem;
             line-height: 1.3;
             letter-spacing: -0.02em;
         }
         
         .page-subtitle {
-            font-size: 0.82rem;
-            color: #64748b;
+            font-size: 0.86rem;
+            color: rgba(255, 255, 255, 0.9);
             margin-bottom: 0;
             line-height: 1.4;
         }
@@ -189,8 +197,8 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
 
         .stat-card.stat-card-ativo {
-            border-color: #667eea;
-            box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.25);
+            border-color: #f57c00;
+            box-shadow: 0 0 0 1px rgba(245, 124, 0, 0.25);
         }
         
         .stat-icon {
@@ -219,12 +227,32 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
 
         .stats-section-label {
-            color: rgba(255, 255, 255, 0.92);
+            color: #757575;
             font-size: 0.8rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.06em;
             margin-bottom: 0.75rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #ff9800 0%, #f57c00 55%, #ef6c00 100%) !important;
+            border: none !important;
+            color: #fff !important;
+        }
+        .btn-primary:hover,
+        .btn-primary:focus {
+            background: linear-gradient(90deg, #fb8c00 0%, #ef6c00 55%, #e65100 100%) !important;
+            color: #fff !important;
+        }
+        .btn-outline-primary {
+            color: #f57c00 !important;
+            border-color: #f57c00 !important;
+            background: transparent !important;
+        }
+        .btn-outline-primary:hover {
+            background: #f57c00 !important;
+            color: #fff !important;
         }
 
         .stats-kpi-section {
@@ -254,12 +282,11 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
 
         .kpi-card {
-            background: rgba(255, 255, 255, 0.97);
-            backdrop-filter: blur(10px);
+            background: #fff;
             border-radius: 14px;
             padding: 1.1rem 1.25rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            border: 2px solid transparent;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+            border: 2px solid #eef0f3;
             transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
             cursor: pointer;
         }
@@ -270,8 +297,8 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
 
         .kpi-card.kpi-card-ativo {
-            border-color: #667eea;
-            box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.25);
+            border-color: #f57c00;
+            box-shadow: 0 0 0 1px rgba(245, 124, 0, 0.25);
         }
 
         .kpi-card.kpi-card-alerta {
@@ -316,7 +343,7 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
 
         .kpi-value.kpi-valor-destaque {
             font-size: 1.55rem;
-            color: #059669;
+            color: #f57c00;
         }
 
         .kpi-sub {
@@ -326,21 +353,22 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
         
         .pedidos-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            background: #fff;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+            border: 1px solid #eef0f3;
         }
         
         .pedido-card {
             background: white;
-            border-radius: 16px;
-            padding: 1.5rem;
+            border-radius: 14px;
+            padding: 1.25rem;
             margin-bottom: 1rem;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: none;
             transition: all 0.3s ease;
-            border-left: 4px solid #e2e8f0;
+            border: 1px solid #eef0f3;
+            border-left: 4px solid #f57c00;
         }
         
         .pedido-card:hover {
@@ -369,17 +397,17 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
             text-transform: uppercase;
         }
         
-        .status-aguardando_cotacao, .status-em_analise, .status-pendente { background: #fef3c7; color: #92400e; }
-        .status-em_cotacao, .status-aprovado_cotacao { background: #dbeafe; color: #1e40af; }
+        .status-aguardando_cotacao, .status-em_analise, .status-pendente { background: #fff3e0; color: #ef6c00; }
+        .status-em_cotacao, .status-aprovado_cotacao { background: #fff8e1; color: #f9a825; }
         .status-aguardando_aprovacao_socio { background: #fff3cd; color: #856404; }
-        .status-aprovado_socio { background: #d1fae5; color: #065f46; }
-        .status-aguardando_faturamento, .status-enviar_para_faturamento { background: #e0e7ff; color: #3730a3; }
-        .status-em_faturamento, .status-aprovado_para_faturar { background: #e0f2fe; color: #0277bd; }
-        .status-em_transito, .status-enviado { background: #cffafe; color: #0e7490; }
-        .status-em_conferencia, .status-entregue, .status-parcialmente_recebido { background: #e8f5e8; color: #2e7d32; }
-        .status-finalizado, .status-recebido { background: #dcfce7; color: #166534; }
-        .status-cancelado { background: #f3e5f5; color: #7b1fa2; }
-        .status-respondido { background: #dbeafe; color: #1e40af; }
+        .status-aprovado_socio { background: #fff3e0; color: #f57c00; }
+        .status-aguardando_faturamento, .status-enviar_para_faturamento { background: #f5f5f5; color: #757575; }
+        .status-em_faturamento, .status-aprovado_para_faturar { background: #ffebee; color: #e53935; }
+        .status-em_transito, .status-enviado { background: #fff3e0; color: #ef6c00; }
+        .status-em_conferencia, .status-entregue, .status-parcialmente_recebido { background: #f5f5f5; color: #616161; }
+        .status-finalizado, .status-recebido { background: #e8f5e9; color: #2e7d32; }
+        .status-cancelado { background: #ffebee; color: #c62828; }
+        .status-respondido { background: #fff3e0; color: #f57c00; }
         
         .pedido-info {
             display: grid;
@@ -422,8 +450,8 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         /* Modais fornecedor — resumo e formulário */
         #modalAprovarFaturamento .aprovar-fat-resumo,
         #modalTransporteFrete .aprovar-fat-resumo {
-            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-            border: 1px solid rgba(102, 126, 234, 0.25);
+            background: linear-gradient(135deg, #f8fafc 0%, #fff3e0 100%);
+            border: 1px solid rgba(245, 124, 0, 0.25);
             border-radius: 14px;
             padding: 1rem 1.25rem;
         }
@@ -456,7 +484,7 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
             width: 44px;
             height: 44px;
             border-radius: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f57c00 0%, #e53935 100%);
             color: #fff;
             display: flex;
             align-items: center;
@@ -472,13 +500,13 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
             padding: 1rem 1.15rem;
         }
         #modalAprovarFaturamento .modal-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f57c00 0%, #e53935 100%);
             color: #fff;
             border-bottom: none;
             border-radius: 0;
         }
         #modalTransporteFrete .modal-header {
-            background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);
+            background: linear-gradient(135deg, #757575 0%, #f57c00 100%);
             color: #fff;
             border-bottom: none;
             border-radius: 0;
@@ -540,9 +568,9 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         }
         
         .price-input:focus {
-            border-color: #667eea;
+            border-color: #f57c00;
             outline: none;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.1);
         }
         
         .loading {
@@ -559,15 +587,15 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
             width: 40px;
             height: 40px;
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            border-top: 4px solid #f57c00;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 1rem;
         }
 
         .resumo-final-box {
-            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-            border: 2px solid #667eea;
+            background: linear-gradient(135deg, #f8fafc 0%, #fff3e0 100%);
+            border: 2px solid #f57c00;
             border-radius: 14px;
             padding: 1rem 1.25rem;
         }
@@ -575,7 +603,7 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
         .resumo-final-valor {
             font-size: 2rem;
             font-weight: 800;
-            color: #1e40af;
+            color: #ef6c00;
             line-height: 1.1;
         }
 
@@ -781,7 +809,7 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body bg-light-subtle">
-                <div class="alert alert-primary border-0 d-flex gap-2 mb-3 py-2 px-3" role="alert" style="background: rgba(102, 126, 234, 0.12); color: #3730a3;">
+                <div class="alert alert-primary border-0 d-flex gap-2 mb-3 py-2 px-3" role="alert" style="background: rgba(245, 124, 0, 0.12); color: #ef6c00;">
                     <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
                     <div class="small mb-0">
                         Ao confirmar, o pedido passa para <strong>Em Faturamento</strong>, as informações abaixo ficam registradas nas <strong>observações do fornecedor</strong> e no histórico. A Nota Fiscal neste passo é <strong>opcional</strong>.
@@ -880,7 +908,7 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body bg-light-subtle">
-                <div class="alert alert-info border-0 d-flex gap-2 mb-3 py-2 px-3" role="alert" style="background: rgba(13, 148, 136, 0.12); color: #0f766e;">
+                <div class="alert alert-info border-0 d-flex gap-2 mb-3 py-2 px-3" role="alert" style="background: rgba(245, 124, 0, 0.12); color: #ef6c00;">
                     <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
                     <div class="small mb-0">
                         Informe os dados do envio (transportadora, rastreio, previsão de entrega, volumes, etc.). Ao confirmar, o pedido passa para <strong>Em trânsito</strong> e o texto é salvo nas <strong>observações do fornecedor</strong> e no histórico.
@@ -1207,16 +1235,16 @@ const ICONES_STATUS_FORNECEDOR = {
 };
 
 const CORES_STATUS_FORNECEDOR = {
-    aguardando_cotacao: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-    em_cotacao: 'linear-gradient(135deg, #60a5fa, #3b82f6)',
-    aguardando_aprovacao_socio: 'linear-gradient(135deg, #fcd34d, #d97706)',
-    aprovado_socio: 'linear-gradient(135deg, #34d399, #059669)',
-    aguardando_faturamento: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
-    em_faturamento: 'linear-gradient(135deg, #38bdf8, #0284c7)',
-    em_transito: 'linear-gradient(135deg, #22d3ee, #0891b2)',
-    em_conferencia: 'linear-gradient(135deg, #4ade80, #16a34a)',
-    finalizado: 'linear-gradient(135deg, #86efac, #15803d)',
-    cancelado: 'linear-gradient(135deg, #f87171, #dc2626)'
+    aguardando_cotacao: 'linear-gradient(135deg, #ffb74d, #f57c00)',
+    em_cotacao: 'linear-gradient(135deg, #ff9800, #ef6c00)',
+    aguardando_aprovacao_socio: 'linear-gradient(135deg, #ffcc80, #f57c00)',
+    aprovado_socio: 'linear-gradient(135deg, #ff9800, #e65100)',
+    aguardando_faturamento: 'linear-gradient(135deg, #9e9e9e, #757575)',
+    em_faturamento: 'linear-gradient(135deg, #ef5350, #e53935)',
+    em_transito: 'linear-gradient(135deg, #ff9800, #f57c00)',
+    em_conferencia: 'linear-gradient(135deg, #757575, #616161)',
+    finalizado: 'linear-gradient(135deg, #81c784, #43a047)',
+    cancelado: 'linear-gradient(135deg, #e57373, #c62828)'
 };
 
 let filtroGrupoCardAtivo = '';
@@ -1453,7 +1481,7 @@ function renderizarCardsResumoKpiFornecedor() {
         {
             grupo: 'todos',
             icon: 'bi-collection',
-            cor: 'linear-gradient(135deg, #667eea, #764ba2)',
+            cor: 'linear-gradient(135deg, #9e9e9e, #757575)',
             titulo: 'Todos',
             valor: String(m.total),
             sub: 'Ver todos os pedidos'
@@ -1461,7 +1489,7 @@ function renderizarCardsResumoKpiFornecedor() {
         {
             grupo: 'a_responder',
             icon: 'bi-pencil-square',
-            cor: 'linear-gradient(135deg, #fbbf24, #d97706)',
+            cor: 'linear-gradient(135deg, #ff9800, #f57c00)',
             titulo: 'A responder',
             valor: String(m.aResponder),
             sub: 'Aguardando cotação ou em cotação'
@@ -1469,7 +1497,7 @@ function renderizarCardsResumoKpiFornecedor() {
         {
             grupo: 'a_faturar',
             icon: 'bi-receipt',
-            cor: 'linear-gradient(135deg, #38bdf8, #0284c7)',
+            cor: 'linear-gradient(135deg, #ef5350, #e53935)',
             titulo: 'A faturar',
             valor: String(m.aFaturar),
             sub: 'Aguardando ou em faturamento'
@@ -1477,7 +1505,7 @@ function renderizarCardsResumoKpiFornecedor() {
         {
             grupo: 'em_transporte',
             icon: 'bi-truck',
-            cor: 'linear-gradient(135deg, #4ade80, #16a34a)',
+            cor: 'linear-gradient(135deg, #ff9800, #ef6c00)',
             titulo: 'Em transporte',
             valor: String(m.emTransporte),
             sub: 'Pedidos a caminho'

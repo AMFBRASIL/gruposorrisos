@@ -29,29 +29,31 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     <title>Login | Grupo Sorrisos Odontologia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/login.css">
+    <link rel="stylesheet" href="assets/css/login.css?v=<?php echo @filemtime(__DIR__ . '/assets/css/login.css') ?: time(); ?>">
 </head>
 <body>
-    <!-- Partículas flutuantes -->
-    <div class="particles" id="particles"></div>
-
     <div class="login-container">
         <div class="login-card">
             <!-- Lado esquerdo - Branding -->
             <div class="login-brand">
-                <img src="assets/img/logo-grupo-sorrisos.jpg" alt="Grupo Sorrisos" class="brand-logo">
-                <h1 class="brand-title">Grupo Sorrisos</h1>
+                <div class="brand-wave" aria-hidden="true"></div>
+                <div class="brand-logo-card">
+                    <img src="assets/img/logo-grupo-sorrisos.svg" alt="Grupo Sorrisos Odontologia">
+                </div>
+                <h1 class="brand-title">
+                    <span class="brand-grupo">Grupo</span>
+                    <span class="brand-sorrisos">Sorrisos</span>
+                </h1>
                 <p class="brand-subtitle">
                     Sistema de Gestão de Estoque Odontológico<br>
-                    Tecnologia avançada para controle total
+                    Tecnologia avançada para <strong>controle total</strong>
                 </p>
             </div>
 
             <!-- Lado direito - Formulário -->
             <div class="login-form">
                 <div class="form-header fade-in">
-                    <h2 class="form-title">Bem-vindo de volta</h2>
+                    <h2 class="form-title">Bem-vindo <span class="accent">de volta</span></h2>
                     <p class="form-subtitle">Entre com suas credenciais para acessar o sistema</p>
                 </div>
 
@@ -60,16 +62,20 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                     
                     <div class="form-group fade-in">
                         <label for="email" class="form-label">E-mail</label>
-                        <input type="email" class="form-control" id="email" name="email" 
-                               placeholder="exemplo@gruposorrisos.com" required>
+                        <div class="input-wrap">
+                            <i class="bi bi-envelope input-icon"></i>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   placeholder="exemplo@gruposorrisos.com" required>
+                        </div>
                     </div>
 
                     <div class="form-group fade-in">
                         <label for="password" class="form-label">Senha</label>
-                        <div class="input-group">
+                        <div class="input-wrap">
+                            <i class="bi bi-lock input-icon"></i>
                             <input type="password" class="form-control" id="password" name="password" 
                                    placeholder="Digite sua senha" required>
-                            <button type="button" class="password-toggle" onclick="togglePassword()">
+                            <button type="button" class="password-toggle" onclick="togglePassword()" aria-label="Mostrar senha">
                                 <i class="bi bi-eye" id="passwordIcon"></i>
                             </button>
                         </div>
@@ -95,46 +101,19 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                     </button>
                 </form>
 
-                <div class="text-center mt-4 fade-in">
-                    <span style="color: #666; font-size: 0.9rem;">
-                        Sistema protegido por criptografia avançada
-                    </span>
+                <div class="security-note fade-in">
+                    Sistema protegido por <strong>criptografia avançada</strong>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="login-footer">
-        &copy; <?php echo date('Y'); ?> Grupo Sorrisos Odontologia. Todos os direitos reservados.
+        &copy; <?php echo date('Y'); ?> <strong class="orange">Grupo Sorrisos</strong> <strong class="red">Odontologia</strong>. Todos os direitos reservados.
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Criar partículas flutuantes
-        function createParticles() {
-            const particlesContainer = document.getElementById('particles');
-            const particleCount = 50;
-
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                
-                const size = Math.random() * 4 + 2;
-                const x = Math.random() * window.innerWidth;
-                const y = Math.random() * window.innerHeight;
-                const delay = Math.random() * 6;
-                
-                particle.style.width = size + 'px';
-                particle.style.height = size + 'px';
-                particle.style.left = x + 'px';
-                particle.style.top = y + 'px';
-                particle.style.animationDelay = delay + 's';
-                
-                particlesContainer.appendChild(particle);
-            }
-        }
-
-        // Toggle password visibility
         function togglePassword() {
             const passwordInput = document.getElementById('password');
             const passwordIcon = document.getElementById('passwordIcon');
@@ -150,13 +129,11 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
             }
         }
 
-        // Validação de email
         function isValidEmail(email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(email);
         }
 
-        // Mostrar alerta
         function showAlert(message, type = 'danger') {
             const alertContainer = document.getElementById('alertContainer');
             const alertClass = type === 'success' ? 'alert-success' : 
@@ -176,7 +153,6 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
             `;
         }
 
-        // Loading state
         function setLoading(loading) {
             const btn = document.getElementById('loginBtn');
             const btnText = btn.querySelector('.btn-text');
@@ -185,41 +161,32 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
             if (loading) {
                 btn.disabled = true;
                 btnText.style.display = 'none';
-                btnLoading.style.display = 'flex';
-                btn.style.alignItems = 'center';
-                btn.style.justifyContent = 'center';
+                btnLoading.style.display = 'inline-flex';
             } else {
                 btn.disabled = false;
-                btnText.style.display = 'flex';
+                btnText.style.display = 'inline-flex';
                 btnLoading.style.display = 'none';
             }
         }
 
-        // Função para obter página de redirecionamento
         function obterPaginaRedirecionamento() {
             fetch('backend/api/redirecionamento.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Redirecionar para a página permitida
                         window.location.href = data.redirect_url;
                     } else {
-                        // Fallback para index.php em caso de erro
                         console.error('Erro ao obter redirecionamento:', data.error);
                         window.location.href = 'index.php';
                     }
                 })
                 .catch(error => {
                     console.error('Erro de conexão:', error);
-                    // Fallback para index.php em caso de erro
                     window.location.href = 'index.php';
                 });
         }
 
-        // Login AJAX
         document.addEventListener('DOMContentLoaded', function() {
-            createParticles();
-            
             const loginForm = document.getElementById('loginForm');
             const emailInput = document.getElementById('email');
             const passwordInput = document.getElementById('password');
@@ -230,10 +197,8 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                 const email = emailInput.value.trim();
                 const password = passwordInput.value.trim();
                 
-                // Limpar alertas anteriores
                 document.getElementById('alertContainer').innerHTML = '';
                 
-                // Validação
                 if (!email || !password) {
                     showAlert('Por favor, preencha todos os campos.', 'warning');
                     return;
@@ -244,10 +209,8 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                     return;
                 }
                 
-                // Iniciar loading
                 setLoading(true);
                 
-                // Requisição AJAX
                 fetch('backend/api/auth.php', {
                     method: 'POST',
                     headers: {
@@ -262,18 +225,11 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                 .then(data => {
                     if (data.success) {
                         showAlert(data.message || 'Login realizado com sucesso!', 'success');
-                        
-                        // Efeito de sucesso
-                        document.querySelector('.login-card').style.animation = 'slideInUp 0.5s ease-out';
-                        
-                        // Obter página de redirecionamento inteligente
                         setTimeout(() => {
                             obterPaginaRedirecionamento();
-                        }, 1500);
+                        }, 1200);
                     } else {
                         showAlert(data.message || 'E-mail ou senha incorretos.', 'danger');
-                        
-                        // Efeito de erro
                         loginForm.style.animation = 'shake 0.5s ease-in-out';
                         setTimeout(() => {
                             loginForm.style.animation = '';
@@ -288,21 +244,8 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                     setLoading(false);
                 });
             });
-
-            // Efeitos de foco nos campos
-            const inputs = document.querySelectorAll('.form-control');
-            inputs.forEach(input => {
-                input.addEventListener('focus', function() {
-                    this.parentElement.style.transform = 'translateY(-2px)';
-                });
-                
-                input.addEventListener('blur', function() {
-                    this.parentElement.style.transform = 'translateY(0)';
-                });
-            });
         });
 
-        // Animação de shake para erro
         const style = document.createElement('style');
         style.textContent = `
             @keyframes shake {
@@ -314,4 +257,4 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
         document.head.appendChild(style);
     </script>
 </body>
-</html> 
+</html>
