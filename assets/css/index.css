@@ -13,14 +13,14 @@ body {
     margin-bottom: 6px;
 }
 .sidebar .nav-link.active, .sidebar .nav-link:hover {
-    background: #e8f0fe;
-    color: #1976d2;
+    background: #f57c00;
+    color: #fff;
 }
 .dashboard-header {
-    background: linear-gradient(90deg, #1976d2 60%, #42a5f5 100%);
+    background: linear-gradient(90deg, #ff9800 0%, #f57c00 55%, #ef6c00 100%) !important;
     color: #fff;
-    border-radius: 16px;
-    padding: 32px 24px;
+    border-radius: 18px;
+    padding: 28px 28px;
     margin-bottom: 24px;
     position: relative;
     overflow: hidden;
@@ -34,29 +34,17 @@ body {
 .card-summary {
     border: none;
     border-radius: 16px;
-    color: #fff;
-    min-height: 120px;
+    min-height: 118px;
     position: relative;
     overflow: hidden;
 }
-.card-summary.bg-success {
-    background: linear-gradient(90deg, #43cea2 0%, #185a9d 100%);
-}
-.card-summary.bg-danger {
-    background: linear-gradient(90deg, #ff5858 0%, #f09819 100%);
-}
-.card-summary.bg-primary {
-    background: linear-gradient(90deg, #1976d2 0%, #42a5f5 100%);
-}
-.card-summary.bg-info {
-    background: linear-gradient(90deg, #00c6fb 0%, #005bea 100%);
-}
 .card-summary .icon {
     position: absolute;
-    top: 16px;
-    right: 24px;
-    font-size: 2.5rem;
-    opacity: 0.15;
+    top: 50%;
+    right: 1.1rem;
+    transform: translateY(-50%);
+    font-size: 2.6rem;
+    opacity: 0.35;
 }
 .transactions-list .badge {
     font-size: 0.9em;
@@ -73,9 +61,20 @@ body {
     }
 }
 .sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #e5e9f2; }
-.sidebar .nav-link { color: #333; font-weight: 500; border-radius: 8px; margin-bottom: 6px; }
-.sidebar .nav-link.active, .sidebar .nav-link.bg-success { background: #43cea2 !important; color: #fff !important; }
-.sidebar .nav-link:hover { background: #e8f0fe; color: #1976d2; }
+.sidebar .nav-link { color: #555; font-weight: 500; border-radius: 10px; margin-bottom: 4px; padding: 0.55rem 0.85rem; }
+.sidebar .nav-link.active,
+.sidebar .nav-link.bg-success {
+    background: #f57c00 !important;
+    color: #fff !important;
+}
+.sidebar .nav-link:hover {
+    background: #fff3e0;
+    color: #f57c00;
+}
+.sidebar .nav-link.active:hover {
+    background: #ef6c00 !important;
+    color: #fff !important;
+}
 
 /* Estilos do Seletor de Filial */
 .filial-dropdown {
@@ -100,9 +99,9 @@ body {
     transition: border-color 0.2s;
 }
 .filial-dropdown-toggle:focus, .filial-dropdown-toggle.active {
-    border-color: #667eea;
+    border-color: #f57c00;
     outline: none;
-    background: #f8f9ff;
+    background: #fff8f0;
 }
 .filial-dropdown-menu {
     position: absolute;
@@ -148,11 +147,11 @@ body {
     border-bottom: none;
 }
 .filial-dropdown-item:hover {
-    background: #f3f6fd;
+    background: #fff3e0;
 }
 .filial-dropdown-item.active {
-    background: #e8f5e8;
-    border-left: 4px solid #28a745;
+    background: #fff3e0;
+    border-left: 4px solid #f57c00;
     position: relative;
 }
 .filial-dropdown-item.active::before {
@@ -204,12 +203,12 @@ body {
     display: inline-block;
 }
 .filial-status.ativo {
-    background: #e8f5e8;
-    color: #2d5a2d;
+    background: #fff3e0;
+    color: #f57c00;
 }
 .filial-status.inativo {
-    background: #ffeaea;
-    color: #8b2d2d;
+    background: #ffebee;
+    color: #e53935;
 }
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-10px); }

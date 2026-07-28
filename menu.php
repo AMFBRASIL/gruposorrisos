@@ -29,8 +29,8 @@ $menuUsuario = $controllerAcesso->obterMenuUsuario();
 echo "<!-- DEBUG: Menu obtido: " . print_r($menuUsuario, true) . " -->";
 ?>
 <!-- Botão de Toggle para Mobile -->
-<button class="btn btn-primary d-md-none position-fixed" 
-        style="top: 10px; left: 10px; z-index: 1050;" 
+<button class="btn btn-brand-orange d-md-none position-fixed" 
+        style="top: 10px; left: 10px; z-index: 1050; background:#f57c00; border-color:#f57c00; color:#fff;" 
         type="button" 
         data-bs-toggle="offcanvas" 
         data-bs-target="#sidebarMenu" 
@@ -46,10 +46,12 @@ echo "<!-- DEBUG: Menu obtido: " . print_r($menuUsuario, true) . " -->";
     <div class="offcanvas-header d-md-none">
         <h5 class="offcanvas-title" id="sidebarMenuLabel">
             <div class="d-flex align-items-center">
-                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; font-size: 1.2rem;">
-                    <i class="bi bi-box-seam"></i>
-                </div>
-                <span class="fw-bold">GRUPO SORRISOS</span>
+                <img src="<?php echo htmlspecialchars(app_url('assets/img/logo-mark.svg')); ?>" alt="Grupo Sorrisos" class="brand-logo-mark me-2" width="32" height="32">
+                <span class="brand-wordmark">
+                    <span class="brand-title-grupo">GRUPO</span>
+                    <span class="brand-title-sep">|</span>
+                    <span class="brand-title-sorrisos">SORRISOS</span>
+                </span>
             </div>
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu" aria-label="Close"></button>
@@ -57,11 +59,13 @@ echo "<!-- DEBUG: Menu obtido: " . print_r($menuUsuario, true) . " -->";
     
     <div class="offcanvas-body p-0" style="overflow-y: auto;">
         <nav class="sidebar p-3">
-            <div class="d-flex align-items-center mb-4 d-none d-md-flex">
-                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.5rem;">
-                    <i class="bi bi-box-seam"></i>
-                </div>
-                <span class="ms-2 fw-bold fs-5"> GRUPO | SORRISOS </span>
+            <div class="d-flex align-items-center mb-4 d-none d-md-flex brand-lockup">
+                <img src="<?php echo htmlspecialchars(app_url('assets/img/logo-mark.svg')); ?>" alt="Grupo Sorrisos" class="brand-logo-mark" width="34" height="34">
+                <span class="brand-wordmark ms-2">
+                    <span class="brand-title-grupo">GRUPO</span>
+                    <span class="brand-title-sep">|</span>
+                    <span class="brand-title-sorrisos">SORRISOS</span>
+                </span>
             </div>
             
             <ul class="nav flex-column">
@@ -106,10 +110,41 @@ echo "<!-- DEBUG: Menu obtido: " . print_r($menuUsuario, true) . " -->";
 </div>
 
 <style>
+/* Marca Grupo Sorrisos — bolinha laranja + carrinho */
+.brand-lockup {
+    gap: 0.15rem;
+}
+.brand-logo-mark {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    display: block;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(245, 124, 0, 0.28);
+}
+.brand-wordmark {
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    white-space: nowrap;
+}
+.brand-title-grupo {
+    color: #6b7280;
+}
+.brand-title-sep {
+    color: #c4c4c4;
+    margin: 0 0.35rem;
+    font-weight: 500;
+}
+.brand-title-sorrisos {
+    color: #e53935;
+}
+
 /* Estilos responsivos para o sidebar */
 .sidebar {
-    background: #f8f9fa;
-    border-right: 1px solid #dee2e6;
+    background: #fff;
+    border-right: 1px solid #eef0f3;
     transition: all 0.3s ease;
 }
 
@@ -192,18 +227,18 @@ echo "<!-- DEBUG: Menu obtido: " . print_r($menuUsuario, true) . " -->";
 }
 
 .nav-link:hover {
-    color: #495057;
-    background-color: #f8f9fa;
+    color: #f57c00;
+    background-color: #fff3e0;
 }
 
 .nav-link.active {
-    color: #fff;
-    background-color: #0d6efd;
+    color: #fff !important;
+    background-color: #f57c00 !important;
 }
 
 .nav-link.active:hover {
-    color: #fff;
-    background-color: #0b5ed7;
+    color: #fff !important;
+    background-color: #ef6c00 !important;
 }
 
 /* Melhorar espaçamento no mobile */

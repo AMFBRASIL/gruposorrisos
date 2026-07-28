@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-hidden="true">
+  <!-- Casinha branca do dashboard (mesma da bolinha) -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 36 L32 16 L50 36 V48 H14 Z"/>
+    <path d="M21 42 Q32 32 43 42"/>
+    <path d="M25.5 46 Q32 41 38.5 46"/>
+  </g>
+</svg>

@@ -160,7 +160,7 @@ function renderizarSeletorFiliais() {
         </div>
         
         <div class="mt-2">
-            <button class="btn btn-outline-primary btn-sm" onclick="window.location.href='filiais.php'">
+            <button class="btn btn-outline-brand-orange btn-sm" style="color:#f57c00;border-color:#f57c00;" onclick="window.location.href='filiais.php'" onmouseover="this.style.background='#f57c00';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#f57c00'">
                 <i class="bi bi-gear me-1"></i>Gerenciar Clínicas
             </button>
         </div>
@@ -335,9 +335,9 @@ async function carregarProdutosEstoqueBaixo() {
             } else {
                 console.log('✅ Nenhum produto com estoque baixo encontrado');
                 container.innerHTML = `
-                    <div class="text-center text-success">
-                        <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                        <p>Nenhum produto com estoque baixo!</p>
+                    <div class="text-center" style="color:#f57c00;">
+                        <i class="bi bi-check-circle" style="font-size: 2.4rem;"></i>
+                        <p class="mt-2 mb-0" style="color:#6b7280;">Nenhum produto com estoque baixo!</p>
                     </div>
                 `;
             }
@@ -534,26 +534,26 @@ async function carregarResumoAtividades() {
         container.innerHTML = `
             <div class="row g-2">
                 <div class="col-6">
-                    <div class="text-center p-2 bg-light rounded">
-                        <div class="fw-bold text-success">${totalProdutos}</div>
+                    <div class="text-center p-3 rounded" style="background:#f8f9fa;">
+                        <div class="fw-bold" style="color:#f57c00;font-size:1.35rem;">${totalProdutos}</div>
                         <small class="text-muted">Produtos</small>
                     </div>
                 </div>
                 <div class="col-6">
-                    <div class="text-center p-2 bg-light rounded">
-                        <div class="fw-bold text-warning">${estoqueBaixo}</div>
+                    <div class="text-center p-3 rounded" style="background:#f8f9fa;">
+                        <div class="fw-bold" style="color:#e53935;font-size:1.35rem;">${estoqueBaixo}</div>
                         <small class="text-muted">Estoque Baixo</small>
                     </div>
                 </div>
                 <div class="col-6">
-                    <div class="text-center p-2 bg-light rounded">
-                        <div class="fw-bold text-info">${movimentacoes}</div>
+                    <div class="text-center p-3 rounded" style="background:#f8f9fa;">
+                        <div class="fw-bold" style="color:#757575;font-size:1.35rem;">${movimentacoes}</div>
                         <small class="text-muted">Movimentações</small>
                     </div>
                 </div>
                 <div class="col-6">
-                    <div class="text-center p-2 bg-light rounded">
-                        <div class="fw-bold text-primary">${pedidosPendentes}</div>
+                    <div class="text-center p-3 rounded" style="background:#f8f9fa;">
+                        <div class="fw-bold" style="color:#757575;font-size:1.35rem;">${pedidosPendentes}</div>
                         <small class="text-muted">Pedidos</small>
                     </div>
                 </div>
