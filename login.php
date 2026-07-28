@@ -45,8 +45,7 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                     <span class="brand-sorrisos">&amp; Estoque</span>
                 </h1>
                 <p class="brand-subtitle">
-                    Sistema de Gestão de Estoque Odontológico<br>
-                    Tecnologia avançada para <strong>controle total</strong>
+                    Sistema de Gestão de Estoque Odontológico
                 </p>
             </div>
 
