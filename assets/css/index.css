@@ -99,9 +99,9 @@ body {
     transition: border-color 0.2s;
 }
 .filial-dropdown-toggle:focus, .filial-dropdown-toggle.active {
-    border-color: #f57c00;
+    border-color: #cfd4da;
     outline: none;
-    background: #fff8f0;
+    background: #fff;
 }
 .filial-dropdown-menu {
     position: absolute;
