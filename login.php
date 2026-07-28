@@ -41,8 +41,8 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                     <img src="assets/img/logo-grupo-sorrisos.svg" alt="Grupo Sorrisos Odontologia">
                 </div>
                 <h1 class="brand-title">
-                    <span class="brand-grupo">Grupo</span>
-                    <span class="brand-sorrisos">Sorrisos</span>
+                    <span class="brand-grupo">Compras</span>
+                    <span class="brand-sorrisos">&amp; Estoque</span>
                 </h1>
                 <p class="brand-subtitle">
                     Sistema de Gestão de Estoque Odontológico<br>
