@@ -38,7 +38,7 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
             <div class="login-brand">
                 <div class="brand-wave" aria-hidden="true"></div>
                 <div class="brand-logo-card">
-                    <img src="assets/img/logo-grupo-sorrisos.svg" alt="Grupo Sorrisos Odontologia">
+                    <img src="assets/img/logo-grupo-sorrisos.png" alt="Grupo Sorrisos Odontologia">
                 </div>
                 <h1 class="brand-title">
                     <span class="brand-grupo">Compras</span>
