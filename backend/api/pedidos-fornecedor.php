@@ -240,6 +240,8 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                     p.valor_total,
                     p.observacoes,
                     p.observacoes_fornecedor,
+                    p.data_entrega_prevista,
+                    p.condicoes_pagamento,
                     p.url_nota_fiscal,
                     p.nf_nome_arquivo_original,
                     p.nf_data_envio,
@@ -260,6 +262,7 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                 AND (p.ativo = 1 OR p.ativo IS NULL)
                 GROUP BY p.id_pedido, p.numero_pedido, p.data_criacao, p.data_solicitacao, 
                          p.status, p.valor_total, p.observacoes, p.observacoes_fornecedor,
+                         p.data_entrega_prevista, p.condicoes_pagamento,
                          p.url_nota_fiscal, p.nf_nome_arquivo_original, p.nf_data_envio,
                          p.nf_id_usuario_envio, p.nf_tamanho_bytes,
                          f.razao_social, f.nome_filial, f.cnpj, u.nome_completo, un.nome_completo
@@ -292,6 +295,8 @@ function listarPedidosFornecedor($pdo, $fornecedor_id) {
                 'valor_total' => floatval($row['valor_total'] ?: 0),
                 'observacoes' => $row['observacoes'] ?: '',
                 'observacoes_fornecedor' => $row['observacoes_fornecedor'] ?: '',
+                'data_entrega_prevista' => $row['data_entrega_prevista'] ?? '',
+                'condicoes_pagamento' => $row['condicoes_pagamento'] ?? '',
                 'total_itens' => intval($row['total_itens'] ?: 0),
                 'url_nota_fiscal' => $row['url_nota_fiscal'] ?? '',
                 'nf_nome_arquivo_original' => $row['nf_nome_arquivo_original'] ?? '',
@@ -465,6 +470,20 @@ function responderPedido($pdo, $input, $fornecedor_id) {
         
         // Atualizar campos específicos do fornecedor (campos separados)
         try {
+            // Data vazia deve ir como NULL — string '' quebra DATE no MySQL e abortava o UPDATE
+            // (incluindo observacoes_fornecedor), por isso as observações “sumiam”.
+            $dataEntregaSql = null;
+            if (!empty($data_entrega_prevista) && preg_match('/^\d{4}-\d{2}-\d{2}/', (string) $data_entrega_prevista)) {
+                $dataEntregaSql = substr((string) $data_entrega_prevista, 0, 10);
+            } elseif (!empty($prazo_entrega) && preg_match('/^\d{4}-\d{2}-\d{2}/', (string) $prazo_entrega)) {
+                $dataEntregaSql = substr((string) $prazo_entrega, 0, 10);
+            }
+
+            $condicoesSql = trim((string) $condicoes_pagamento);
+            if ($condicoesSql === '') {
+                $condicoesSql = null;
+            }
+
             $sql_campos = "UPDATE tbl_pedidos_compra
                            SET observacoes_fornecedor = ?,
                                data_entrega_prevista = ?,
@@ -473,8 +492,8 @@ function responderPedido($pdo, $input, $fornecedor_id) {
             $stmt_campos = $pdo->prepare($sql_campos);
             $stmt_campos->execute([
                 $observacoes,
-                $prazo_entrega,
-                $condicoes_pagamento,
+                $dataEntregaSql,
+                $condicoesSql,
                 $pedido_id
             ]);
             
@@ -482,6 +501,7 @@ function responderPedido($pdo, $input, $fornecedor_id) {
             
         } catch (Exception $e) {
             error_log("Erro ao atualizar campos do fornecedor no pedido {$pedido_id}: " . $e->getMessage());
+            throw $e;
         }
         
         // Atualizar preços dos itens na tabela tbl_itens_pedido_compra

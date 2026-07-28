@@ -1937,6 +1937,16 @@ function responderPedido(pedidoId = null) {
     document.getElementById('pedido-numero-resposta').textContent = pedido.numero;
     document.getElementById('pedido-data-resposta').textContent = formatarData(pedido.data);
     document.getElementById('observacoes-fornecedor').value = pedido.observacoes_fornecedor || '';
+    restaurarBotaoSalvarResposta();
+    const prazoEl = document.getElementById('prazo-entrega');
+    if (prazoEl) {
+        const dataPrev = (pedido.data_entrega_prevista || '').toString().substring(0, 10);
+        prazoEl.value = dataPrev || '';
+    }
+    const condEl = document.getElementById('condicoes-pagamento');
+    if (condEl) {
+        condEl.value = pedido.condicoes_pagamento || '';
+    }
     document.getElementById('desconto-final-tipo').value = '';
     document.getElementById('desconto-final-valor').value = '';
     document.getElementById('desconto-final-valor').placeholder = '0,00';
@@ -1994,7 +2004,7 @@ function responderPedido(pedidoId = null) {
                                    placeholder="0,00" 
                                    onchange="calcularTotalItem(${index})"
                                    oninput="validarQuantidade(${index}, ${item.quantidade})">
-                            <div class="text-muted compact-help">Máx: ${item.quantidade} ${item.unidade}</div>
+                            <div class="text-muted compact-help">Solicitado: ${item.quantidade} ${item.unidade}</div>
                         </div>
                         <div class="col-6 col-md-2 compact-field">
                             <label class="form-label" for="preco-${index}">Preço (bruto)</label>
@@ -2138,20 +2148,23 @@ function filtrarItensRespostaFornecedor() {
     });
 }
 
-// Validar quantidade
+// Validar quantidade (fornecedor informa estoque disponível — sem teto pela qtd. solicitada)
 function validarQuantidade(index, quantidadeSolicitada) {
     const quantidadeInput = document.getElementById(`quantidade-${index}`);
     const quantidade = parseFloat(quantidadeInput.value) || 0;
     const infoQuantidade = document.getElementById(`info-quantidade-${index}`);
     
-    if (quantidade > quantidadeSolicitada) {
-        quantidadeInput.value = quantidadeSolicitada;
-        infoQuantidade.textContent = 'Quantidade ajustada para o máximo solicitado';
-        infoQuantidade.className = 'text-warning ms-2';
-    } else if (quantidade < quantidadeSolicitada && quantidade > 0) {
+    if (quantidade < 0) {
+        quantidadeInput.value = 0;
+        infoQuantidade.textContent = '';
+        infoQuantidade.className = 'text-muted ms-2';
+    } else if (quantidade > 0 && quantidadeSolicitada > 0 && quantidade > quantidadeSolicitada) {
+        infoQuantidade.textContent = `Estoque informado: ${quantidade} (solicitado: ${quantidadeSolicitada})`;
+        infoQuantidade.className = 'text-success ms-2';
+    } else if (quantidade > 0 && quantidade < quantidadeSolicitada) {
         infoQuantidade.textContent = `Disponível: ${quantidade} de ${quantidadeSolicitada} solicitados`;
         infoQuantidade.className = 'text-warning ms-2';
-    } else if (quantidade === quantidadeSolicitada) {
+    } else if (quantidade === quantidadeSolicitada && quantidade > 0) {
         infoQuantidade.textContent = 'Quantidade completa disponível';
         infoQuantidade.className = 'text-success ms-2';
     } else {
@@ -2815,6 +2828,15 @@ function calcularTotalItem(index) {
     calcularResumoFinal();
 }
 
+function restaurarBotaoSalvarResposta() {
+    const btnSalvar = document.getElementById('btn-salvar-resposta');
+    const iconSalvar = document.getElementById('icon-salvar-resposta');
+    const textSalvar = document.getElementById('text-salvar-resposta');
+    if (btnSalvar) btnSalvar.disabled = false;
+    if (iconSalvar) iconSalvar.className = 'bi bi-check-lg me-2';
+    if (textSalvar) textSalvar.textContent = 'Salvar Resposta';
+}
+
 // Salvar resposta
 async function salvarResposta() {
     // Obter referências do botão
@@ -2852,18 +2874,12 @@ async function salvarResposta() {
             
             if (disponivel === 'sim') {
                 if (preco <= 0) {
-                    // Restaurar botão em caso de erro de validação
-                    btnSalvar.disabled = false;
-                    iconSalvar.className = 'bi bi-check-lg me-2';
-                    textSalvar.textContent = 'Salvar Resposta';
+                    restaurarBotaoSalvarResposta();
                     Swal.fire('Erro', `Informe o preço para o item "${pedido.itens[i].nome}"`, 'error');
                     return;
                 }
                 if (quantidade <= 0) {
-                    // Restaurar botão em caso de erro de validação
-                    btnSalvar.disabled = false;
-                    iconSalvar.className = 'bi bi-check-lg me-2';
-                    textSalvar.textContent = 'Salvar Resposta';
+                    restaurarBotaoSalvarResposta();
                     Swal.fire('Erro', `Informe a quantidade disponível para o item "${pedido.itens[i].nome}"`, 'error');
                     return;
                 }
@@ -2915,22 +2931,34 @@ async function salvarResposta() {
             if (data.success) {
                 pedido.status = 'em_cotacao';
                 pedido.observacoes_fornecedor = (observacoes || '').trim();
+                pedido.data_entrega_prevista = (prazoEntrega || '').toString().substring(0, 10);
+                pedido.condicoes_pagamento = condicoesPagamento || '';
                 if (resumoFinal?.total_final != null) {
                     pedido.valor_total = resumoFinal.total_final;
                 }
                 if (Array.isArray(pedido.itens)) {
-                    pedido.itens.forEach((item) => {
+                    pedido.itens.forEach((item, idx) => {
+                        const resp = itensResposta[idx];
+                        if (!resp) return;
                         item.novo_pos_resposta = 0;
+                        item.quantidade_disponivel = resp.quantidade_disponivel;
+                        item.preco_fornecedor = resp.preco;
+                        item.disponivel = resp.disponivel === 'sim' ? 1 : 0;
+                        item.observacoes_item_fornecedor = resp.observacoes_item || '';
                     });
                 }
                 atualizarEstatisticas();
                 renderizarPedidos();
+
+                restaurarBotaoSalvarResposta();
                 
                 // Fechar modal
                 const modal = bootstrap.Modal.getInstance(document.getElementById('modalResponderPedido'));
                 modal.hide();
                 
                 Swal.fire('Sucesso', 'Resposta enviada com sucesso! O pedido está aguardando aprovação.', 'success');
+                // Recarrega do servidor para garantir observações/quantidades persistidas
+                carregarPedidos();
             } else {
                 throw new Error(data.error || 'Erro ao enviar resposta');
             }
@@ -2941,14 +2969,7 @@ async function salvarResposta() {
         
     } catch (error) {
         console.error('Erro:', error);
-        
-        // Restaurar botão em caso de erro
-        if (btnSalvar) {
-            btnSalvar.disabled = false;
-            if (iconSalvar) iconSalvar.className = 'bi bi-check-lg me-2';
-            if (textSalvar) textSalvar.textContent = 'Salvar Resposta';
-        }
-        
+        restaurarBotaoSalvarResposta();
         Swal.fire('Erro', error.message || 'Erro ao enviar resposta. Tente novamente.', 'error');
     }
 }
