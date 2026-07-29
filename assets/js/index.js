@@ -373,8 +373,6 @@ async function carregarDadosEstoque() {
                 document.getElementById('total-produtos').textContent = data.total_produtos || 0;
                 document.getElementById('estoque-baixo').textContent = data.produtos_estoque_baixo || 0;
                 document.getElementById('estoque-zerado').textContent = data.produtos_estoque_zerado || 0;
-                document.getElementById('valor-total').textContent = 
-                    'R$ ' + (data.valor_total_custo || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2});
             }
         }
     } catch (error) {
@@ -434,12 +432,11 @@ function zerarDashboardPedidosCompra() {
 }
 
 // Carregar pedidos (fases + total em aberto)
+// Visão geral das clínicas permitidas ao usuário (igual à listagem em pedidos-compra).
+// O seletor de clínica do topo continua filtrando estoque/produtos, não este card.
 async function carregarPedidosPendentes() {
     try {
         const params = new URLSearchParams({ action: 'stats' });
-        if (filialSelecionada && Number(filialSelecionada) > 0) {
-            params.append('filial_id', String(filialSelecionada));
-        }
         const response = await fetch(`backend/api/pedidos_compra.php?${params}`, {
             credentials: 'same-origin'
         });

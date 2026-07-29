@@ -226,7 +226,7 @@ $user = getCurrentUser();
             </div>
             <!-- Cards Summary -->
             <div class="row g-3 mb-4">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="card card-summary card-produtos">
                         <div class="card-body">
                             <div class="icon"><i class="bi bi-box"></i></div>
@@ -236,7 +236,7 @@ $user = getCurrentUser();
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="card card-summary card-baixo">
                         <div class="card-body">
                             <div class="icon"><i class="bi bi-bell"></i></div>
@@ -246,23 +246,13 @@ $user = getCurrentUser();
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="card card-summary card-zerado">
                         <div class="card-body">
                             <div class="icon"><i class="bi bi-box-seam"></i></div>
                             <h6 class="card-title">Estoque Zerado</h6>
                             <h3 class="card-text" id="estoque-zerado">0</h3>
                             <small>Produtos sem estoque</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card card-summary card-valor">
-                        <div class="card-body">
-                            <div class="icon"><i class="bi bi-currency-dollar"></i></div>
-                            <h6 class="card-title">Valor Total</h6>
-                            <h3 class="card-text" id="valor-total">R$ 0,00</h3>
-                            <small>Valor total em estoque</small>
                         </div>
                     </div>
                 </div>
@@ -289,7 +279,7 @@ $user = getCurrentUser();
                                     </span>
                                 </div>
                             </div>
-                            <p class="small text-muted mb-2">Com uma clínica selecionada acima, as quantidades são só dela. “Total em aberto” soma as fases até faturamento concluído (sem em trânsito / entregue).</p>
+                            <p class="small text-muted mb-2">Quantidades de todas as clínicas que você pode acessar (mesmo critério da tela de pedidos). “Total em aberto” soma as fases até faturamento (sem em trânsito / conferência / finalizado).</p>
                             <div class="dash-pedidos-fases row row-cols-2 row-cols-sm-3 row-cols-xl-5 g-2 mb-3">
                                 <div class="col">
                                     <div class="fase-item text-center h-100">

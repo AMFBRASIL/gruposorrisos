@@ -151,14 +151,26 @@ try {
                     break;
                     
                 case 'stats':
+                    // Filtra por clínica só se filial_id vier na URL (explícito).
+                    // Sem parâmetro: todas as clínicas permitidas ao usuário — não usa fallback
+                    // da sessão (isso zerava os indicadores quando a filial da sessão não tinha pedidos).
+                    $fidStats = isset($_GET['filial_id']) ? (int) $_GET['filial_id'] : 0;
                     try {
-                        $fidStats = resolverFilialIdRequisicao($pdoPedidos);
+                        if ($fidStats > 0) {
+                            exigirFilialPermitida($fidStats, $pdoPedidos);
+                            $stats = $pedidoCompra->getEstatisticas($fidStats);
+                        } else {
+                            $filiaisOk = obterFiliaisPermitidasUsuario($pdoPedidos);
+                            $idsFiliais = array_map(static function ($f) {
+                                return (int) ($f['id_filial'] ?? 0);
+                            }, $filiaisOk);
+                            $stats = $pedidoCompra->getEstatisticas(null, $idsFiliais);
+                        }
                     } catch (Exception $e) {
                         http_response_code(403);
                         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                         break;
                     }
-                    $stats = $pedidoCompra->getEstatisticas($fidStats);
                     echo json_encode(['success' => true, 'stats' => $stats]);
                     break;
                     

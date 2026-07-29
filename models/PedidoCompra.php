@@ -523,42 +523,75 @@ class PedidoCompra extends BaseModel {
     }
     
     /**
-     * Buscar estatísticas
+     * Buscar estatísticas de pedidos de compra (por fase do fluxo).
      *
-     * @param int|null $idFilial Se informado, restringe contagens à filial (alinhado ao seletor do dashboard).
+     * @param int|null   $idFilial          Uma clínica específica (opcional).
+     * @param int[]|null $idsFiliaisFiltro  Lista de clínicas permitidas quando $idFilial não é informado.
      */
-    public function getEstatisticas(?int $idFilial = null) {
+    public function getEstatisticas(?int $idFilial = null, ?array $idsFiliaisFiltro = null) {
+        // Normalização no SQL (mesmo mapa de fluxoPedidoNormalizarStatus) para status legado + atual.
+        $faseSql = "CASE LOWER(TRIM(COALESCE(status, '')))
+            WHEN 'em_analise' THEN 'aguardando_cotacao'
+            WHEN 'pendente' THEN 'aguardando_cotacao'
+            WHEN 'aguardando_aprovacao' THEN 'aguardando_cotacao'
+            WHEN 'rascunho' THEN 'aguardando_cotacao'
+            WHEN 'aprovado_cotacao' THEN 'em_cotacao'
+            WHEN 'enviar_para_faturamento' THEN 'aguardando_faturamento'
+            WHEN 'enviar_faturamento' THEN 'aguardando_faturamento'
+            WHEN 'aprovado_para_faturar' THEN 'em_faturamento'
+            WHEN 'faturado' THEN 'em_faturamento'
+            WHEN 'enviado' THEN 'em_transito'
+            WHEN 'entregue' THEN 'em_conferencia'
+            WHEN 'recebido' THEN 'finalizado'
+            WHEN 'parcialmente_recebido' THEN 'em_conferencia'
+            WHEN '' THEN 'aguardando_cotacao'
+            ELSE LOWER(TRIM(COALESCE(status, '')))
+        END";
+
         $sql = "SELECT 
                 COUNT(*) as total_pedidos,
-                COUNT(CASE WHEN status NOT IN ('finalizado', 'cancelado', 'recebido') THEN 1 END) as indicador_pedidos_pendentes,
-                COUNT(CASE WHEN status IN (
-                    'aguardando_cotacao', 'em_analise', 'pendente', 'aguardando_aprovacao', 'rascunho'
-                ) THEN 1 END) as fase_aguardando_cotacao,
-                COUNT(CASE WHEN status IN ('em_cotacao', 'aprovado_cotacao') THEN 1 END) as fase_em_cotacao,
-                COUNT(CASE WHEN status IN (
-                    'aguardando_aprovacao_socio', 'aprovado_socio'
-                ) THEN 1 END) as fase_aprovacao_socio,
-                COUNT(CASE WHEN status IN (
-                    'aguardando_faturamento', 'enviar_para_faturamento', 'enviar_faturamento'
-                ) THEN 1 END) as fase_aguardando_faturamento,
-                COUNT(CASE WHEN status IN (
-                    'em_faturamento', 'aprovado_para_faturar', 'faturado',
-                    'em_producao', 'aprovado'
-                ) THEN 1 END) as fase_em_faturamento,
-                COUNT(CASE WHEN status IN ('em_transito', 'enviado') THEN 1 END) as fase_em_transito,
-                COUNT(CASE WHEN status IN ('em_conferencia', 'entregue', 'parcialmente_recebido') THEN 1 END) as em_conferencia,
-                COUNT(CASE WHEN status IN ('finalizado', 'recebido') THEN 1 END) as finalizados,
-                COUNT(CASE WHEN status = 'cancelado' THEN 1 END) as cancelados,
+                COUNT(CASE WHEN ({$faseSql}) = 'aguardando_cotacao' THEN 1 END) as fase_aguardando_cotacao,
+                COUNT(CASE WHEN ({$faseSql}) = 'em_cotacao' THEN 1 END) as fase_em_cotacao,
+                COUNT(CASE WHEN ({$faseSql}) = 'aguardando_aprovacao_socio' THEN 1 END) as fase_aprovacao_socio,
+                COUNT(CASE WHEN ({$faseSql}) IN ('aprovado_socio', 'aguardando_faturamento') THEN 1 END) as fase_aguardando_faturamento,
+                COUNT(CASE WHEN ({$faseSql}) IN ('em_faturamento', 'aprovado', 'em_producao') THEN 1 END) as fase_em_faturamento,
+                COUNT(CASE WHEN ({$faseSql}) = 'em_transito' THEN 1 END) as fase_em_transito,
+                COUNT(CASE WHEN ({$faseSql}) = 'em_conferencia' THEN 1 END) as em_conferencia,
+                COUNT(CASE WHEN ({$faseSql}) = 'finalizado' THEN 1 END) as finalizados,
+                COUNT(CASE WHEN ({$faseSql}) = 'cancelado' THEN 1 END) as cancelados,
+                COUNT(CASE WHEN ({$faseSql}) = 'em_producao' THEN 1 END) as em_producao,
                 SUM(valor_total) as valor_total,
                 COUNT(CASE WHEN DATE(data_criacao) = CURDATE() THEN 1 END) as hoje
-                FROM {$this->table}";
-        
+                FROM {$this->table}
+                WHERE (ativo = 1 OR ativo IS NULL)";
+
         $params = [];
         if ($idFilial !== null && $idFilial > 0) {
-            $sql .= ' WHERE id_filial = ?';
+            $sql .= ' AND id_filial = ?';
             $params[] = $idFilial;
+        } elseif (is_array($idsFiliaisFiltro)) {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $idsFiliaisFiltro), static function ($id) {
+                return $id > 0;
+            })));
+            if (empty($ids)) {
+                return [
+                    'total_pedidos' => 0,
+                    'indicador_pedidos_pendentes' => 0,
+                    'em_producao' => 0,
+                    'fases_pedidos_compra' => [
+                        'em_analise' => 0,
+                        'pendente' => 0,
+                        'aprovado' => 0,
+                        'envio_faturamento' => 0,
+                        'em_faturamento' => 0,
+                    ],
+                ];
+            }
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $sql .= " AND id_filial IN ($placeholders)";
+            $params = array_merge($params, $ids);
         }
-        
+
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -566,6 +599,7 @@ class PedidoCompra extends BaseModel {
             return [
                 'total_pedidos' => 0,
                 'indicador_pedidos_pendentes' => 0,
+                'em_producao' => 0,
                 'fases_pedidos_compra' => [
                     'em_analise' => 0,
                     'pendente' => 0,
@@ -576,13 +610,17 @@ class PedidoCompra extends BaseModel {
             ];
         }
 
-        $result['fases_pedidos_compra'] = [
+        $fases = [
             'em_analise' => (int) ($result['fase_aguardando_cotacao'] ?? 0),
             'pendente' => (int) ($result['fase_em_cotacao'] ?? 0),
             'aprovado' => (int) ($result['fase_aprovacao_socio'] ?? 0),
             'envio_faturamento' => (int) ($result['fase_aguardando_faturamento'] ?? 0),
             'em_faturamento' => (int) ($result['fase_em_faturamento'] ?? 0),
         ];
+
+        // “Total em aberto” = soma das 5 fases do card (até faturamento; sem trânsito/conferência/finalizado).
+        $result['fases_pedidos_compra'] = $fases;
+        $result['indicador_pedidos_pendentes'] = array_sum($fases);
 
         return $result;
     }
