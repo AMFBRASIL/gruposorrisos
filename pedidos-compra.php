@@ -83,6 +83,34 @@ $pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
             margin-left: 8px;
             display: inline-block;
         }
+
+        /* Ordenação / filtro de itens nos modais */
+        th.th-ordenavel {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            position: relative;
+        }
+        th.th-ordenavel:hover {
+            background: #eef2f7 !important;
+            color: #0d6efd;
+        }
+        th.th-ordenavel .sort-icon {
+            font-size: 0.75rem;
+            opacity: 0.45;
+            margin-left: 4px;
+        }
+        th.th-ordenavel.sort-asc .sort-icon,
+        th.th-ordenavel.sort-desc .sort-icon {
+            opacity: 1;
+            color: #0d6efd;
+        }
+        .toolbar-filtro-itens {
+            background: #f8fafc;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 0.65rem 0.75rem;
+        }
         
         /* Estilos simples para a tabela */
         .table-simple {
@@ -545,24 +573,48 @@ $pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
                     </div>
 
                     <div id="busca-itens-pedido-existente" class="mb-3 d-none">
-                        <label for="filtro-itens-pedido-existente" class="form-label mb-1">
-                            Buscar item na lista já criada
-                        </label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text"><i class="bi bi-search"></i></span>
-                            <input
-                                type="text"
-                                class="form-control"
-                                id="filtro-itens-pedido-existente"
-                                placeholder="Digite código ou nome para conferir se o item existe no pedido..."
-                                oninput="filtrarItensPedidoExistente()">
-                            <button type="button" class="btn btn-outline-secondary" onclick="limparBuscaItensPedidoExistente()">
-                                <i class="bi bi-x-circle me-1"></i>Limpar
-                            </button>
+                        <div class="toolbar-filtro-itens">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-6">
+                                    <label for="filtro-itens-pedido-existente" class="form-label mb-1 small fw-semibold">
+                                        Filtrar itens do pedido
+                                    </label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            id="filtro-itens-pedido-existente"
+                                            placeholder="Código, nome do material..."
+                                            oninput="filtrarItensPedidoExistente()">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="ordenar-itens-pedido-existente" class="form-label mb-1 small fw-semibold">Ordenar por</label>
+                                    <select class="form-select form-select-sm" id="ordenar-itens-pedido-existente" onchange="ordenarItensPedidoExistenteSelect()">
+                                        <option value="">Padrão (ordem do pedido)</option>
+                                        <option value="material:asc">Material (A → Z)</option>
+                                        <option value="material:desc">Material (Z → A)</option>
+                                        <option value="estoque:asc">Estoque (menor → maior)</option>
+                                        <option value="estoque:desc">Estoque (maior → menor)</option>
+                                        <option value="preco:asc">Preço (menor → maior)</option>
+                                        <option value="preco:desc">Preço (maior → menor)</option>
+                                        <option value="quantidade:asc">Quantidade (menor → maior)</option>
+                                        <option value="quantidade:desc">Quantidade (maior → menor)</option>
+                                        <option value="total:asc">Total (menor → maior)</option>
+                                        <option value="total:desc">Total (maior → menor)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="limparBuscaItensPedidoExistente()">
+                                        <i class="bi bi-x-circle me-1"></i>Limpar
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-2" id="resultado-busca-itens-pedido-existente">
+                                Informe um termo para filtrar ou clique nas colunas para ordenar.
+                            </small>
                         </div>
-                        <small class="text-muted" id="resultado-busca-itens-pedido-existente">
-                            Informe um termo para conferir os itens deste pedido.
-                        </small>
                     </div>
 
                     <div class="alert alert-danger py-2 px-3 d-none mb-3" id="edit-alerta-itens-pendentes-resposta">
@@ -800,16 +852,65 @@ $pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
                             <i class="bi bi-exclamation-triangle me-1"></i>
                             <span id="view-alerta-itens-pendentes-resposta-texto"></span>
                         </div>
+                        <div class="toolbar-filtro-itens mb-2" id="view-filtro-itens-toolbar">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-6">
+                                    <label for="view-filtro-itens" class="form-label mb-1 small fw-semibold">Filtrar itens</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input type="text" class="form-control" id="view-filtro-itens"
+                                               placeholder="Código, nome ou observação..."
+                                               oninput="filtrarItensVisualizarPedido()">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="view-ordenar-itens" class="form-label mb-1 small fw-semibold">Ordenar por</label>
+                                    <select class="form-select form-select-sm" id="view-ordenar-itens" onchange="ordenarItensVisualizarPedidoSelect()">
+                                        <option value="">Padrão (ordem do pedido)</option>
+                                        <option value="material:asc">Material (A → Z)</option>
+                                        <option value="material:desc">Material (Z → A)</option>
+                                        <option value="qtd_sol:asc">Qtd. solicitada (menor → maior)</option>
+                                        <option value="qtd_sol:desc">Qtd. solicitada (maior → menor)</option>
+                                        <option value="qtd_disp:asc">Qtd. disponível (menor → maior)</option>
+                                        <option value="qtd_disp:desc">Qtd. disponível (maior → menor)</option>
+                                        <option value="preco:asc">Preço (menor → maior)</option>
+                                        <option value="preco:desc">Preço (maior → menor)</option>
+                                        <option value="total:asc">Total (menor → maior)</option>
+                                        <option value="total:desc">Total (maior → menor)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="limparFiltroItensVisualizarPedido()">
+                                        <i class="bi bi-x-circle me-1"></i>Limpar
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-2" id="view-filtro-itens-resultado">
+                                Clique nas colunas para ordenar ou use o filtro acima.
+                            </small>
+                        </div>
                         <div class="itens-scroll-box itens-scroll-box--resize">
-                            <table class="table table-sm table-hover mb-0">
+                            <table class="table table-sm table-hover mb-0" id="view_itens_table">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Material</th>
-                                        <th class="text-center">Quantidade Solicitada</th>
-                                        <th class="text-center">Quantidade Disponível</th>
-                                        <th class="text-center">Preço Unit.</th>
-                                        <th class="text-center">Total</th>
-                                        <th>Observação do Item</th>
+                                        <th class="th-ordenavel" data-sort-key="material" data-sort-type="text" data-sort-table="view" title="Clique para ordenar">
+                                            Material <i class="bi bi-arrow-down-up sort-icon"></i>
+                                        </th>
+                                        <th class="text-center th-ordenavel" data-sort-key="qtd_sol" data-sort-type="number" data-sort-table="view" title="Clique para ordenar">
+                                            Quantidade Solicitada <i class="bi bi-arrow-down-up sort-icon"></i>
+                                        </th>
+                                        <th class="text-center th-ordenavel" data-sort-key="qtd_disp" data-sort-type="number" data-sort-table="view" title="Clique para ordenar">
+                                            Quantidade Disponível <i class="bi bi-arrow-down-up sort-icon"></i>
+                                        </th>
+                                        <th class="text-center th-ordenavel" data-sort-key="preco" data-sort-type="number" data-sort-table="view" title="Clique para ordenar">
+                                            Preço Unit. <i class="bi bi-arrow-down-up sort-icon"></i>
+                                        </th>
+                                        <th class="text-center th-ordenavel" data-sort-key="total" data-sort-type="number" data-sort-table="view" title="Clique para ordenar">
+                                            Total <i class="bi bi-arrow-down-up sort-icon"></i>
+                                        </th>
+                                        <th class="th-ordenavel" data-sort-key="obs" data-sort-type="text" data-sort-table="view" title="Clique para ordenar">
+                                            Observação do Item <i class="bi bi-arrow-down-up sort-icon"></i>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody id="view_itens_tbody">

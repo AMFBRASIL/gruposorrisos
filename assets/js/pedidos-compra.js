@@ -621,15 +621,27 @@ function renderizarResultadoPesquisa(materiais) {
                 <i class="bi bi-search me-2"></i>Materiais Selecionados para Pedido
             </h6>
             <div class="table-responsive">
-                <table class="table table-sm table-hover">
+                <table class="table table-sm table-hover" id="tabela-itens-pedido-edit">
                     <thead class="table-light">
                         <tr>
-                            <th>Material</th>
-                            <th>Estoque</th>
-                            <th>Preço Unit.</th>
-                            <th>Quantidade</th>
-                            <th>Valor Unit.</th>
-                            <th>Total</th>
+                            <th class="th-ordenavel" data-sort-key="material" data-sort-type="text" data-sort-table="edit" title="Clique para ordenar">
+                                Material <i class="bi bi-arrow-down-up sort-icon"></i>
+                            </th>
+                            <th class="th-ordenavel" data-sort-key="estoque" data-sort-type="number" data-sort-table="edit" title="Clique para ordenar">
+                                Estoque <i class="bi bi-arrow-down-up sort-icon"></i>
+                            </th>
+                            <th class="th-ordenavel" data-sort-key="preco" data-sort-type="number" data-sort-table="edit" title="Clique para ordenar">
+                                Preço Unit. <i class="bi bi-arrow-down-up sort-icon"></i>
+                            </th>
+                            <th class="th-ordenavel" data-sort-key="quantidade" data-sort-type="number" data-sort-table="edit" title="Clique para ordenar">
+                                Quantidade <i class="bi bi-arrow-down-up sort-icon"></i>
+                            </th>
+                            <th class="th-ordenavel" data-sort-key="valor_unit" data-sort-type="number" data-sort-table="edit" title="Clique para ordenar">
+                                Valor Unit. <i class="bi bi-arrow-down-up sort-icon"></i>
+                            </th>
+                            <th class="th-ordenavel" data-sort-key="total" data-sort-type="number" data-sort-table="edit" title="Clique para ordenar">
+                                Total <i class="bi bi-arrow-down-up sort-icon"></i>
+                            </th>
                             <th>Ação</th>
                         </tr>
                     </thead>
@@ -641,16 +653,18 @@ function renderizarResultadoPesquisa(materiais) {
         
         // Adicionar a nova tabela ao container (após os materiais com estoque baixo)
         container.appendChild(tabelaPesquisados);
+        ativarCabecalhosOrdenaveisTabela('#tabela-itens-pedido-edit');
     }
     
     // Adicionar materiais à tabela existente
     const tbody = tabelaPesquisados.querySelector('#tbody-materiais-pesquisados');
+    let proximoSortIndex = tbody.querySelectorAll('tr').length;
     
     materiais.forEach((material, index) => {
         console.log(`🔧 Adicionando material pesquisado ${index}:`, material);
         
         // Verificar se o material já existe na tabela
-        const materialExistente = tbody.querySelector(`[data-material-id="${material.id_material}"]`);
+        const materialExistente = tbody.querySelector(`tr[data-material-id="${material.id_material}"]`);
         if (materialExistente) {
             if (parseInt(material?.novo_pos_resposta || 0, 10) === 1) {
                 materialExistente.classList.add('item-pendente-resposta');
@@ -665,6 +679,17 @@ function renderizarResultadoPesquisa(materiais) {
         
         const tr = document.createElement('tr');
         tr.setAttribute('data-material-id', material.id_material);
+        const codigoMat = (material.codigo || '').toString();
+        const nomeMat = (material.nome || '').toString();
+        const estoqueMat = parseFloat(material.estoque_atual) || 0;
+        const precoMat = parseFloat(material.preco_unitario) || 0;
+        tr.dataset.sortIndex = String(proximoSortIndex++);
+        tr.dataset.sortMaterial = `${codigoMat} ${nomeMat}`;
+        tr.dataset.sortEstoque = String(estoqueMat);
+        tr.dataset.sortPreco = String(precoMat);
+        tr.dataset.sortQuantidade = '0';
+        tr.dataset.sortValorUnit = String(precoMat);
+        tr.dataset.sortTotal = '0';
         if (parseInt(material?.novo_pos_resposta || 0, 10) === 1) {
             tr.classList.add('item-pendente-resposta');
         }
@@ -750,6 +775,148 @@ function normalizarTextoComparacao(valor) {
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .trim();
+}
+
+/** Estado de ordenação das tabelas de itens (edit / view). */
+const estadoOrdenacaoItensPedido = {
+    edit: { key: null, dir: 'asc' },
+    view: { key: null, dir: 'asc' }
+};
+
+function obterValorOrdenacaoLinhaItem(linha, chave, tipo) {
+    // Valores dinâmicos do modal de edição (inputs)
+    if (chave === 'quantidade') {
+        const input = linha.querySelector('.quantidade-pesquisada');
+        if (input) return parseFloat(input.value) || 0;
+    }
+    if (chave === 'valor_unit') {
+        const input = linha.querySelector('.valor-unitario-pesquisado');
+        if (input && typeof converterMoedaParaNumero === 'function') {
+            return converterMoedaParaNumero(input.value);
+        }
+    }
+    if (chave === 'total') {
+        const input = linha.querySelector('.valor-total-material-pesquisado');
+        if (input && typeof converterMoedaParaNumero === 'function') {
+            return converterMoedaParaNumero(input.value);
+        }
+        const attrTotal = linha.dataset.sortTotal;
+        if (attrTotal !== undefined) return parseFloat(attrTotal) || 0;
+    }
+
+    const mapaAttr = {
+        material: 'sortMaterial',
+        estoque: 'sortEstoque',
+        preco: 'sortPreco',
+        quantidade: 'sortQuantidade',
+        valor_unit: 'sortValorUnit',
+        total: 'sortTotal',
+        qtd_sol: 'sortQtdSol',
+        qtd_disp: 'sortQtdDisp',
+        obs: 'sortObs'
+    };
+    const attr = mapaAttr[chave];
+    const raw = attr ? (linha.dataset[attr] ?? '') : '';
+
+    if (tipo === 'number') {
+        const n = parseFloat(raw);
+        return Number.isFinite(n) ? n : 0;
+    }
+    return normalizarTextoComparacao(raw);
+}
+
+function atualizarIconesOrdenacaoTabela(table, chaveAtiva, direcao) {
+    if (!table) return;
+    table.querySelectorAll('th.th-ordenavel').forEach((th) => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        const icon = th.querySelector('.sort-icon');
+        const key = th.getAttribute('data-sort-key');
+        if (key === chaveAtiva) {
+            th.classList.add(direcao === 'desc' ? 'sort-desc' : 'sort-asc');
+            if (icon) icon.className = `bi ${direcao === 'desc' ? 'bi-sort-down' : 'bi-sort-up'} sort-icon`;
+        } else if (icon) {
+            icon.className = 'bi bi-arrow-down-up sort-icon';
+        }
+    });
+}
+
+function ordenarLinhasTabelaItensPedido(tableIdOrEl, chave, tipo = 'text', direcao = 'asc', estadoKey = 'edit') {
+    const table = typeof tableIdOrEl === 'string' ? document.querySelector(tableIdOrEl) : tableIdOrEl;
+    if (!table) return;
+    const tbody = table.tBodies[0] || table.querySelector('tbody');
+    if (!tbody) return;
+
+    const linhas = Array.from(tbody.querySelectorAll('tr')).filter((tr) => !tr.classList.contains('linha-vazia-itens'));
+    linhas.sort((a, b) => {
+        const va = obterValorOrdenacaoLinhaItem(a, chave, tipo);
+        const vb = obterValorOrdenacaoLinhaItem(b, chave, tipo);
+        let cmp = 0;
+        if (tipo === 'number') {
+            cmp = (va || 0) - (vb || 0);
+        } else {
+            cmp = String(va).localeCompare(String(vb), 'pt-BR', { numeric: true, sensitivity: 'base' });
+        }
+        return direcao === 'desc' ? -cmp : cmp;
+    });
+    linhas.forEach((tr) => tbody.appendChild(tr));
+
+    estadoOrdenacaoItensPedido[estadoKey] = { key: chave, dir: direcao };
+    atualizarIconesOrdenacaoTabela(table, chave, direcao);
+}
+
+function ativarCabecalhosOrdenaveisTabela(tableSelector) {
+    const table = document.querySelector(tableSelector);
+    if (!table || table.dataset.sortBound === '1') return;
+    table.dataset.sortBound = '1';
+
+    table.querySelectorAll('th.th-ordenavel').forEach((th) => {
+        th.addEventListener('click', () => {
+            const chave = th.getAttribute('data-sort-key');
+            const tipo = th.getAttribute('data-sort-type') || 'text';
+            const estadoKey = th.getAttribute('data-sort-table') || 'edit';
+            if (!chave) return;
+
+            const estado = estadoOrdenacaoItensPedido[estadoKey] || { key: null, dir: 'asc' };
+            const novaDir = (estado.key === chave && estado.dir === 'asc') ? 'desc' : 'asc';
+            ordenarLinhasTabelaItensPedido(table, chave, tipo, novaDir, estadoKey);
+
+            // Sincroniza o select da toolbar, se existir
+            const selectId = estadoKey === 'view' ? 'view-ordenar-itens' : 'ordenar-itens-pedido-existente';
+            const select = document.getElementById(selectId);
+            if (select) {
+                const valor = `${chave}:${novaDir}`;
+                if ([...select.options].some((o) => o.value === valor)) {
+                    select.value = valor;
+                }
+            }
+
+            if (estadoKey === 'edit') filtrarItensPedidoExistente();
+            if (estadoKey === 'view') filtrarItensVisualizarPedido();
+        });
+    });
+}
+
+function restaurarOrdemPadraoTabelaItens(tableSelector, estadoKey) {
+    const table = document.querySelector(tableSelector);
+    if (!table) return;
+    const tbody = table.tBodies[0] || table.querySelector('tbody');
+    if (!tbody) return;
+    const linhas = Array.from(tbody.querySelectorAll('tr')).filter((tr) => !tr.classList.contains('linha-vazia-itens'));
+    linhas.sort((a, b) => (parseInt(a.dataset.sortIndex || '0', 10) || 0) - (parseInt(b.dataset.sortIndex || '0', 10) || 0));
+    linhas.forEach((tr) => tbody.appendChild(tr));
+    estadoOrdenacaoItensPedido[estadoKey] = { key: null, dir: 'asc' };
+    atualizarIconesOrdenacaoTabela(table, null, 'asc');
+}
+
+function aplicarOrdenacaoPorSelect(selectValue, tableSelector, estadoKey) {
+    if (!selectValue) {
+        restaurarOrdemPadraoTabelaItens(tableSelector, estadoKey);
+        return;
+    }
+    const [chave, dir] = selectValue.split(':');
+    const th = document.querySelector(`${tableSelector} th.th-ordenavel[data-sort-key="${chave}"]`);
+    const tipo = th?.getAttribute('data-sort-type') || (chave === 'material' || chave === 'obs' ? 'text' : 'number');
+    ordenarLinhasTabelaItensPedido(tableSelector, chave, tipo, dir || 'asc', estadoKey);
 }
 
 function extrairObservacaoFornecedorItem(observacoesBrutas) {
@@ -1039,6 +1206,7 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarFornecedores();
     carregarFiliais();
     carregarMateriais();
+    ativarCabecalhosOrdenaveisTabela('#view_itens_table');
 
     if (!pedidoPodeCriarNovo()) {
         document.querySelectorAll('[onclick*="abrirModalNovoPedido"]').forEach(btn => {
@@ -1897,14 +2065,17 @@ function configurarBuscaItensPedidoExistente(ativo) {
     const box = document.getElementById('busca-itens-pedido-existente');
     const input = document.getElementById('filtro-itens-pedido-existente');
     const resultado = document.getElementById('resultado-busca-itens-pedido-existente');
+    const selectOrdenar = document.getElementById('ordenar-itens-pedido-existente');
 
     if (!box) return;
 
     box.classList.toggle('d-none', !ativo);
     if (!ativo) {
         if (input) input.value = '';
+        if (selectOrdenar) selectOrdenar.value = '';
+        estadoOrdenacaoItensPedido.edit = { key: null, dir: 'asc' };
         if (resultado) {
-            resultado.textContent = 'Informe um termo para conferir os itens deste pedido.';
+            resultado.textContent = 'Informe um termo para filtrar ou clique nas colunas para ordenar.';
         }
         document.querySelectorAll('.tabela-materiais-pesquisados tbody tr').forEach(linha => {
             linha.style.display = '';
@@ -1913,6 +2084,7 @@ function configurarBuscaItensPedidoExistente(ativo) {
         return;
     }
 
+    ativarCabecalhosOrdenaveisTabela('#tabela-itens-pedido-edit');
     filtrarItensPedidoExistente();
 }
 
@@ -1931,27 +2103,91 @@ function filtrarItensPedidoExistente() {
 
     let encontrados = 0;
     linhas.forEach(linha => {
-        const textoLinha = normalizarTextoComparacao(linha.textContent || '');
-        const corresponde = !termo || textoLinha.includes(termo);
+        const textoMaterial = normalizarTextoComparacao(linha.dataset.sortMaterial || linha.textContent || '');
+        const corresponde = !termo || textoMaterial.includes(termo);
         linha.style.display = corresponde ? '' : 'none';
         linha.classList.toggle('table-success', Boolean(termo && corresponde));
         if (corresponde) encontrados++;
     });
 
+    const ord = estadoOrdenacaoItensPedido.edit?.key
+        ? ` · ordenado por ${estadoOrdenacaoItensPedido.edit.key} (${estadoOrdenacaoItensPedido.edit.dir})`
+        : '';
+
     if (!termo) {
-        resultado.textContent = `Lista com ${linhas.length} item(ns) do pedido. Digite para conferir se um item existe.`;
+        resultado.textContent = `Exibindo ${linhas.length} item(ns). Use o filtro, o seletor ou clique nas colunas.${ord}`;
         return;
     }
 
     resultado.textContent = encontrados > 0
-        ? `${encontrados} item(ns) encontrado(s) na lista já criada.`
-        : 'Nenhum item encontrado na lista já criada.';
+        ? `Exibindo ${encontrados} de ${linhas.length} item(ns).${ord}`
+        : 'Nenhum item encontrado com esse filtro.';
+}
+
+function ordenarItensPedidoExistenteSelect() {
+    const select = document.getElementById('ordenar-itens-pedido-existente');
+    aplicarOrdenacaoPorSelect(select?.value || '', '#tabela-itens-pedido-edit', 'edit');
+    filtrarItensPedidoExistente();
 }
 
 function limparBuscaItensPedidoExistente() {
     const input = document.getElementById('filtro-itens-pedido-existente');
+    const select = document.getElementById('ordenar-itens-pedido-existente');
     if (input) input.value = '';
+    if (select) select.value = '';
+    restaurarOrdemPadraoTabelaItens('#tabela-itens-pedido-edit', 'edit');
     filtrarItensPedidoExistente();
+}
+
+function filtrarItensVisualizarPedido() {
+    const input = document.getElementById('view-filtro-itens');
+    const resultado = document.getElementById('view-filtro-itens-resultado');
+    const termo = normalizarTextoComparacao(input?.value || '');
+    const linhas = document.querySelectorAll('#view_itens_tbody tr');
+
+    if (!resultado) return;
+
+    const linhasDados = Array.from(linhas).filter((tr) => !tr.classList.contains('linha-vazia-itens'));
+    if (linhasDados.length === 0) {
+        resultado.textContent = 'Nenhum item neste pedido.';
+        return;
+    }
+
+    let encontrados = 0;
+    linhasDados.forEach((linha) => {
+        const texto = normalizarTextoComparacao(
+            `${linha.dataset.sortMaterial || ''} ${linha.dataset.sortObs || ''} ${linha.textContent || ''}`
+        );
+        const corresponde = !termo || texto.includes(termo);
+        linha.style.display = corresponde ? '' : 'none';
+        linha.classList.toggle('table-success', Boolean(termo && corresponde));
+        if (corresponde) encontrados++;
+    });
+
+    const ord = estadoOrdenacaoItensPedido.view?.key
+        ? ` · ordenado por ${estadoOrdenacaoItensPedido.view.key}`
+        : '';
+
+    resultado.textContent = !termo
+        ? `Exibindo ${linhasDados.length} item(ns). Clique nas colunas ou use o filtro.${ord}`
+        : (encontrados > 0
+            ? `Exibindo ${encontrados} de ${linhasDados.length} item(ns).${ord}`
+            : 'Nenhum item encontrado com esse filtro.');
+}
+
+function ordenarItensVisualizarPedidoSelect() {
+    const select = document.getElementById('view-ordenar-itens');
+    aplicarOrdenacaoPorSelect(select?.value || '', '#view_itens_table', 'view');
+    filtrarItensVisualizarPedido();
+}
+
+function limparFiltroItensVisualizarPedido() {
+    const input = document.getElementById('view-filtro-itens');
+    const select = document.getElementById('view-ordenar-itens');
+    if (input) input.value = '';
+    if (select) select.value = '';
+    restaurarOrdemPadraoTabelaItens('#view_itens_table', 'view');
+    filtrarItensVisualizarPedido();
 }
 
 function removerItemEstoqueBaixo(index) {
@@ -2084,6 +2320,13 @@ function calcularTotalMaterialPesquisado(materialId) {
     
     valorTotalInput.value = formatarMoeda(valorTotal);
     console.log(`✅ Valor total atualizado: ${valorTotalInput.value}`);
+
+    const linha = quantidadeInput.closest('tr');
+    if (linha) {
+        linha.dataset.sortQuantidade = String(quantidade);
+        linha.dataset.sortValorUnit = String(valorUnitario);
+        linha.dataset.sortTotal = String(valorTotal);
+    }
     
     calcularTotalPedido();
 }
@@ -2389,6 +2632,13 @@ async function visualizarPedido(id) {
             let precoMedio = 0;
             const pctDescontoCotacao = obterPercentualDescontoCotacaoPedido(pedido);
             
+            // Reset filtro/ordenação do modal visualizar
+            const viewFiltroInput = document.getElementById('view-filtro-itens');
+            const viewOrdenarSelect = document.getElementById('view-ordenar-itens');
+            if (viewFiltroInput) viewFiltroInput.value = '';
+            if (viewOrdenarSelect) viewOrdenarSelect.value = '';
+            estadoOrdenacaoItensPedido.view = { key: null, dir: 'asc' };
+
             // Renderizar itens e calcular métricas
             const tbody = document.getElementById('view_itens_tbody');
             if (tbody) {
@@ -2397,7 +2647,7 @@ async function visualizarPedido(id) {
             if (pedido.itens && pedido.itens.length > 0) {
                     totalItens = pedido.itens.length;
                     
-                pedido.itens.forEach(item => {
+                pedido.itens.forEach((item, idxItem) => {
                         // Quantidade solicitada (campo quantidade)
                         const quantidadeSolicitada = parseFloat(item.quantidade) || 0;
                         
@@ -2467,10 +2717,27 @@ async function visualizarPedido(id) {
                         qtdDisponivelHtml = `<span class="text-muted">Aguardando resposta</span>`;
                     }
                     
+                    const obsItem = extrairObservacaoFornecedorItem(item.observacoes) || '';
+                    const codigoItem = item.codigo_material || 'N/A';
+                    const nomeItem = item.nome_material || 'Material não encontrado';
+                    row.dataset.sortIndex = String(idxItem);
+                    row.dataset.sortMaterial = `${codigoItem} ${nomeItem}`;
+                    row.dataset.sortQtdSol = String(quantidadeSolicitada);
+                    row.dataset.sortQtdDisp = String(
+                        disponivel === 0
+                            ? -1
+                            : ((quantidadeDisponivel !== null && !Number.isNaN(quantidadeDisponivel))
+                                ? quantidadeDisponivel
+                                : (disponivel === 1 ? quantidadeSolicitada : -2))
+                    );
+                    row.dataset.sortPreco = String(precoParaCalculo);
+                    row.dataset.sortTotal = String(valorItem);
+                    row.dataset.sortObs = obsItem || 'Sem observação';
+
                     row.innerHTML = `
                             <td>
-                                <strong>${item.codigo_material || 'N/A'}</strong><br>
-                                <small class="text-muted">${item.nome_material || 'Material não encontrado'}</small>
+                                <strong>${codigoItem}</strong><br>
+                                <small class="text-muted">${nomeItem}</small>
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-primary">${quantidadeSolicitada}</span>
@@ -2486,7 +2753,7 @@ async function visualizarPedido(id) {
                                 <strong class="text-success">${formatarMoeda(valorItem)}</strong>
                             </td>
                             <td>
-                                <small class="text-muted">${extrairObservacaoFornecedorItem(item.observacoes) || 'Sem observação'}</small>
+                                <small class="text-muted">${obsItem || 'Sem observação'}</small>
                             </td>
                     `;
                     tbody.appendChild(row);
@@ -2498,8 +2765,12 @@ async function visualizarPedido(id) {
                     } else {
                         precoMedio = 0;
                     }
+                    ativarCabecalhosOrdenaveisTabela('#view_itens_table');
+                    atualizarIconesOrdenacaoTabela(document.querySelector('#view_itens_table'), null, 'asc');
+                    filtrarItensVisualizarPedido();
             } else {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum item encontrado</td></tr>';
+                    tbody.innerHTML = '<tr class="linha-vazia-itens"><td colspan="6" class="text-center text-muted">Nenhum item encontrado</td></tr>';
+                    filtrarItensVisualizarPedido();
                 }
             }
             
