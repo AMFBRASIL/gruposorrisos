@@ -449,8 +449,21 @@ function removerMaterialPedido(index) {
 }
 
 // Pesquisar material para pedidos críticos/urgentes
+/** Normaliza termo do campo de busca (ex.: "298451 - NOME..." → prioriza o código). */
+function normalizarTermoBuscaMaterial(termo) {
+    const t = (termo || '').trim();
+    if (!t) return '';
+    const m = t.match(/^(\S+)\s*-\s*(.+)$/);
+    if (m && m[1]) {
+        // Se o usuário/autocomplete preencheu "código - nome", a API também trata;
+        // aqui mantemos o texto completo (a API extrai o código).
+        return t;
+    }
+    return t;
+}
+
 async function pesquisarMaterial() {
-    const busca = document.getElementById('busca-material').value.trim();
+    const busca = normalizarTermoBuscaMaterial(document.getElementById('busca-material').value);
     const idFilial = document.getElementById('novo_id_filial').value;
     const idFornecedor = document.getElementById('novo_id_fornecedor').value;
     

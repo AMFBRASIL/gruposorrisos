@@ -1042,8 +1042,20 @@ class PedidoCompra extends BaseModel {
     
     /**
      * Pesquisar material por código ou nome
+     *
+     * Aceita termo simples ("298451") ou formato do autocomplete ("298451 - NOME...").
      */
     public function pesquisarMaterial($busca, $idFilial, $idFornecedor) {
+        $busca = trim((string) $busca);
+        $codigoExtraido = null;
+        $nomeExtraido = null;
+
+        // Formato preenchido pelo autocomplete: "CODIGO - NOME"
+        if (preg_match('/^(\S+)\s*-\s*(.+)$/u', $busca, $m)) {
+            $codigoExtraido = trim($m[1]);
+            $nomeExtraido = trim($m[2], " \t-");
+        }
+
         $sql = "SELECT cm.id_catalogo as id_material, cm.codigo, cm.nome, um.sigla as unidade_medida, 
                        COALESCE(ef.estoque_atual, 0) as estoque_atual,
                        COALESCE(ef.preco_unitario, 0) as preco_unitario
@@ -1051,14 +1063,45 @@ class PedidoCompra extends BaseModel {
                 LEFT JOIN tbl_estoque_filiais ef ON cm.id_catalogo = ef.id_catalogo AND ef.id_filial = ?
                 LEFT JOIN tbl_unidades_medida um ON cm.id_unidade = um.id_unidade
                 WHERE cm.ativo = 1 
-                AND (cm.codigo LIKE ? OR cm.nome LIKE ?)
                 AND cm.id_fornecedor = ?
-                ORDER BY cm.nome
+                AND (
+                    cm.codigo LIKE ?
+                    OR cm.nome LIKE ?
+                    OR CONCAT(cm.codigo, ' - ', cm.nome) LIKE ?
+                ";
+
+        $params = [
+            $idFilial,
+            $idFornecedor,
+            "%{$busca}%",
+            "%{$busca}%",
+            "%{$busca}%",
+        ];
+
+        if ($codigoExtraido !== null && $codigoExtraido !== '') {
+            $sql .= " OR cm.codigo LIKE ? OR cm.codigo = ?";
+            $params[] = "%{$codigoExtraido}%";
+            $params[] = $codigoExtraido;
+        }
+        if ($nomeExtraido !== null && $nomeExtraido !== '') {
+            $sql .= " OR cm.nome LIKE ?";
+            $params[] = "%{$nomeExtraido}%";
+        }
+
+        $sql .= ")
+                ORDER BY
+                    CASE WHEN cm.codigo = ? THEN 0
+                         WHEN cm.codigo LIKE ? THEN 1
+                         ELSE 2 END,
+                    cm.nome
                 LIMIT 20";
-        
-        $buscaTermo = "%{$busca}%";
+
+        $codigoOrdem = $codigoExtraido !== null && $codigoExtraido !== '' ? $codigoExtraido : $busca;
+        $params[] = $codigoOrdem;
+        $params[] = $codigoOrdem . '%';
+
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$idFilial, $buscaTermo, $buscaTermo, $idFornecedor]);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
     
