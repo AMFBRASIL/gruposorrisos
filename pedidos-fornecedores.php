@@ -558,6 +558,36 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
             overflow-x: hidden;
             padding-right: 6px;
         }
+
+        .toolbar-filtro-itens-fornecedor {
+            background: #fff8f1;
+            border: 1px solid #ffe0b2;
+            border-radius: 10px;
+            padding: 0.65rem 0.75rem;
+        }
+        th.th-ordenavel-forn {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        th.th-ordenavel-forn:hover {
+            background: #fff3e0 !important;
+            color: #ef6c00;
+        }
+        th.th-ordenavel-forn .sort-icon {
+            font-size: 0.75rem;
+            opacity: 0.45;
+            margin-left: 4px;
+        }
+        th.th-ordenavel-forn.sort-asc .sort-icon,
+        th.th-ordenavel-forn.sort-desc .sort-icon {
+            opacity: 1;
+            color: #f57c00;
+        }
+        .item-row.item-filtro-destaque {
+            outline: 2px solid #ffb74d;
+            background: #fffaf3;
+        }
         
         .price-input {
             border: 2px solid #e2e8f0;
@@ -1053,11 +1083,45 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
                 </div>
                 
                 <h6 class="mb-3">Itens do Pedido</h6>
-                <div class="mb-3">
-                    <label class="form-label">Pesquisar Itens</label>
-                    <input type="text" class="form-control" id="filtro-itens-resposta"
-                           placeholder="Digite nome ou código do item..."
-                           oninput="filtrarItensRespostaFornecedor()">
+                <div class="toolbar-filtro-itens-fornecedor mb-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <label for="filtro-itens-resposta" class="form-label mb-1 small fw-semibold">Filtrar itens</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="filtro-itens-resposta"
+                                       placeholder="Código, nome ou categoria..."
+                                       oninput="filtrarItensRespostaFornecedor()">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="ordenar-itens-resposta" class="form-label mb-1 small fw-semibold">Ordenar por</label>
+                            <select class="form-select form-select-sm" id="ordenar-itens-resposta" onchange="ordenarItensRespostaFornecedorSelect()">
+                                <option value="">Padrão (ordem do pedido)</option>
+                                <option value="material:asc">Material (A → Z)</option>
+                                <option value="material:desc">Material (Z → A)</option>
+                                <option value="codigo:asc">Código (A → Z)</option>
+                                <option value="codigo:desc">Código (Z → A)</option>
+                                <option value="qtd_sol:asc">Qtd. solicitada (menor → maior)</option>
+                                <option value="qtd_sol:desc">Qtd. solicitada (maior → menor)</option>
+                                <option value="qtd_disp:asc">Qtd. disponível (menor → maior)</option>
+                                <option value="qtd_disp:desc">Qtd. disponível (maior → menor)</option>
+                                <option value="preco:asc">Preço (menor → maior)</option>
+                                <option value="preco:desc">Preço (maior → menor)</option>
+                                <option value="total:asc">Total (menor → maior)</option>
+                                <option value="total:desc">Total (maior → menor)</option>
+                                <option value="novo:desc">Novos itens primeiro</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="limparFiltroItensRespostaFornecedor()">
+                                <i class="bi bi-x-circle me-1"></i>Limpar filtro
+                            </button>
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-2" id="resultado-filtro-itens-resposta">
+                        Use o filtro ou o seletor para organizar a lista.
+                    </small>
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <input type="file" id="input-csv-resposta-fornecedor" accept=".csv,text/csv" class="d-none">
@@ -1171,6 +1235,10 @@ $descontoFornecedorPercentual = obterDescontoFornecedorPercentual();
 // Variáveis globais
 let pedidosData = [];
 let pedidoAtual = null;
+const estadoOrdenacaoItensFornecedor = {
+    resposta: { key: null, dir: 'asc' },
+    detalhes: { key: null, dir: 'asc' }
+};
 
 const MAPA_STATUS_FORNECEDOR = {
     em_analise: 'aguardando_cotacao',
@@ -1834,20 +1902,58 @@ function visualizarPedido(pedidoId) {
         ` : ''}
         
         <h6 class="mb-3">Itens do Pedido</h6>
+        <div class="toolbar-filtro-itens-fornecedor mb-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label for="filtro-itens-detalhes-fornecedor" class="form-label mb-1 small fw-semibold">Filtrar itens</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="filtro-itens-detalhes-fornecedor"
+                               placeholder="Código, nome ou categoria..."
+                               oninput="filtrarItensDetalhesFornecedor()">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label for="ordenar-itens-detalhes-fornecedor" class="form-label mb-1 small fw-semibold">Ordenar por</label>
+                    <select class="form-select form-select-sm" id="ordenar-itens-detalhes-fornecedor" onchange="ordenarItensDetalhesFornecedorSelect()">
+                        <option value="">Padrão (ordem do pedido)</option>
+                        <option value="material:asc">Item (A → Z)</option>
+                        <option value="material:desc">Item (Z → A)</option>
+                        <option value="codigo:asc">Código (A → Z)</option>
+                        <option value="codigo:desc">Código (Z → A)</option>
+                        <option value="categoria:asc">Categoria (A → Z)</option>
+                        <option value="qtd:asc">Quantidade (menor → maior)</option>
+                        <option value="qtd:desc">Quantidade (maior → menor)</option>
+                        <option value="preco:asc">Preço (menor → maior)</option>
+                        <option value="preco:desc">Preço (maior → menor)</option>
+                        <option value="total:asc">Total (menor → maior)</option>
+                        <option value="total:desc">Total (maior → menor)</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="limparFiltroItensDetalhesFornecedor()">
+                        <i class="bi bi-x-circle me-1"></i>Limpar filtro
+                    </button>
+                </div>
+            </div>
+            <small class="text-muted d-block mt-2" id="resultado-filtro-itens-detalhes">
+                Clique nas colunas ou use o filtro para organizar.
+            </small>
+        </div>
         <div class="table-responsive">
-            <table class="table table-striped">
+            <table class="table table-striped" id="tabela-itens-detalhes-fornecedor">
                 <thead>
                     <tr>
-                        <th>Item</th>
-                        <th>Código</th>
-                        <th>Categoria</th>
-                        <th>Quantidade</th>
+                        <th class="th-ordenavel-forn" data-sort-key="material" data-sort-type="text" onclick="ordenarItensDetalhesPorCabecalho(this)">Item <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                        <th class="th-ordenavel-forn" data-sort-key="codigo" data-sort-type="text" onclick="ordenarItensDetalhesPorCabecalho(this)">Código <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                        <th class="th-ordenavel-forn" data-sort-key="categoria" data-sort-type="text" onclick="ordenarItensDetalhesPorCabecalho(this)">Categoria <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                        <th class="th-ordenavel-forn" data-sort-key="qtd" data-sort-type="number" onclick="ordenarItensDetalhesPorCabecalho(this)">Quantidade <i class="bi bi-arrow-down-up sort-icon"></i></th>
                         <th>Unidade</th>
-                        <th>Preço Unitário</th>
-                        <th>Total</th>
+                        <th class="th-ordenavel-forn" data-sort-key="preco" data-sort-type="number" onclick="ordenarItensDetalhesPorCabecalho(this)">Preço Unitário <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                        <th class="th-ordenavel-forn" data-sort-key="total" data-sort-type="number" onclick="ordenarItensDetalhesPorCabecalho(this)">Total <i class="bi bi-arrow-down-up sort-icon"></i></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tbody-itens-detalhes-fornecedor">
                     ${renderizarLinhasItensDetalhes(pedido)}
                 </tbody>
             </table>
@@ -1913,6 +2019,10 @@ function visualizarPedido(pedidoId) {
     
     const modal = new bootstrap.Modal(document.getElementById('modalVisualizarPedido'));
     modal.show();
+    estadoOrdenacaoItensFornecedor.detalhes = { key: null, dir: 'asc' };
+    setTimeout(() => {
+        filtrarItensDetalhesFornecedor();
+    }, 50);
 }
 
 // Responder pedido
@@ -1957,6 +2067,9 @@ function responderPedido(pedidoId = null) {
     if (descItensEl) descItensEl.value = 'R$ 0,00';
     document.getElementById('valor-final-resposta').textContent = 'R$ 0,00';
     document.getElementById('filtro-itens-resposta').value = '';
+    const ordenarSelectResposta = document.getElementById('ordenar-itens-resposta');
+    if (ordenarSelectResposta) ordenarSelectResposta.value = '';
+    estadoOrdenacaoItensFornecedor.resposta = { key: null, dir: 'asc' };
     atualizarBadgeCsvFornecedor(0);
     renderizarItensNaoEncontradosCsvFornecedor([]);
     limparValidacaoCsvLocalFornecedor();
@@ -1972,7 +2085,16 @@ function responderPedido(pedidoId = null) {
     // Renderizar itens para resposta
     const itensContainer = document.getElementById('itens-resposta');
     itensContainer.innerHTML = pedido.itens.map((item, index) => `
-        <div class="item-row ${item.novo_pos_resposta == 1 ? 'item-novo-pos-resposta' : ''}" data-item-nome="${(item.nome || '').toLowerCase()}" data-item-codigo="${(item.codigo || '').toString().toLowerCase()}">
+        <div class="item-row ${item.novo_pos_resposta == 1 ? 'item-novo-pos-resposta' : ''}"
+             data-item-index="${index}"
+             data-item-nome="${(item.nome || '').toLowerCase()}"
+             data-item-codigo="${(item.codigo || '').toString().toLowerCase()}"
+             data-item-categoria="${(item.categoria || '').toString().toLowerCase()}"
+             data-sort-index="${index}"
+             data-sort-material="${((item.nome || '') + ' ' + (item.codigo || '')).replace(/"/g, '&quot;')}"
+             data-sort-codigo="${(item.codigo || '').toString().replace(/"/g, '&quot;')}"
+             data-sort-qtd-sol="${parseFloat(item.quantidade) || 0}"
+             data-sort-novo="${parseInt(item.novo_pos_resposta || 0, 10) === 1 ? 1 : 0}">
             <div class="row g-2 align-items-start">
                 <div class="col-lg-5">
                     <div class="item-title fw-semibold">
@@ -2132,20 +2254,141 @@ function responderPedido(pedidoId = null) {
             }
         });
         calcularResumoFinal();
+        filtrarItensRespostaFornecedor();
     }, 300);
+}
+
+function normalizarTextoFiltroFornecedor(valor) {
+    return (valor || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function obterValorOrdenacaoItemResposta(itemRow, chave) {
+    const idx = itemRow.getAttribute('data-item-index');
+    if (chave === 'qtd_disp') {
+        const input = document.getElementById(`quantidade-${idx}`);
+        return parseFloat(input?.value) || 0;
+    }
+    if (chave === 'preco') {
+        const input = document.getElementById(`preco-${idx}`);
+        if (input && typeof removerMascaraMoeda === 'function') {
+            return removerMascaraMoeda(input.value) || 0;
+        }
+        return 0;
+    }
+    if (chave === 'total') {
+        const input = document.getElementById(`total-${idx}`);
+        if (input && typeof removerMascaraMoeda === 'function') {
+            return removerMascaraMoeda(input.value) || 0;
+        }
+        return 0;
+    }
+    if (chave === 'qtd_sol' || chave === 'novo') {
+        return parseFloat(itemRow.getAttribute(`data-sort-${chave.replace('_', '-')}`) || itemRow.dataset[`sort${chave}`] || 0) || 0;
+    }
+    if (chave === 'material') return normalizarTextoFiltroFornecedor(itemRow.dataset.sortMaterial || '');
+    if (chave === 'codigo') return normalizarTextoFiltroFornecedor(itemRow.dataset.sortCodigo || '');
+    return normalizarTextoFiltroFornecedor(itemRow.dataset[`sort${chave}`] || '');
+}
+
+function ordenarItensRespostaFornecedor(chave, direcao = 'asc') {
+    const container = document.getElementById('itens-resposta');
+    if (!container) return;
+    const itens = Array.from(container.querySelectorAll('.item-row'));
+    const tipoNumero = ['qtd_sol', 'qtd_disp', 'preco', 'total', 'novo'].includes(chave);
+
+    itens.sort((a, b) => {
+        let va;
+        let vb;
+        if (chave === 'qtd_sol') {
+            va = parseFloat(a.dataset.sortQtdSol) || 0;
+            vb = parseFloat(b.dataset.sortQtdSol) || 0;
+        } else if (chave === 'novo') {
+            va = parseInt(a.dataset.sortNovo || '0', 10) || 0;
+            vb = parseInt(b.dataset.sortNovo || '0', 10) || 0;
+        } else {
+            va = obterValorOrdenacaoItemResposta(a, chave);
+            vb = obterValorOrdenacaoItemResposta(b, chave);
+        }
+        let cmp = 0;
+        if (tipoNumero) {
+            cmp = (va || 0) - (vb || 0);
+        } else {
+            cmp = String(va).localeCompare(String(vb), 'pt-BR', { numeric: true, sensitivity: 'base' });
+        }
+        return direcao === 'desc' ? -cmp : cmp;
+    });
+
+    itens.forEach((el) => container.appendChild(el));
+    estadoOrdenacaoItensFornecedor.resposta = { key: chave, dir: direcao };
+}
+
+function restaurarOrdemPadraoItensRespostaFornecedor() {
+    const container = document.getElementById('itens-resposta');
+    if (!container) return;
+    const itens = Array.from(container.querySelectorAll('.item-row'));
+    itens.sort((a, b) => (parseInt(a.dataset.sortIndex || '0', 10) || 0) - (parseInt(b.dataset.sortIndex || '0', 10) || 0));
+    itens.forEach((el) => container.appendChild(el));
+    estadoOrdenacaoItensFornecedor.resposta = { key: null, dir: 'asc' };
+}
+
+function ordenarItensRespostaFornecedorSelect() {
+    const select = document.getElementById('ordenar-itens-resposta');
+    const valor = select?.value || '';
+    if (!valor) {
+        restaurarOrdemPadraoItensRespostaFornecedor();
+    } else {
+        const [chave, dir] = valor.split(':');
+        ordenarItensRespostaFornecedor(chave, dir || 'asc');
+    }
+    filtrarItensRespostaFornecedor();
 }
 
 function filtrarItensRespostaFornecedor() {
     const filtroInput = document.getElementById('filtro-itens-resposta');
-    const termo = (filtroInput?.value || '').trim().toLowerCase();
+    const resultado = document.getElementById('resultado-filtro-itens-resposta');
+    const termo = normalizarTextoFiltroFornecedor(filtroInput?.value || '');
     const itens = document.querySelectorAll('#itens-resposta .item-row');
+    let encontrados = 0;
 
     itens.forEach((itemRow) => {
-        const nome = itemRow.getAttribute('data-item-nome') || '';
-        const codigo = itemRow.getAttribute('data-item-codigo') || '';
-        const exibir = !termo || nome.includes(termo) || codigo.includes(termo);
-        itemRow.style.display = exibir ? '' : 'none';
+        const nome = normalizarTextoFiltroFornecedor(itemRow.getAttribute('data-item-nome') || '');
+        const codigo = normalizarTextoFiltroFornecedor(itemRow.getAttribute('data-item-codigo') || '');
+        const categoria = normalizarTextoFiltroFornecedor(itemRow.getAttribute('data-item-categoria') || '');
+        const corresponde = !termo || nome.includes(termo) || codigo.includes(termo) || categoria.includes(termo);
+        itemRow.style.display = corresponde ? '' : 'none';
+        itemRow.classList.toggle('item-filtro-destaque', Boolean(termo && corresponde));
+        if (corresponde) encontrados++;
     });
+
+    if (!resultado) return;
+    const ord = estadoOrdenacaoItensFornecedor.resposta?.key
+        ? ` · ordenado por ${estadoOrdenacaoItensFornecedor.resposta.key}`
+        : '';
+    if (!itens.length) {
+        resultado.textContent = 'Nenhum item neste pedido.';
+        return;
+    }
+    if (!termo) {
+        resultado.textContent = `Exibindo ${itens.length} item(ns). Use o filtro ou o seletor para organizar.${ord}`;
+        return;
+    }
+    resultado.textContent = encontrados > 0
+        ? `Exibindo ${encontrados} de ${itens.length} item(ns).${ord}`
+        : 'Nenhum item encontrado com esse filtro.';
+}
+
+function limparFiltroItensRespostaFornecedor() {
+    const filtroInput = document.getElementById('filtro-itens-resposta');
+    const select = document.getElementById('ordenar-itens-resposta');
+    if (filtroInput) filtroInput.value = '';
+    if (select) select.value = '';
+    restaurarOrdemPadraoItensRespostaFornecedor();
+    filtrarItensRespostaFornecedor();
 }
 
 // Validar quantidade (fornecedor informa estoque disponível — sem teto pela qtd. solicitada)
@@ -3025,7 +3268,7 @@ function obterPrecoParaCalculoItem(item) {
 function renderizarLinhasItensDetalhes(pedido) {
     if (!pedido?.itens?.length) return '';
 
-    return pedido.itens.map(item => {
+    return pedido.itens.map((item, idx) => {
         const quantidadeCalculo = obterQuantidadeParaCalculoItem(item);
         const precoCalculo = obterPrecoParaCalculoItem(item);
         const totalItem = quantidadeCalculo * precoCalculo;
@@ -3037,16 +3280,25 @@ function renderizarLinhasItensDetalhes(pedido) {
         const obsForn = (item.observacoes_item_fornecedor !== undefined && item.observacoes_item_fornecedor !== null)
             ? String(item.observacoes_item_fornecedor)
             : '';
+        const nomeItem = item.nome || '';
+        const codigoItem = item.codigo || 'N/A';
+        const categoriaItem = item.categoria || 'N/A';
 
         return `
-            <tr>
+            <tr data-sort-index="${idx}"
+                data-sort-material="${escapeHtml(nomeItem)}"
+                data-sort-codigo="${escapeHtml(codigoItem)}"
+                data-sort-categoria="${escapeHtml(categoriaItem)}"
+                data-sort-qtd="${quantidadeCalculo}"
+                data-sort-preco="${precoCalculo}"
+                data-sort-total="${totalItem}">
                 <td>
-                    <strong>${item.nome}</strong>
+                    <strong>${nomeItem}</strong>
                     ${obsSol.trim() ? `<br><small class="text-muted">Solicitação: ${escapeHtml(obsSol)}</small>` : ''}
                     ${obsForn.trim() ? `<br><small class="text-primary">Fornecedor: ${escapeHtml(obsForn)}</small>` : ''}
                 </td>
-                <td>${item.codigo || 'N/A'}</td>
-                <td>${item.categoria || 'N/A'}</td>
+                <td>${codigoItem}</td>
+                <td>${categoriaItem}</td>
                 <td>
                     ${quantidadeCalculo}
                     ${(quantidadeCalculo !== quantidadeSolicitada) ? `<br><small class="text-muted">Solicitado: ${quantidadeSolicitada}</small>` : ''}
@@ -3057,6 +3309,132 @@ function renderizarLinhasItensDetalhes(pedido) {
             </tr>
         `;
     }).join('');
+}
+
+function atualizarIconesOrdenacaoDetalhesFornecedor(chaveAtiva, direcao) {
+    const table = document.getElementById('tabela-itens-detalhes-fornecedor');
+    if (!table) return;
+    table.querySelectorAll('th.th-ordenavel-forn').forEach((th) => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        const icon = th.querySelector('.sort-icon');
+        const key = th.getAttribute('data-sort-key');
+        if (key === chaveAtiva) {
+            th.classList.add(direcao === 'desc' ? 'sort-desc' : 'sort-asc');
+            if (icon) icon.className = `bi ${direcao === 'desc' ? 'bi-sort-down' : 'bi-sort-up'} sort-icon`;
+        } else if (icon) {
+            icon.className = 'bi bi-arrow-down-up sort-icon';
+        }
+    });
+}
+
+function ordenarLinhasDetalhesFornecedor(chave, tipo = 'text', direcao = 'asc') {
+    const tbody = document.getElementById('tbody-itens-detalhes-fornecedor');
+    if (!tbody) return;
+    const linhas = Array.from(tbody.querySelectorAll('tr'));
+    const mapa = {
+        material: 'sortMaterial',
+        codigo: 'sortCodigo',
+        categoria: 'sortCategoria',
+        qtd: 'sortQtd',
+        preco: 'sortPreco',
+        total: 'sortTotal'
+    };
+    const attr = mapa[chave];
+    linhas.sort((a, b) => {
+        const rawA = a.dataset[attr] ?? '';
+        const rawB = b.dataset[attr] ?? '';
+        let cmp = 0;
+        if (tipo === 'number') {
+            cmp = (parseFloat(rawA) || 0) - (parseFloat(rawB) || 0);
+        } else {
+            cmp = normalizarTextoFiltroFornecedor(rawA).localeCompare(
+                normalizarTextoFiltroFornecedor(rawB),
+                'pt-BR',
+                { numeric: true, sensitivity: 'base' }
+            );
+        }
+        return direcao === 'desc' ? -cmp : cmp;
+    });
+    linhas.forEach((tr) => tbody.appendChild(tr));
+    estadoOrdenacaoItensFornecedor.detalhes = { key: chave, dir: direcao };
+    atualizarIconesOrdenacaoDetalhesFornecedor(chave, direcao);
+}
+
+function ordenarItensDetalhesPorCabecalho(th) {
+    if (!th) return;
+    const chave = th.getAttribute('data-sort-key');
+    const tipo = th.getAttribute('data-sort-type') || 'text';
+    if (!chave) return;
+    const estado = estadoOrdenacaoItensFornecedor.detalhes || { key: null, dir: 'asc' };
+    const novaDir = (estado.key === chave && estado.dir === 'asc') ? 'desc' : 'asc';
+    ordenarLinhasDetalhesFornecedor(chave, tipo, novaDir);
+    const select = document.getElementById('ordenar-itens-detalhes-fornecedor');
+    if (select) {
+        const valor = `${chave}:${novaDir}`;
+        if ([...select.options].some((o) => o.value === valor)) select.value = valor;
+    }
+    filtrarItensDetalhesFornecedor();
+}
+
+function ordenarItensDetalhesFornecedorSelect() {
+    const select = document.getElementById('ordenar-itens-detalhes-fornecedor');
+    const valor = select?.value || '';
+    const tbody = document.getElementById('tbody-itens-detalhes-fornecedor');
+    if (!valor) {
+        if (tbody) {
+            const linhas = Array.from(tbody.querySelectorAll('tr'));
+            linhas.sort((a, b) => (parseInt(a.dataset.sortIndex || '0', 10) || 0) - (parseInt(b.dataset.sortIndex || '0', 10) || 0));
+            linhas.forEach((tr) => tbody.appendChild(tr));
+        }
+        estadoOrdenacaoItensFornecedor.detalhes = { key: null, dir: 'asc' };
+        atualizarIconesOrdenacaoDetalhesFornecedor(null, 'asc');
+    } else {
+        const [chave, dir] = valor.split(':');
+        const th = document.querySelector(`#tabela-itens-detalhes-fornecedor th[data-sort-key="${chave}"]`);
+        const tipo = th?.getAttribute('data-sort-type') || (chave === 'material' || chave === 'codigo' || chave === 'categoria' ? 'text' : 'number');
+        ordenarLinhasDetalhesFornecedor(chave, tipo, dir || 'asc');
+    }
+    filtrarItensDetalhesFornecedor();
+}
+
+function filtrarItensDetalhesFornecedor() {
+    const input = document.getElementById('filtro-itens-detalhes-fornecedor');
+    const resultado = document.getElementById('resultado-filtro-itens-detalhes');
+    const termo = normalizarTextoFiltroFornecedor(input?.value || '');
+    const linhas = document.querySelectorAll('#tbody-itens-detalhes-fornecedor tr');
+    let encontrados = 0;
+
+    linhas.forEach((linha) => {
+        const texto = normalizarTextoFiltroFornecedor(
+            `${linha.dataset.sortMaterial || ''} ${linha.dataset.sortCodigo || ''} ${linha.dataset.sortCategoria || ''}`
+        );
+        const corresponde = !termo || texto.includes(termo);
+        linha.style.display = corresponde ? '' : 'none';
+        linha.classList.toggle('table-warning', Boolean(termo && corresponde));
+        if (corresponde) encontrados++;
+    });
+
+    if (!resultado) return;
+    const ord = estadoOrdenacaoItensFornecedor.detalhes?.key
+        ? ` · ordenado por ${estadoOrdenacaoItensFornecedor.detalhes.key}`
+        : '';
+    if (!linhas.length) {
+        resultado.textContent = 'Nenhum item neste pedido.';
+        return;
+    }
+    resultado.textContent = !termo
+        ? `Exibindo ${linhas.length} item(ns). Clique nas colunas ou use o filtro.${ord}`
+        : (encontrados > 0
+            ? `Exibindo ${encontrados} de ${linhas.length} item(ns).${ord}`
+            : 'Nenhum item encontrado com esse filtro.');
+}
+
+function limparFiltroItensDetalhesFornecedor() {
+    const input = document.getElementById('filtro-itens-detalhes-fornecedor');
+    const select = document.getElementById('ordenar-itens-detalhes-fornecedor');
+    if (input) input.value = '';
+    if (select) select.value = '';
+    ordenarItensDetalhesFornecedorSelect();
 }
 
 function calcularValorTotalDetalhesPedido(pedido) {
