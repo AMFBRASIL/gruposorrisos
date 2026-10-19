@@ -2583,7 +2583,10 @@ async function visualizarPedido(id) {
             }
             
             // Cabeçalho principal
-            document.getElementById('view_numero_pedido').textContent = pedido.numero_pedido;
+            const elNumeroPedido = document.getElementById('view_numero_pedido');
+            elNumeroPedido.textContent = pedido.numero_pedido;
+            elNumeroPedido.dataset.pedidoId = id;
+            elNumeroPedido.dataset.statusAtual = pedido.status || '';
             document.getElementById('view_data_pedido').textContent = formatarData(pedido.data_solicitacao);
             
             // Status badge e card - com verificação opcional
@@ -4281,36 +4284,70 @@ async function atualizarStatusPedido(novoStatus, observacao = null) {
  */
 async function mostrarOpcoesVoltarStatus() {
     try {
-        const pedidoId = document.getElementById('view_numero_pedido').dataset.pedidoId;
-        const statusAtual = document.getElementById('view_numero_pedido').dataset.statusAtual;
+        const modalElement = document.getElementById('modalVisualizarPedido');
+        const elNumero = document.getElementById('view_numero_pedido');
+        // Status fica no modal (data-pedido-status); o dataset do número era lido mas nunca preenchido.
+        const statusAtual = modalElement?.getAttribute('data-pedido-status')
+            || elNumero?.dataset?.statusAtual
+            || window.pedidoAtual?.status
+            || '';
+        const pedidoId = modalElement?.getAttribute('data-pedido-id')
+            || elNumero?.dataset?.pedidoId
+            || window.pedidoAtual?.id_pedido
+            || '';
+
+        if (!statusAtual) {
+            mostrarErro('Não foi possível identificar o status atual do pedido. Feche e abra novamente.');
+            return;
+        }
 
         if (!pedidoPermissaoFlag(statusAtual, 'pode_voltar')) {
             mostrarErro('Sem permissão para voltar o status nesta situação');
             return;
         }
         
-        // Definir opções de volta baseadas no status atual
+        // Opções de volta alinhadas a fluxoPedidoTransicoesPermitidas()
         const s = normalizarStatusPedido(statusAtual);
         const opcoesVolta = {
             em_cotacao: [{ valor: 'aguardando_cotacao', nome: 'Aguardando Cotação' }],
             aguardando_aprovacao_socio: [{ valor: 'em_cotacao', nome: 'Em Cotação' }],
-            aguardando_faturamento: [{ valor: 'aguardando_aprovacao_socio', nome: 'Aguard. Aprovação Sócio' }],
+            aprovado_socio: [{ valor: 'aguardando_aprovacao_socio', nome: 'Aguard. Aprovação Sócio' }],
+            aguardando_faturamento: [
+                { valor: 'aguardando_aprovacao_socio', nome: 'Aguard. Aprovação Sócio' }
+            ],
             em_faturamento: [{ valor: 'aguardando_faturamento', nome: 'Aguard. Faturamento' }],
             em_transito: [{ valor: 'em_faturamento', nome: 'Em Faturamento' }],
-            em_conferencia: [{ valor: 'em_transito', nome: 'Em Trânsito' }],
-            finalizado: [{ valor: 'em_conferencia', nome: 'Em Conferência' }]
+            em_conferencia: [{ valor: 'em_transito', nome: 'Em Trânsito' }]
         };
         
-        const opcoes = opcoesVolta[s] || [];
+        // Filtra só transições realmente permitidas no fluxo
+        const fluxoPermitido = {
+            em_cotacao: ['aguardando_cotacao', 'cancelado'],
+            aguardando_aprovacao_socio: ['em_cotacao', 'cancelado'],
+            aprovado_socio: ['aguardando_aprovacao_socio', 'cancelado'],
+            aguardando_faturamento: ['aguardando_aprovacao_socio', 'em_faturamento', 'cancelado'],
+            em_faturamento: ['aguardando_faturamento', 'cancelado'],
+            em_transito: ['em_faturamento', 'cancelado'],
+            em_conferencia: ['em_transito', 'cancelado']
+        };
+        const permitidos = fluxoPermitido[s] || [];
+        const opcoes = (opcoesVolta[s] || []).filter((op) => permitidos.includes(op.valor));
         
         if (opcoes.length === 0) {
-            mostrarErro('Não é possível voltar o status deste pedido');
+            console.warn('Voltar status sem opções', { statusAtual, s, pedidoId });
+            mostrarErro(`Não é possível voltar o status deste pedido a partir de "${getStatusNome(s) || s}".`);
             return;
+        }
+
+        // Mantém dataset sincronizado para as próximas ações
+        if (elNumero) {
+            if (pedidoId) elNumero.dataset.pedidoId = pedidoId;
+            elNumero.dataset.statusAtual = statusAtual;
         }
         
         // Criar HTML das opções
         const opcoesHtml = opcoes.map(opcao => 
-            `<button class="btn btn-outline-warning me-2 mb-2" onclick="atualizarStatusPedido('${opcao.valor}')">
+            `<button type="button" class="btn btn-outline-warning me-2 mb-2" onclick="Swal.close(); atualizarStatusPedido('${opcao.valor}');">
                 <i class="bi bi-arrow-left me-2"></i>${opcao.nome}
             </button>`
         ).join('');
@@ -4318,6 +4355,7 @@ async function mostrarOpcoesVoltarStatus() {
         await Swal.fire({
             title: 'Voltar Status',
             html: `
+                <p class="mb-2 text-muted small">Status atual: <strong>${getStatusNome(s) || s}</strong></p>
                 <p class="mb-3">Selecione para qual status deseja voltar:</p>
                 <div class="d-flex flex-wrap justify-content-center">
                     ${opcoesHtml}
