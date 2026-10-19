@@ -593,8 +593,10 @@ $pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
                                     <label for="ordenar-itens-pedido-existente" class="form-label mb-1 small fw-semibold">Ordenar por</label>
                                     <select class="form-select form-select-sm" id="ordenar-itens-pedido-existente" onchange="ordenarItensPedidoExistenteSelect()">
                                         <option value="">Padrão (ordem do pedido)</option>
-                                        <option value="material:asc">Material (A → Z)</option>
-                                        <option value="material:desc">Material (Z → A)</option>
+                                        <option value="material:asc">Nome (A → Z)</option>
+                                        <option value="material:desc">Nome (Z → A)</option>
+                                        <option value="codigo:asc">Código (menor → maior)</option>
+                                        <option value="codigo:desc">Código (maior → menor)</option>
                                         <option value="estoque:asc">Estoque (menor → maior)</option>
                                         <option value="estoque:desc">Estoque (maior → menor)</option>
                                         <option value="preco:asc">Preço (menor → maior)</option>
@@ -867,8 +869,10 @@ $pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
                                     <label for="view-ordenar-itens" class="form-label mb-1 small fw-semibold">Ordenar por</label>
                                     <select class="form-select form-select-sm" id="view-ordenar-itens" onchange="ordenarItensVisualizarPedidoSelect()">
                                         <option value="">Padrão (ordem do pedido)</option>
-                                        <option value="material:asc">Material (A → Z)</option>
-                                        <option value="material:desc">Material (Z → A)</option>
+                                        <option value="material:asc">Nome (A → Z)</option>
+                                        <option value="material:desc">Nome (Z → A)</option>
+                                        <option value="codigo:asc">Código (menor → maior)</option>
+                                        <option value="codigo:desc">Código (maior → menor)</option>
                                         <option value="qtd_sol:asc">Qtd. solicitada (menor → maior)</option>
                                         <option value="qtd_sol:desc">Qtd. solicitada (maior → menor)</option>
                                         <option value="qtd_disp:asc">Qtd. disponível (menor → maior)</option>
@@ -893,8 +897,8 @@ $pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
                             <table class="table table-sm table-hover mb-0" id="view_itens_table">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="th-ordenavel" data-sort-key="material" data-sort-type="text" data-sort-table="view" title="Clique para ordenar">
-                                            Material <i class="bi bi-arrow-down-up sort-icon"></i>
+                                        <th class="th-ordenavel" data-sort-key="material" data-sort-type="text" data-sort-table="view" title="Ordenar por nome A-Z">
+                                            Material (nome) <i class="bi bi-arrow-down-up sort-icon"></i>
                                         </th>
                                         <th class="text-center th-ordenavel" data-sort-key="qtd_sol" data-sort-type="number" data-sort-table="view" title="Clique para ordenar">
                                             Quantidade Solicitada <i class="bi bi-arrow-down-up sort-icon"></i>

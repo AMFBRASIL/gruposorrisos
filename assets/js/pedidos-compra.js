@@ -624,8 +624,8 @@ function renderizarResultadoPesquisa(materiais) {
                 <table class="table table-sm table-hover" id="tabela-itens-pedido-edit">
                     <thead class="table-light">
                         <tr>
-                            <th class="th-ordenavel" data-sort-key="material" data-sort-type="text" data-sort-table="edit" title="Clique para ordenar">
-                                Material <i class="bi bi-arrow-down-up sort-icon"></i>
+                            <th class="th-ordenavel" data-sort-key="material" data-sort-type="text" data-sort-table="edit" title="Ordenar por nome A-Z">
+                                Material (nome) <i class="bi bi-arrow-down-up sort-icon"></i>
                             </th>
                             <th class="th-ordenavel" data-sort-key="estoque" data-sort-type="number" data-sort-table="edit" title="Clique para ordenar">
                                 Estoque <i class="bi bi-arrow-down-up sort-icon"></i>
@@ -684,7 +684,8 @@ function renderizarResultadoPesquisa(materiais) {
         const estoqueMat = parseFloat(material.estoque_atual) || 0;
         const precoMat = parseFloat(material.preco_unitario) || 0;
         tr.dataset.sortIndex = String(proximoSortIndex++);
-        tr.dataset.sortMaterial = `${codigoMat} ${nomeMat}`;
+        tr.dataset.sortMaterial = nomeMat; // A-Z pelo nome (não pelo código numérico)
+        tr.dataset.sortCodigo = codigoMat;
         tr.dataset.sortEstoque = String(estoqueMat);
         tr.dataset.sortPreco = String(precoMat);
         tr.dataset.sortQuantidade = '0';
@@ -806,6 +807,7 @@ function obterValorOrdenacaoLinhaItem(linha, chave, tipo) {
 
     const mapaAttr = {
         material: 'sortMaterial',
+        codigo: 'sortCodigo',
         estoque: 'sortEstoque',
         preco: 'sortPreco',
         quantidade: 'sortQuantidade',
@@ -821,6 +823,10 @@ function obterValorOrdenacaoLinhaItem(linha, chave, tipo) {
     if (tipo === 'number') {
         const n = parseFloat(raw);
         return Number.isFinite(n) ? n : 0;
+    }
+    // Material/nome: ordem alfabética pura (A-Z), sem numeric no código
+    if (chave === 'material') {
+        return normalizarTextoComparacao(raw);
     }
     return normalizarTextoComparacao(raw);
 }
@@ -853,6 +859,11 @@ function ordenarLinhasTabelaItensPedido(tableIdOrEl, chave, tipo = 'text', direc
         let cmp = 0;
         if (tipo === 'number') {
             cmp = (va || 0) - (vb || 0);
+        } else if (chave === 'material') {
+            // A-Z pelo nome do material (sem ordenação numérica de código)
+            cmp = String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base' });
+        } else if (chave === 'codigo') {
+            cmp = String(va).localeCompare(String(vb), 'pt-BR', { numeric: true, sensitivity: 'base' });
         } else {
             cmp = String(va).localeCompare(String(vb), 'pt-BR', { numeric: true, sensitivity: 'base' });
         }
@@ -915,7 +926,8 @@ function aplicarOrdenacaoPorSelect(selectValue, tableSelector, estadoKey) {
     }
     const [chave, dir] = selectValue.split(':');
     const th = document.querySelector(`${tableSelector} th.th-ordenavel[data-sort-key="${chave}"]`);
-    const tipo = th?.getAttribute('data-sort-type') || (chave === 'material' || chave === 'obs' ? 'text' : 'number');
+    const tipo = th?.getAttribute('data-sort-type')
+        || (['material', 'obs', 'codigo'].includes(chave) ? 'text' : 'number');
     ordenarLinhasTabelaItensPedido(tableSelector, chave, tipo, dir || 'asc', estadoKey);
 }
 
@@ -2103,7 +2115,9 @@ function filtrarItensPedidoExistente() {
 
     let encontrados = 0;
     linhas.forEach(linha => {
-        const textoMaterial = normalizarTextoComparacao(linha.dataset.sortMaterial || linha.textContent || '');
+        const textoMaterial = normalizarTextoComparacao(
+            `${linha.dataset.sortMaterial || ''} ${linha.dataset.sortCodigo || ''} ${linha.textContent || ''}`
+        );
         const corresponde = !termo || textoMaterial.includes(termo);
         linha.style.display = corresponde ? '' : 'none';
         linha.classList.toggle('table-success', Boolean(termo && corresponde));
@@ -2156,7 +2170,7 @@ function filtrarItensVisualizarPedido() {
     let encontrados = 0;
     linhasDados.forEach((linha) => {
         const texto = normalizarTextoComparacao(
-            `${linha.dataset.sortMaterial || ''} ${linha.dataset.sortObs || ''} ${linha.textContent || ''}`
+            `${linha.dataset.sortMaterial || ''} ${linha.dataset.sortCodigo || ''} ${linha.dataset.sortObs || ''} ${linha.textContent || ''}`
         );
         const corresponde = !termo || texto.includes(termo);
         linha.style.display = corresponde ? '' : 'none';
@@ -2724,7 +2738,8 @@ async function visualizarPedido(id) {
                     const codigoItem = item.codigo_material || 'N/A';
                     const nomeItem = item.nome_material || 'Material não encontrado';
                     row.dataset.sortIndex = String(idxItem);
-                    row.dataset.sortMaterial = `${codigoItem} ${nomeItem}`;
+                    row.dataset.sortMaterial = nomeItem; // A-Z pelo nome
+                    row.dataset.sortCodigo = codigoItem;
                     row.dataset.sortQtdSol = String(quantidadeSolicitada);
                     row.dataset.sortQtdDisp = String(
                         disponivel === 0
