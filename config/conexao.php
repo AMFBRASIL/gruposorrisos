@@ -13,6 +13,11 @@ class Conexao {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
+            if (function_exists('applyAppTimezone')) {
+                applyAppTimezone($this->pdo);
+            } else {
+                $this->pdo->exec("SET time_zone = '-03:00'");
+            }
         } catch (PDOException $e) {
             throw new Exception("Erro na conexão com o banco de dados: " . $e->getMessage());
         }

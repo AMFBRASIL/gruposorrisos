@@ -3,6 +3,29 @@
 define('OPENAI_API_KEY', getenv('OPENAI_API_KEY') ?: '');
 define('OPENAI_API_URL', 'https://api.openai.com/v1/chat/completions');
 
+// Fuso horário padrão do sistema (Brasília) — PHP + MySQL (sessão)
+if (!defined('APP_TIMEZONE')) {
+    define('APP_TIMEZONE', 'America/Sao_Paulo');
+}
+// Offset fixo: Brasil sem horário de verão desde 2019 (mais confiável que nome no MySQL)
+if (!defined('APP_TIMEZONE_OFFSET')) {
+    define('APP_TIMEZONE_OFFSET', '-03:00');
+}
+date_default_timezone_set(APP_TIMEZONE);
+
+/**
+ * Aplica o fuso de Brasília na sessão MySQL (NOW(), CURDATE(), CURRENT_TIMESTAMP).
+ */
+if (!function_exists('applyAppTimezone')) {
+    function applyAppTimezone(PDO $pdo): void {
+        try {
+            $pdo->exec("SET time_zone = '" . APP_TIMEZONE . "'");
+        } catch (Throwable $e) {
+            $pdo->exec("SET time_zone = '" . APP_TIMEZONE_OFFSET . "'");
+        }
+    }
+}
+
 // Database Configuration (if not already in conexao.php)
 ###############################################################
 # PRODUCAO DB

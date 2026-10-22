@@ -14,6 +14,7 @@ class Database {
             );
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            applyAppTimezone($this->conn);
         } catch(PDOException $exception) {
             echo "Erro de conexão: " . $exception->getMessage();
         }
@@ -30,13 +31,16 @@ try {
     );
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    applyAppTimezone($pdo);
 } catch(PDOException $exception) {
     error_log("Erro de conexão com banco: " . $exception->getMessage());
     $pdo = null;
 }
 
-// Configurações globais
-define('TIMEZONE', 'America/Sao_Paulo');
+// Configurações globais (timezone já definido em config.php)
+if (!defined('TIMEZONE')) {
+    define('TIMEZONE', APP_TIMEZONE);
+}
 define('JWT_SECRET', 'sua_chave_secreta_jwt_aqui_2024');
 define('JWT_EXPIRATION', 3600); // 1 hora
 
