@@ -820,26 +820,123 @@ function showAlert(message, type = 'info') {
     }, 5000);
 }
 
-// Validações
-document.getElementById('codigo').addEventListener('blur', async function() {
-    if (this.value && !editando) {
-        try {
-            const response = await fetch(`api/materiais_nova_estrutura.php?action=check-codigo&codigo=${this.value}`);
-            const data = await response.json();
-            
-            if (data.exists) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Código Duplicado',
-                    text: 'Este código já existe. Escolha outro código.',
-                    confirmButtonText: 'OK',
-                    confirmButtonColor: '#ffc107'
-                });
-                this.focus();
+// Consulta código existente (somente informativo no cadastro)
+let ultimoCodigoConsultado = '';
+let modalCodigoExistente = null;
+
+function escaparHtml(texto) {
+    if (texto === null || texto === undefined || texto === '') return '';
+    return String(texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function formatarPrecoBr(valor) {
+    if (valor === null || valor === undefined || valor === '') return '—';
+    const n = Number(valor);
+    if (Number.isNaN(n)) return escaparHtml(valor);
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function itemInfoMaterial(rotulo, valor) {
+    const v = (valor !== null && valor !== undefined && String(valor).trim() !== '') ? String(valor).trim() : '';
+    if (!v) return '';
+    return `
+        <div class="col-sm-6">
+            <div class="codigo-existente-item">
+                <span class="codigo-existente-label">${escaparHtml(rotulo)}</span>
+                <span class="codigo-existente-valor">${escaparHtml(v)}</span>
+            </div>
+        </div>`;
+}
+
+function abrirModalCodigoExistente(material) {
+    const corpo = document.getElementById('modalCodigoExistenteBody');
+    if (!corpo || !material) return;
+
+    const unidade = material.unidade || '';
+    corpo.innerHTML = `
+        <div class="codigo-existente-aviso">
+            <i class="bi bi-info-circle-fill"></i>
+            <div>
+                <strong>Código já cadastrado</strong>
+                <p class="mb-0">Este código já existe no catálogo. As informações abaixo são apenas para consulta.</p>
+            </div>
+        </div>
+        <div class="codigo-existente-hero">
+            <div class="codigo-existente-badge">${escaparHtml(material.codigo || '—')}</div>
+            <h4 class="codigo-existente-nome mb-0">${escaparHtml(material.nome || 'Material sem nome')}</h4>
+        </div>
+        <div class="row g-3 mt-1">
+            ${itemInfoMaterial('Categoria', material.nome_categoria)}
+            ${itemInfoMaterial('Unidade', unidade)}
+            ${itemInfoMaterial('Fornecedor', material.fornecedor_nome)}
+            ${itemInfoMaterial('Fabricante', material.fabricante_nome)}
+            ${itemInfoMaterial('Código de barras', material.codigo_barras)}
+            ${itemInfoMaterial('CA', material.ca)}
+            ${itemInfoMaterial('Marca', material.marca)}
+            ${itemInfoMaterial('Modelo', material.modelo)}
+            ${itemInfoMaterial('Cor', material.cor)}
+            ${itemInfoMaterial('Tamanho', material.tamanho)}
+            ${(() => {
+                const preco = formatarPrecoBr(material.preco_unitario_padrao);
+                return itemInfoMaterial('Preço padrão', preco === '—' ? '' : preco);
+            })()}
+        </div>
+        ${material.descricao ? `
+            <div class="codigo-existente-bloco mt-3">
+                <span class="codigo-existente-label">Descrição</span>
+                <p class="mb-0">${escaparHtml(material.descricao)}</p>
+            </div>` : ''}
+        ${material.observacoes ? `
+            <div class="codigo-existente-bloco mt-3">
+                <span class="codigo-existente-label">Observações</span>
+                <p class="mb-0">${escaparHtml(material.observacoes)}</p>
+            </div>` : ''}
+    `;
+
+    const modalEl = document.getElementById('modalCodigoExistente');
+    if (!modalCodigoExistente) {
+        modalCodigoExistente = new bootstrap.Modal(modalEl);
+        modalEl.addEventListener('hidden.bs.modal', function() {
+            const campoCodigo = document.getElementById('codigo');
+            if (campoCodigo) {
+                campoCodigo.value = '';
+                ultimoCodigoConsultado = '';
+                campoCodigo.focus();
             }
-        } catch (error) {
-            console.error('Erro ao verificar código:', error);
+        });
+    }
+    modalCodigoExistente.show();
+}
+
+document.getElementById('codigo').addEventListener('blur', async function() {
+    const codigo = (this.value || '').trim();
+    if (!codigo || editando) return;
+    if (codigo === ultimoCodigoConsultado) return;
+
+    try {
+        const response = await fetch(
+            `api/materiais_nova_estrutura.php?action=check-codigo&codigo=${encodeURIComponent(codigo)}`,
+            { credentials: 'same-origin' }
+        );
+        const data = await response.json();
+        ultimoCodigoConsultado = codigo;
+
+        if (data.exists && data.material) {
+            abrirModalCodigoExistente(data.material);
         }
+    } catch (error) {
+        console.error('Erro ao verificar código:', error);
+    }
+});
+
+document.getElementById('codigo').addEventListener('input', function() {
+    if ((this.value || '').trim() !== ultimoCodigoConsultado) {
+        ultimoCodigoConsultado = '';
     }
 });
 
@@ -1666,6 +1763,30 @@ async function removerFabricante(id, nome) {
 }
 
 </script>
+
+<!-- Modal informativo: código já existente -->
+<div class="modal fade" id="modalCodigoExistente" tabindex="-1" aria-labelledby="modalCodigoExistenteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content codigo-existente-modal">
+            <div class="modal-header codigo-existente-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="codigo-existente-icon"><i class="bi bi-box-seam"></i></span>
+                    <div>
+                        <h5 class="modal-title mb-0" id="modalCodigoExistenteLabel">Material encontrado</h5>
+                        <small class="opacity-75">Consulta informativa — o cadastro não foi alterado</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="modalCodigoExistenteBody"></div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal de Gerenciamento de Categorias -->
 <div class="modal fade" id="modalCategorias" tabindex="-1" aria-labelledby="modalCategoriasLabel" aria-hidden="true">

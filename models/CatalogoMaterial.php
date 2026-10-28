@@ -59,6 +59,29 @@ class CatalogoMaterial extends BaseModel {
         $stmt->execute([$codigo]);
         return $stmt->fetch();
     }
+
+    /**
+     * Busca material por código com categoria, fornecedor, fabricante e unidade
+     */
+    public function findByCodigoWithRelations($codigo) {
+        $sql = "SELECT cm.*,
+                       c.nome_categoria,
+                       f.razao_social as fornecedor_nome,
+                       fab.razao_social as fabricante_nome,
+                       u.sigla as unidade_sigla,
+                       u.nome as unidade_nome
+                FROM {$this->table} cm
+                LEFT JOIN tbl_categorias c ON cm.id_categoria = c.id_categoria
+                LEFT JOIN tbl_fornecedores f ON cm.id_fornecedor = f.id_fornecedor
+                LEFT JOIN tbl_fornecedores fab ON cm.id_fabricante = fab.id_fornecedor
+                LEFT JOIN tbl_unidades_medida u ON cm.id_unidade = u.id_unidade
+                WHERE cm.codigo = ? AND cm.ativo = 1
+                LIMIT 1";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([trim($codigo)]);
+        return $stmt->fetch();
+    }
     
     /**
      * Busca material por código de barras

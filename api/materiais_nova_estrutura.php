@@ -147,12 +147,57 @@ function handleGet($catalogo, $estoque, $categoria, $fornecedor, $action) {
         case 'buscar-estoque':
             buscarEstoqueEspecifico($estoque);
             break;
+
+        case 'check-codigo':
+            verificarCodigoExistente($catalogo);
+            break;
             
         default:
             http_response_code(400);
             echo json_encode(['error' => 'Ação não especificada']);
             break;
     }
+}
+
+/**
+ * Verifica se o código do material já existe no catálogo (cadastro informativo)
+ */
+function verificarCodigoExistente($catalogo) {
+    $codigo = trim($_GET['codigo'] ?? '');
+
+    if ($codigo === '') {
+        echo json_encode(['exists' => false, 'material' => null]);
+        return;
+    }
+
+    $material = $catalogo->findByCodigoWithRelations($codigo);
+
+    if (!$material) {
+        echo json_encode(['exists' => false, 'material' => null]);
+        return;
+    }
+
+    echo json_encode([
+        'exists' => true,
+        'material' => [
+            'id_catalogo' => $material['id_catalogo'] ?? null,
+            'codigo' => $material['codigo'] ?? '',
+            'nome' => $material['nome'] ?? '',
+            'descricao' => $material['descricao'] ?? '',
+            'nome_categoria' => $material['nome_categoria'] ?? '',
+            'fornecedor_nome' => $material['fornecedor_nome'] ?? '',
+            'fabricante_nome' => $material['fabricante_nome'] ?? '',
+            'unidade' => trim(($material['unidade_sigla'] ?? '') . (($material['unidade_nome'] ?? '') ? ' - ' . $material['unidade_nome'] : '')),
+            'codigo_barras' => $material['codigo_barras'] ?? '',
+            'ca' => $material['ca'] ?? '',
+            'marca' => $material['marca'] ?? '',
+            'modelo' => $material['modelo'] ?? '',
+            'cor' => $material['cor'] ?? '',
+            'tamanho' => $material['tamanho'] ?? '',
+            'preco_unitario_padrao' => $material['preco_unitario_padrao'] ?? null,
+            'observacoes' => $material['observacoes'] ?? ''
+        ]
+    ]);
 }
 
 /**
