@@ -160,7 +160,8 @@ function handleGet($catalogo, $estoque, $categoria, $fornecedor, $action) {
 }
 
 /**
- * Verifica se o código do material já existe no catálogo (cadastro informativo)
+ * Verifica se o código do material já existe no catálogo (cadastro informativo).
+ * Usado no blur do campo código em addMaterial.
  */
 function verificarCodigoExistente($catalogo) {
     $codigo = trim($_GET['codigo'] ?? '');
