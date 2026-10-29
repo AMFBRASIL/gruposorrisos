@@ -2,7 +2,6 @@
 let paginaAtual = 1;
 let movimentacaoParaExcluir = null;
 let confirmModal;
-let modalAguardeLista;
 let materiais = [];
 let materiaisMovimentacao = [];
 let materialCounter = 0;
@@ -10,10 +9,6 @@ let materialCounter = 0;
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-    const elAguarde = document.getElementById('modalAguardeLista');
-    if (elAguarde) {
-        modalAguardeLista = new bootstrap.Modal(elAguarde, { backdrop: 'static', keyboard: false });
-    }
     
     // Carregar dados iniciais
     carregarEstatisticas();
@@ -301,14 +296,25 @@ function toggleCamposBrinde() {
 }
 
 function abrirModalAguardeLista() {
-    if (modalAguardeLista) {
-        modalAguardeLista.show();
-    }
+    const el = document.getElementById('overlayAguardeLista');
+    if (!el) return;
+    el.hidden = false;
+    el.setAttribute('aria-busy', 'true');
 }
 
 function fecharModalAguardeLista() {
-    if (modalAguardeLista) {
-        modalAguardeLista.hide();
+    const el = document.getElementById('overlayAguardeLista');
+    if (!el) return;
+    el.hidden = true;
+    el.setAttribute('aria-busy', 'false');
+    // Limpa qualquer backdrop órfão de tentativas anteriores com Bootstrap Modal
+    document.querySelectorAll('.modal-backdrop').forEach(function(b) {
+        if (!document.querySelector('.modal.show')) b.remove();
+    });
+    if (!document.querySelector('.modal.show')) {
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
     }
 }
 

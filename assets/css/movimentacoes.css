@@ -1158,3 +1158,25 @@ body { background: #f7f9fb; }
         margin-bottom: 8px;
     }
 }
+
+/* Overlay de carregamento da lista (paginação) */
+.overlay-aguarde-lista {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.45);
+}
+.overlay-aguarde-lista[hidden] {
+    display: none !important;
+}
+.overlay-aguarde-lista-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.75rem 2rem;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+    min-width: 220px;
+}

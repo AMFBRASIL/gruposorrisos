@@ -26,7 +26,7 @@ $menuActive = 'movimentacoes';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/index.css">
-    <link rel="stylesheet" href="assets/css/movimentacoes.css">
+    <link rel="stylesheet" href="assets/css/movimentacoes.css?v=20261029b">
     <link rel="stylesheet" href="assets/css/materiais.css">
     <link rel="stylesheet" href="assets/css/responsive.css">
     
@@ -652,16 +652,12 @@ $menuActive = 'movimentacoes';
     </div>
 </div>
 
-<!-- Modal carregando lista (paginação) -->
-<div class="modal fade" id="modalAguardeLista" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-body text-center py-4 px-4">
-                <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
-                <div class="fw-semibold">Aguarde</div>
-                <div class="text-muted small mt-1">Carregando dados...</div>
-            </div>
-        </div>
+<!-- Overlay carregando lista (paginação) — sem Bootstrap Modal (evita travar no hide) -->
+<div id="overlayAguardeLista" class="overlay-aguarde-lista" hidden aria-live="polite" aria-busy="true">
+    <div class="overlay-aguarde-lista-card">
+        <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+        <div class="fw-semibold">Aguarde</div>
+        <div class="text-muted small mt-1">Carregando dados...</div>
     </div>
 </div>
 
@@ -698,6 +694,6 @@ $menuActive = 'movimentacoes';
     console.log('👤 Usuário logado:', usuarioLogado);
 </script>
 
-<script src="assets/js/movimentacoes.js"></script>
+<script src="assets/js/movimentacoes.js?v=20261029b"></script>
 </body>
 </html>
