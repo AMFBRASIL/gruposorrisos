@@ -274,6 +274,90 @@ try {
                     }
                     break;
 
+                case 'enviar-email':
+                    $id = $_GET['id'] ?? null;
+                    if (!$id) {
+                        http_response_code(400);
+                        echo json_encode(['success' => false, 'error' => 'ID do pedido não fornecido', 'logs' => []]);
+                        break;
+                    }
+
+                    try {
+                        $logsApi = [];
+                        $logApi = static function (string $level, string $message) use (&$logsApi): void {
+                            $logsApi[] = ['ts' => date('H:i:s'), 'level' => $level, 'message' => $message];
+                        };
+
+                        $logApi('info', 'Validando pedido #' . $id . '...');
+                        $pedido = $pedidoCompra->findByIdWithRelations($id);
+                        if (!$pedido) {
+                            http_response_code(404);
+                            $logApi('error', 'Pedido não encontrado.');
+                            echo json_encode(['success' => false, 'error' => 'Pedido não encontrado', 'logs' => $logsApi]);
+                            break;
+                        }
+                        $pedido['itens'] = $pedidoCompra->buscarItens($id);
+                        $logApi('ok', 'Pedido ' . ($pedido['numero_pedido'] ?? $id) . ' carregado com ' . count($pedido['itens']) . ' item(ns).');
+
+                        require_once __DIR__ . '/../../models/Fornecedor.php';
+                        $fornecedorModel = new Fornecedor();
+                        $fornecedor = $fornecedorModel->findById($pedido['id_fornecedor']);
+
+                        if (!$fornecedor) {
+                            http_response_code(400);
+                            $logApi('error', 'Fornecedor não encontrado.');
+                            echo json_encode(['success' => false, 'error' => 'Fornecedor não encontrado', 'logs' => $logsApi]);
+                            break;
+                        }
+                        $logApi('ok', 'Fornecedor: ' . ($fornecedor['razao_social'] ?? 'N/A'));
+
+                        require_once __DIR__ . '/../helpers/email_notificacoes.php';
+                        require_once __DIR__ . '/../utils/EmailUtils.php';
+
+                        $idFilial = (int)($pedido['id_filial'] ?? 0);
+                        $idSolicitante = (int)($pedido['id_usuario_solicitante'] ?? 0);
+                        $logApi('info', 'Coletando e-mails de compras / solicitante...');
+                        $destCompras = coletarEmailsNotificacaoCompras($pdoPedidos, $idFilial, $idSolicitante);
+                        $logApi('info', 'Destinatários de compras encontrados: ' . count($destCompras));
+
+                        $resultado = EmailUtils::enviarEmailPedidoCompraCompleto($pedido, $fornecedor, $destCompras);
+                        $logsFinais = array_merge($logsApi, $resultado['logs'] ?? []);
+
+                        if (!empty($resultado['success'])) {
+                            $msg = 'E-mail do pedido enviado: ' . (int)($resultado['enviados'] ?? 0) . ' destinatário(s)';
+                            if (!empty($resultado['falhas'])) {
+                                $msg .= ' (' . (int)$resultado['falhas'] . ' falha(s))';
+                            }
+                            echo json_encode([
+                                'success' => true,
+                                'message' => $msg,
+                                'enviados' => (int)($resultado['enviados'] ?? 0),
+                                'falhas' => (int)($resultado['falhas'] ?? 0),
+                                'logs' => $logsFinais,
+                            ]);
+                        } else {
+                            http_response_code(500);
+                            echo json_encode([
+                                'success' => false,
+                                'error' => EmailUtils::getUltimoErro() ?: 'Erro ao enviar e-mail do pedido',
+                                'enviados' => (int)($resultado['enviados'] ?? 0),
+                                'falhas' => (int)($resultado['falhas'] ?? 0),
+                                'logs' => $logsFinais,
+                            ]);
+                        }
+                    } catch (Exception $e) {
+                        error_log("Erro ao enviar email do pedido: " . $e->getMessage());
+                        http_response_code(500);
+                        echo json_encode([
+                            'success' => false,
+                            'error' => 'Erro interno do servidor: ' . $e->getMessage(),
+                            'logs' => [
+                                ['ts' => date('H:i:s'), 'level' => 'error', 'message' => $e->getMessage()],
+                            ],
+                        ]);
+                    }
+                    break;
+
                 default:
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Ação não especificada']);
@@ -535,52 +619,6 @@ try {
                     } catch (Exception $e) {
                         http_response_code(500);
                         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-                    }
-                    break;
-                    
-                case 'enviar-email':
-                    $id = $_GET['id'] ?? null;
-                    if (!$id) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'ID do pedido não fornecido']);
-                        break;
-                    }
-                    
-                    try {
-                        // Buscar dados completos do pedido
-                        $pedido = $pedidoCompra->buscarPorId($id);
-                        if (!$pedido) {
-                            http_response_code(404);
-                            echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
-                            break;
-                        }
-                        
-                        // Buscar dados do fornecedor
-                        require_once __DIR__ . '/../models/Fornecedor.php';
-                        $fornecedorModel = new Fornecedor();
-                        $fornecedor = $fornecedorModel->buscarPorId($pedido['id_fornecedor']);
-                        
-                        if (!$fornecedor || empty($fornecedor['email'])) {
-                            http_response_code(400);
-                            echo json_encode(['success' => false, 'error' => 'Fornecedor não encontrado ou sem email cadastrado']);
-                            break;
-                        }
-                        
-                        // Enviar email usando EmailUtils
-                        require_once __DIR__ . '/../utils/EmailUtils.php';
-                        $resultado = EmailUtils::enviarEmailPedidoCompra($pedido, $fornecedor);
-                        
-                        if ($resultado) {
-                            echo json_encode(['success' => true, 'message' => 'Email enviado com sucesso para o fornecedor']);
-                        } else {
-                            http_response_code(500);
-                            echo json_encode(['success' => false, 'error' => 'Erro ao enviar email']);
-                        }
-                        
-                    } catch (Exception $e) {
-                        error_log("Erro ao enviar email do pedido: " . $e->getMessage());
-                        http_response_code(500);
-                        echo json_encode(['success' => false, 'error' => 'Erro interno do servidor']);
                     }
                     break;
                     

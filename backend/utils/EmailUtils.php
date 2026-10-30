@@ -495,48 +495,53 @@ class EmailUtils {
      * @param array $fornecedor Dados do fornecedor
      * @return bool True se enviado com sucesso
      */
-    public static function enviarEmailPedidoCompra($pedido, $fornecedor) {
+    /**
+     * Monta assunto/corpo do e-mail completo do pedido de compra.
+     * @return array{subject: string, html: string, text: string}
+     */
+    public static function montarConteudoEmailPedidoCompra($pedido, $fornecedor): array {
         $subject = "Pedido de Compra {$pedido['numero_pedido']} - {$fornecedor['razao_social']}";
-        
-        // Formatar status para exibição
-        $statusDisplay = self::formatarStatusPedido($pedido['status']);
-        
-        // Formatar datas
-        $dataSolicitacao = date('d/m/Y H:i', strtotime($pedido['data_solicitacao']));
-        $dataEntrega = $pedido['data_entrega_prevista'] ? 
-            date('d/m/Y', strtotime($pedido['data_entrega_prevista'])) : 'Não informado';
-        
-        // Formatar valores monetários
-        $valorTotal = number_format($pedido['valor_total'], 2, ',', '.');
-        
-        // Preparar itens
+
+        $statusDisplay = self::formatarStatusPedido($pedido['status'] ?? '');
+        $dataSolicitacao = !empty($pedido['data_solicitacao'])
+            ? date('d/m/Y H:i', strtotime($pedido['data_solicitacao']))
+            : 'Não informado';
+        $dataEntrega = !empty($pedido['data_entrega_prevista'])
+            ? date('d/m/Y', strtotime($pedido['data_entrega_prevista']))
+            : 'Não informado';
+        $valorTotal = number_format((float)($pedido['valor_total'] ?? 0), 2, ',', '.');
+
         $itensHtml = '';
         if (!empty($pedido['itens'])) {
             foreach ($pedido['itens'] as $item) {
                 $itensHtml .= '<tr>';
-                $itensHtml .= '<td><strong>' . htmlspecialchars($item['codigo_material']) . '</strong></td>';
-                $itensHtml .= '<td>' . htmlspecialchars($item['nome_material']) . '</td>';
-                $itensHtml .= '<td>' . $item['quantidade'] . '</td>';
-                $itensHtml .= '<td>R$ ' . number_format($item['preco_unitario'], 2, ',', '.') . '</td>';
-                $itensHtml .= '<td><strong>R$ ' . number_format($item['valor_total'], 2, ',', '.') . '</strong></td>';
+                $itensHtml .= '<td><strong>' . htmlspecialchars((string)($item['codigo_material'] ?? '')) . '</strong></td>';
+                $itensHtml .= '<td>' . htmlspecialchars((string)($item['nome_material'] ?? '')) . '</td>';
+                $itensHtml .= '<td>' . htmlspecialchars((string)($item['quantidade'] ?? '')) . '</td>';
+                $itensHtml .= '<td>R$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, ',', '.') . '</td>';
+                $itensHtml .= '<td><strong>R$ ' . number_format((float)($item['valor_total'] ?? 0), 2, ',', '.') . '</strong></td>';
                 $itensHtml .= '</tr>';
             }
         } else {
             $itensHtml = '<tr><td colspan="5" style="text-align: center; color: #6c757d;">Nenhum item encontrado</td></tr>';
         }
-        
-        // Gerar links de ação
+
         $baseUrl = self::getBaseUrl();
-        $linkAprovacao = $baseUrl . "/fornecedor/aprovar-pedido.php?id=" . $pedido['id_pedido'];
-        $linkVisualizacao = $baseUrl . "/fornecedor/visualizar-pedido.php?id=" . $pedido['id_pedido'];
-        
+        $linkAprovacao = $baseUrl . "/fornecedor/aprovar-pedido.php?id=" . ($pedido['id_pedido'] ?? '');
+        $linkVisualizacao = $baseUrl . "/fornecedor/visualizar-pedido.php?id=" . ($pedido['id_pedido'] ?? '');
+        $nomeFilial = htmlspecialchars((string)($pedido['nome_filial'] ?? 'N/A'));
+        $nomeUsuario = htmlspecialchars((string)($pedido['nome_usuario'] ?? $pedido['nome_usuario_solicitante'] ?? 'Sistema'));
+        $numeroPedido = htmlspecialchars((string)($pedido['numero_pedido'] ?? ''));
+        $statusRaw = htmlspecialchars((string)($pedido['status'] ?? ''));
+        $obs = htmlspecialchars((string)($pedido['observacoes'] ?? ''));
+
         $htmlBody = "
         <!DOCTYPE html>
         <html lang='pt-BR'>
         <head>
             <meta charset='UTF-8'>
             <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-            <title>Pedido de Compra - {$pedido['numero_pedido']}</title>
+            <title>Pedido de Compra - {$numeroPedido}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
                 .email-container { background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden; }
@@ -561,100 +566,60 @@ class EmailUtils {
                 .action-buttons { text-align: center; margin: 30px 0; }
                 .btn { display: inline-block; padding: 12px 24px; margin: 0 10px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; transition: all 0.3s ease; }
                 .btn-primary { background-color: #2563eb; color: white; }
-                .btn-primary:hover { background-color: #1d4ed8; transform: translateY(-2px); }
                 .btn-success { background-color: #28a745; color: white; }
-                .btn-success:hover { background-color: #218838; transform: translateY(-2px); }
                 .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
                 .status-pendente { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
                 .status-aprovado { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-                .status-em_producao { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-                .status-enviado { background-color: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
-                .status-recebido { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-                .status-cancelado { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-                @media (max-width: 768px) { .info-grid { grid-template-columns: 1fr; } .content { padding: 20px; } .header { padding: 20px; } }
+                @media (max-width: 768px) { .info-grid { grid-template-columns: 1fr; } }
             </style>
         </head>
         <body>
             <div class='email-container'>
                 <div class='header'>
-                    <h1>📋 Pedido de Compra</h1>
-                    <p class='subtitle'>{$pedido['numero_pedido']}</p>
+                    <h1>Pedido de Compra</h1>
+                    <p class='subtitle'>{$numeroPedido}</p>
                 </div>
-                
                 <div class='content'>
                     <div class='info-section'>
-                        <h3 style='margin-top: 0; color: #2563eb;'>📋 Informações do Pedido</h3>
+                        <h3 style='margin-top: 0; color: #2563eb;'>Informações do Pedido</h3>
                         <div class='info-grid'>
-                            <div class='info-item'>
-                                <div class='info-label'>Número do Pedido</div>
-                                <div class='info-value'>{$pedido['numero_pedido']}</div>
-                            </div>
-                            <div class='info-item'>
-                                <div class='info-label'>Status</div>
-                                <div class='info-value'>
-                                    <span class='status-badge status-{$pedido['status']}'>{$statusDisplay}</span>
-                                </div>
-                            </div>
-                            <div class='info-item'>
-                                <div class='info-label'>Data de Solicitação</div>
-                                <div class='info-value'>{$dataSolicitacao}</div>
-                            </div>
-                            <div class='info-item'>
-                                <div class='info-label'>Entrega Prevista</div>
-                                <div class='info-value'>{$dataEntrega}</div>
-                            </div>
-                            <div class='info-item'>
-                                <div class='info-label'>Clínica</div>
-                                <div class='info-value'>{$pedido['nome_filial']}</div>
-                            </div>
-                            <div class='info-item'>
-                                <div class='info-label'>Solicitante</div>
-                                <div class='info-value'>{$pedido['nome_usuario']}</div>
-                            </div>
+                            <div class='info-item'><div class='info-label'>Número do Pedido</div><div class='info-value'>{$numeroPedido}</div></div>
+                            <div class='info-item'><div class='info-label'>Status</div><div class='info-value'><span class='status-badge status-{$statusRaw}'>{$statusDisplay}</span></div></div>
+                            <div class='info-item'><div class='info-label'>Data de Solicitação</div><div class='info-value'>{$dataSolicitacao}</div></div>
+                            <div class='info-item'><div class='info-label'>Entrega Prevista</div><div class='info-value'>{$dataEntrega}</div></div>
+                            <div class='info-item'><div class='info-label'>Clínica</div><div class='info-value'>{$nomeFilial}</div></div>
+                            <div class='info-item'><div class='info-label'>Solicitante</div><div class='info-value'>{$nomeUsuario}</div></div>
+                            <div class='info-item'><div class='info-label'>Fornecedor</div><div class='info-value'>" . htmlspecialchars((string)($fornecedor['razao_social'] ?? '')) . "</div></div>
                         </div>
                     </div>
-                    
                     <div class='info-section'>
-                        <h3 style='margin-top: 0; color: #2563eb;'>🛍️ Itens Solicitados</h3>
+                        <h3 style='margin-top: 0; color: #2563eb;'>Itens Solicitados</h3>
                         <div class='table-container'>
                             <table class='items-table'>
-                                <thead>
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Material</th>
-                                        <th>Quantidade</th>
-                                        <th>Preço Unitário</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {$itensHtml}
-                                </tbody>
+                                <thead><tr><th>Código</th><th>Material</th><th>Quantidade</th><th>Preço Unitário</th><th>Total</th></tr></thead>
+                                <tbody>{$itensHtml}</tbody>
                             </table>
                         </div>
-                        
                         <div class='total-section'>
                             <div class='info-label'>Valor Total do Pedido</div>
                             <div class='total-value'>R$ {$valorTotal}</div>
                         </div>
                     </div>";
-        
-        // Adicionar observações se existirem
-        if (!empty($pedido['observacoes'])) {
+
+        if ($obs !== '') {
             $htmlBody .= "
                     <div class='info-section'>
-                        <h3 style='margin-top: 0; color: #2563eb;'>💬 Observações</h3>
-                        <p style='margin: 0; font-style: italic;'>{$pedido['observacoes']}</p>
+                        <h3 style='margin-top: 0; color: #2563eb;'>Observações</h3>
+                        <p style='margin: 0; font-style: italic;'>{$obs}</p>
                     </div>";
         }
-        
+
         $htmlBody .= "
                     <div class='action-buttons'>
-                        <a href='{$linkAprovacao}' class='btn btn-success'>✅ Aprovar Pedido</a>
-                        <a href='{$linkVisualizacao}' class='btn btn-primary'>👁️ Visualizar Detalhes</a>
+                        <a href='{$linkAprovacao}' class='btn btn-success'>Aprovar Pedido</a>
+                        <a href='{$linkVisualizacao}' class='btn btn-primary'>Visualizar Detalhes</a>
                     </div>
                 </div>
-                
                 <div class='footer'>
                     <p><strong>Este é um email automático do sistema de gestão de estoque.</strong></p>
                     <p>Para dúvidas, entre em contato com a equipe de compras.</p>
@@ -663,18 +628,144 @@ class EmailUtils {
             </div>
         </body>
         </html>";
-        
+
         $textBody = "Pedido de Compra {$pedido['numero_pedido']}\n\n";
         $textBody .= "Fornecedor: {$fornecedor['razao_social']}\n";
-        $textBody .= "Clínica: {$pedido['nome_filial']}\n";
+        $textBody .= "Clínica: " . ($pedido['nome_filial'] ?? '') . "\n";
         $textBody .= "Data de Solicitação: {$dataSolicitacao}\n";
         $textBody .= "Entrega Prevista: {$dataEntrega}\n";
         $textBody .= "Valor Total: R$ {$valorTotal}\n\n";
         $textBody .= "Para aprovar o pedido, acesse: {$linkAprovacao}\n";
         $textBody .= "Para visualizar detalhes: {$linkVisualizacao}\n\n";
         $textBody .= "Este é um email automático do sistema de gestão de estoque.";
-        
-        return self::enviarEmail($fornecedor['email'], $fornecedor['razao_social'], $subject, $htmlBody, $textBody);
+
+        return ['subject' => $subject, 'html' => $htmlBody, 'text' => $textBody];
+    }
+
+    public static function enviarEmailPedidoCompra($pedido, $fornecedor) {
+        $conteudo = self::montarConteudoEmailPedidoCompra($pedido, $fornecedor);
+        return self::enviarEmail(
+            $fornecedor['email'],
+            $fornecedor['razao_social'],
+            $conteudo['subject'],
+            $conteudo['html'],
+            $conteudo['text']
+        );
+    }
+
+    /**
+     * Envia o pedido completo para o fornecedor e demais destinatários (compras/solicitante),
+     * retornando um log detalhado de cada etapa.
+     *
+     * @param array $pedido
+     * @param array $fornecedor
+     * @param array<int, array{email: string, nome?: string}> $destinatariosExtras
+     * @return array{success: bool, enviados: int, falhas: int, logs: array<int, array{ts: string, level: string, message: string}>}
+     */
+    public static function enviarEmailPedidoCompraCompleto($pedido, $fornecedor, array $destinatariosExtras = []): array {
+        $logs = [];
+        $addLog = static function (string $level, string $message) use (&$logs): void {
+            $logs[] = [
+                'ts' => date('H:i:s'),
+                'level' => $level,
+                'message' => $message,
+            ];
+        };
+
+        $enviados = 0;
+        $falhas = 0;
+
+        $addLog('info', 'Iniciando envio do pedido completo...');
+        $addLog('info', 'Pedido: ' . ($pedido['numero_pedido'] ?? '#' . ($pedido['id_pedido'] ?? '?')));
+        $qtdItens = is_array($pedido['itens'] ?? null) ? count($pedido['itens']) : 0;
+        $addLog('info', "Carregando conteúdo do e-mail ({$qtdItens} item(ns))...");
+
+        $conteudo = self::montarConteudoEmailPedidoCompra($pedido, $fornecedor);
+        $addLog('ok', 'Conteúdo do pedido montado com sucesso.');
+
+        $fila = [];
+        $emailsVistos = [];
+
+        $emailForn = trim((string)($fornecedor['email'] ?? ''));
+        if ($emailForn !== '' && filter_var($emailForn, FILTER_VALIDATE_EMAIL)) {
+            $fila[] = [
+                'email' => $emailForn,
+                'nome' => $fornecedor['razao_social'] ?? 'Fornecedor',
+                'papel' => 'Fornecedor',
+            ];
+            $emailsVistos[strtolower($emailForn)] = true;
+            $addLog('info', "Destinatário fornecedor: {$emailForn}");
+        } else {
+            $addLog('error', 'Fornecedor sem e-mail válido cadastrado.');
+            $falhas++;
+        }
+
+        foreach ($destinatariosExtras as $dest) {
+            $email = trim((string)($dest['email'] ?? ''));
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $addLog('warn', 'Destinatário de compras ignorado (e-mail inválido).');
+                continue;
+            }
+            $key = strtolower($email);
+            if (isset($emailsVistos[$key])) {
+                $addLog('info', "E-mail já na fila (ignorando duplicata): {$email}");
+                continue;
+            }
+            $emailsVistos[$key] = true;
+            $fila[] = [
+                'email' => $email,
+                'nome' => $dest['nome'] ?? 'Compras',
+                'papel' => 'Compras / Solicitante',
+            ];
+            $addLog('info', "Destinatário compras: {$email}");
+        }
+
+        if ($fila === []) {
+            $addLog('error', 'Nenhum destinatário válido para envio.');
+            return [
+                'success' => false,
+                'enviados' => 0,
+                'falhas' => max(1, $falhas),
+                'logs' => $logs,
+            ];
+        }
+
+        $addLog('info', 'Total na fila de envio: ' . count($fila));
+
+        foreach ($fila as $i => $dest) {
+            $n = $i + 1;
+            $addLog('info', "[{$n}/" . count($fila) . "] Enviando para {$dest['papel']}: {$dest['email']}...");
+            $ok = self::enviarEmail(
+                $dest['email'],
+                $dest['nome'],
+                $conteudo['subject'],
+                $conteudo['html'],
+                $conteudo['text']
+            );
+            if ($ok) {
+                $enviados++;
+                $addLog('ok', "[{$n}/" . count($fila) . "] Enviado com sucesso para {$dest['email']}.");
+            } else {
+                $falhas++;
+                $erro = self::getUltimoErro() ?: 'falha desconhecida no SMTP/Mailgun';
+                $addLog('error', "[{$n}/" . count($fila) . "] Falha ao enviar para {$dest['email']}: {$erro}");
+            }
+        }
+
+        if ($enviados > 0 && $falhas === 0) {
+            $addLog('ok', "Processo concluído: {$enviados} e-mail(s) enviado(s) com sucesso.");
+        } elseif ($enviados > 0) {
+            $addLog('warn', "Processo concluído com falhas parciais: {$enviados} ok, {$falhas} falha(s).");
+        } else {
+            $addLog('error', 'Processo concluído sem nenhum e-mail enviado.');
+        }
+
+        return [
+            'success' => $enviados > 0,
+            'enviados' => $enviados,
+            'falhas' => $falhas,
+            'logs' => $logs,
+        ];
     }
 
     /**

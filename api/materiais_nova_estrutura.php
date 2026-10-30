@@ -164,6 +164,7 @@ function handleGet($catalogo, $estoque, $categoria, $fornecedor, $action) {
  * Usado no blur do campo código em addMaterial.
  */
 function verificarCodigoExistente($catalogo) {
+    global $pdo;
     $codigo = trim($_GET['codigo'] ?? '');
 
     if ($codigo === '') {
@@ -176,6 +177,42 @@ function verificarCodigoExistente($catalogo) {
     if (!$material) {
         echo json_encode(['exists' => false, 'material' => null]);
         return;
+    }
+
+    $idFilial = resolverFilialIdListagemMateriais();
+    $estoqueFilial = null;
+    if ($idFilial && !empty($material['id_catalogo'])) {
+        $stEf = $pdo->prepare(
+            'SELECT ef.ativo, ef.estoque_atual, fil.nome_filial
+             FROM tbl_estoque_filiais ef
+             LEFT JOIN tbl_filiais fil ON fil.id_filial = ef.id_filial
+             WHERE ef.id_catalogo = ? AND ef.id_filial = ?
+             LIMIT 1'
+        );
+        $stEf->execute([(int) $material['id_catalogo'], $idFilial]);
+        $estoqueFilial = $stEf->fetch() ?: null;
+    }
+
+    $duplicados = [];
+    if (!empty($material['nome'])) {
+        $stDup = $pdo->prepare(
+            'SELECT codigo, id_catalogo FROM tbl_catalogo_materiais
+             WHERE ativo = 1 AND nome = ? AND codigo <> ?
+             ORDER BY codigo ASC LIMIT 10'
+        );
+        $stDup->execute([$material['nome'], $codigo]);
+        $duplicados = $stDup->fetchAll() ?: [];
+    }
+
+    $estoqueAtivo = null;
+    $avisoEstoque = null;
+    if ($estoqueFilial) {
+        $estoqueAtivo = ((int) $estoqueFilial['ativo'] === 1);
+        if (!$estoqueAtivo) {
+            $avisoEstoque = 'Este código existe no catálogo, mas o estoque está INATIVO na clínica selecionada — por isso não aparece na listagem /material.';
+        }
+    } elseif ($idFilial) {
+        $avisoEstoque = 'Este código existe no catálogo, mas ainda não há estoque vinculado à clínica selecionada.';
     }
 
     echo json_encode([
@@ -196,7 +233,12 @@ function verificarCodigoExistente($catalogo) {
             'cor' => $material['cor'] ?? '',
             'tamanho' => $material['tamanho'] ?? '',
             'preco_unitario_padrao' => $material['preco_unitario_padrao'] ?? null,
-            'observacoes' => $material['observacoes'] ?? ''
+            'observacoes' => $material['observacoes'] ?? '',
+            'estoque_filial_ativo' => $estoqueAtivo,
+            'estoque_filial_qtd' => $estoqueFilial['estoque_atual'] ?? null,
+            'nome_filial' => $estoqueFilial['nome_filial'] ?? null,
+            'aviso_estoque' => $avisoEstoque,
+            'codigos_duplicados_mesmo_nome' => array_column($duplicados, 'codigo')
         ]
     ]);
 }

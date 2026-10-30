@@ -858,14 +858,35 @@ function abrirModalCodigoExistente(material) {
     if (!corpo || !material) return;
 
     const unidade = material.unidade || '';
+    const dups = Array.isArray(material.codigos_duplicados_mesmo_nome)
+        ? material.codigos_duplicados_mesmo_nome.filter(Boolean)
+        : [];
+    const avisoExtra = material.aviso_estoque
+        ? `<div class="codigo-existente-aviso codigo-existente-aviso-warn mt-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div>
+                    <strong>Atenção na clínica</strong>
+                    <p class="mb-0">${escaparHtml(material.aviso_estoque)}</p>
+                </div>
+           </div>`
+        : '';
+    const avisoDups = dups.length
+        ? `<div class="codigo-existente-bloco mt-3">
+                <span class="codigo-existente-label">Outros códigos com o mesmo nome</span>
+                <p class="mb-0">${dups.map(c => escaparHtml(c)).join(', ')}</p>
+                <p class="text-muted small mb-0 mt-1">Na busca por nome em /material pode aparecer um destes códigos (estoque ativo).</p>
+           </div>`
+        : '';
+
     corpo.innerHTML = `
         <div class="codigo-existente-aviso">
             <i class="bi bi-info-circle-fill"></i>
             <div>
                 <strong>Código já cadastrado</strong>
-                <p class="mb-0">Este código já existe no catálogo. As informações abaixo são apenas para consulta.</p>
+                <p class="mb-0">Este código já existe no catálogo (o mesmo campo “Código” da listagem /material). As informações abaixo são apenas para consulta.</p>
             </div>
         </div>
+        ${avisoExtra}
         <div class="codigo-existente-hero">
             <div class="codigo-existente-badge">${escaparHtml(material.codigo || '—')}</div>
             <h4 class="codigo-existente-nome mb-0">${escaparHtml(material.nome || 'Material sem nome')}</h4>
@@ -896,6 +917,7 @@ function abrirModalCodigoExistente(material) {
                 <span class="codigo-existente-label">Observações</span>
                 <p class="mb-0">${escaparHtml(material.observacoes)}</p>
             </div>` : ''}
+        ${avisoDups}
     `;
 
     const modalEl = document.getElementById('modalCodigoExistente');
@@ -919,8 +941,11 @@ document.getElementById('codigo').addEventListener('blur', async function() {
     if (codigo === ultimoCodigoConsultado) return;
 
     try {
+        const filialId = localStorage.getItem('filialSelecionada') || '';
+        const qs = new URLSearchParams({ action: 'check-codigo', codigo });
+        if (filialId) qs.set('filial_id', filialId);
         const response = await fetch(
-            `api/materiais_nova_estrutura.php?action=check-codigo&codigo=${encodeURIComponent(codigo)}`,
+            `api/materiais_nova_estrutura.php?${qs.toString()}`,
             { credentials: 'same-origin' }
         );
         const data = await response.json();

@@ -1592,6 +1592,66 @@ $pedidoPermissoesFrontend = pedidoPermissoesParaFrontend();
     </div>
 </div>
 
+<!-- Modal LOG: envio de e-mail do pedido -->
+<div class="modal fade" id="modalLogEmailPedido" tabindex="-1" aria-labelledby="modalLogEmailPedidoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow log-email-modal">
+            <div class="modal-header log-email-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="log-email-icon"><i class="bi bi-terminal"></i></span>
+                    <div>
+                        <h5 class="modal-title mb-0" id="modalLogEmailPedidoLabel">Envio de e-mail do pedido</h5>
+                        <small class="opacity-75">Log do processo — fornecedor, compras e solicitante</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="logEmailPedidoSpinner" class="spinner-border spinner-border-sm text-light" role="status" aria-hidden="true"></span>
+                    <span id="logEmailPedidoStatus" class="badge text-bg-primary">Processando...</span>
+                </div>
+            </div>
+            <div class="modal-body p-0">
+                <div id="logEmailPedidoBody" class="log-email-console" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-primary px-4" id="btnFecharLogEmailPedido" data-bs-dismiss="modal" disabled>
+                    <i class="bi bi-x-lg me-1"></i>Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.log-email-modal { border-radius: 14px; overflow: hidden; }
+.log-email-header {
+    background: linear-gradient(120deg, #0f172a 0%, #1e3a5f 55%, #2563eb 100%);
+    color: #fff;
+    border: none;
+}
+.log-email-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: rgba(255,255,255,.15);
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.log-email-console {
+    background: #0b1220;
+    color: #e2e8f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    min-height: 280px;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 1rem 1.15rem;
+}
+.log-email-line { margin-bottom: .35rem; word-break: break-word; }
+.log-email-ts { color: #64748b; margin-right: .35rem; }
+.log-email-ok .log-email-msg { color: #4ade80; }
+.log-email-error .log-email-msg { color: #f87171; }
+.log-email-warn .log-email-msg { color: #fbbf24; }
+.log-email-info .log-email-msg { color: #93c5fd; }
+</style>
+
 <script>
     window.usuarioEhAdmin = <?php echo $usuarioEhAdmin ? 'true' : 'false'; ?>;
     window.PEDIDOS_CONFIG = {

@@ -197,19 +197,27 @@ class EstoqueFilial extends BaseModel {
             $params[] = $filters['id_fornecedor'];
         }
         
-        // Busca genérica em múltiplos campos (codigo, nome, descricao)
+        // Busca genérica (codigo, nome, descricao, marca)
+        $codigoBuscaExato = null;
         if (!empty($filters['busca'])) {
-            $where[] = '(cm.codigo LIKE ? OR cm.nome LIKE ? OR cm.descricao LIKE ?)';
-            $searchTerm = '%' . $filters['busca'] . '%';
+            $termoBusca = trim((string) $filters['busca']);
+            $where[] = '(cm.codigo LIKE ? OR cm.nome LIKE ? OR cm.descricao LIKE ? OR IFNULL(cm.marca, \'\') LIKE ?)';
+            $searchTerm = '%' . $termoBusca . '%';
             $params[] = $searchTerm;
             $params[] = $searchTerm;
             $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            // Código sem espaços: inclui estoque inativo na filial (ex.: 236996 com ativo=0)
+            if ($termoBusca !== '' && strpos($termoBusca, ' ') === false) {
+                $codigoBuscaExato = $termoBusca;
+            }
         }
         
         // Busca específica por código (mantido para compatibilidade)
         if (!empty($filters['codigo']) && empty($filters['busca'])) {
             $where[] = 'cm.codigo LIKE ?';
             $params[] = '%' . $filters['codigo'] . '%';
+            $codigoBuscaExato = trim((string) $filters['codigo']);
         }
         
         // Busca específica por nome (mantido para compatibilidade)
@@ -237,14 +245,23 @@ class EstoqueFilial extends BaseModel {
         
         $whereClause = !empty($where) ? implode(' AND ', $where) : '';
         
-        return $this->findWithPagination($page, $limit, $whereClause, $params);
+        return $this->findWithPagination($page, $limit, $whereClause, $params, $codigoBuscaExato ?? null);
     }
     
     /**
      * Busca estoques com paginação e filtros
+     * @param string|null $codigoExatoInativo Se informado, inclui estoque inativo cujo cm.codigo = valor
      */
-    public function findWithPagination($page = 1, $limit = 10, $where = '', $params = []) {
+    public function findWithPagination($page = 1, $limit = 10, $where = '', $params = [], $codigoExatoInativo = null) {
         $offset = ($page - 1) * $limit;
+        $ativoParams = [];
+
+        if ($codigoExatoInativo !== null && $codigoExatoInativo !== '') {
+            $ativoSql = '(ef.ativo = 1 OR (ef.ativo = 0 AND cm.codigo = ?))';
+            $ativoParams[] = $codigoExatoInativo;
+        } else {
+            $ativoSql = 'ef.ativo = 1';
+        }
         
         // Query principal com JOINs
         // IMPORTANTE: Usar COALESCE para priorizar estoque_minimo/maximo da filial sobre valores padrão do catálogo
@@ -284,7 +301,7 @@ class EstoqueFilial extends BaseModel {
                 LEFT JOIN tbl_fornecedores f ON cm.id_fornecedor = f.id_fornecedor
                 LEFT JOIN tbl_unidades_medida u ON cm.id_unidade = u.id_unidade
                 LEFT JOIN tbl_filiais fil ON ef.id_filial = fil.id_filial
-                WHERE ef.ativo = 1";
+                WHERE {$ativoSql}";
         
         if (!empty($where)) {
             $sql .= " AND " . $where;
@@ -292,20 +309,20 @@ class EstoqueFilial extends BaseModel {
         $sql .= " ORDER BY cm.nome ASC LIMIT ? OFFSET ?";
         
         $stmt = $this->pdo->prepare($sql);
-        $allParams = array_merge($params, [$limit, $offset]);
+        $allParams = array_merge($ativoParams, $params, [$limit, $offset]);
         $stmt->execute($allParams);
         $data = $stmt->fetchAll();
         
         // Query para contar total
         $countSql = "SELECT COUNT(*) as total FROM {$this->table} ef
                      INNER JOIN tbl_catalogo_materiais cm ON ef.id_catalogo = cm.id_catalogo
-                     WHERE ef.ativo = 1";
+                     WHERE {$ativoSql}";
         if (!empty($where)) {
             $countSql .= " AND " . $where;
         }
         
         $countStmt = $this->pdo->prepare($countSql);
-        $countStmt->execute($params);
+        $countStmt->execute(array_merge($ativoParams, $params));
         $total = $countStmt->fetch()['total'];
         
         return [

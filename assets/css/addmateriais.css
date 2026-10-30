@@ -190,6 +190,14 @@
   font-size: 1.25rem;
   margin-top: 0.1rem;
 }
+.codigo-existente-aviso-warn {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+.codigo-existente-aviso-warn i {
+  color: #ea580c;
+}
 .codigo-existente-aviso p {
   color: #475569;
   font-size: 0.92rem;

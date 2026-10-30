@@ -1009,6 +1009,10 @@ function renderizarTabela(materiais) {
 }
 
 function getStatusBadge(material) {
+    if (material.ativo == 0 || material.ativo === '0' || material.ativo === false) {
+        return '<span class="status-badge status-zerado" title="Estoque inativo nesta clínica">Inativo</span>';
+    }
+
     const estoque = parseFloat(material.estoque_atual || 0);
     const minimo = parseFloat(material.estoque_minimo || 0);
     

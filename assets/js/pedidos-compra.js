@@ -3460,18 +3460,78 @@ async function imprimirPedido() {
                         font-size: 11px;
                     }
                     @media print {
+                        @page {
+                            size: A4 portrait;
+                            margin: 10mm;
+                        }
                         body { background: #fff; }
                         .page {
                             width: 100%;
                             margin: 0;
-                            padding: 12mm;
+                            padding: 0;
                             box-shadow: none;
                             border-radius: 0;
                         }
-                        .actions { display: none; }
-                        .section, .card { break-inside: avoid; }
-                        table { page-break-inside: auto; }
-                        tr { page-break-inside: avoid; page-break-after: auto; }
+                        .actions { display: none !important; }
+                        .topbar {
+                            margin-bottom: 12px;
+                            padding-bottom: 10px;
+                        }
+                        .grid {
+                            gap: 8px;
+                            margin-bottom: 12px;
+                        }
+                        .card {
+                            padding: 8px 10px;
+                            break-inside: avoid;
+                            page-break-inside: avoid;
+                        }
+                        .card-value { font-size: 14px; }
+                        /* NÃO usar break-inside:avoid em .section — tabela grande
+                           era empurrada inteira para a página 2, deixando a 1 vazia */
+                        .section {
+                            margin-top: 12px;
+                            overflow: visible;
+                            break-inside: auto;
+                            page-break-inside: auto;
+                        }
+                        .section-dados,
+                        .section-obs,
+                        .footer {
+                            break-inside: avoid;
+                            page-break-inside: avoid;
+                        }
+                        .section-itens {
+                            break-inside: auto;
+                            page-break-inside: auto;
+                        }
+                        .section-itens .section-body {
+                            padding: 0 !important;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            page-break-inside: auto;
+                            break-inside: auto;
+                        }
+                        thead {
+                            display: table-header-group;
+                        }
+                        tfoot {
+                            display: table-footer-group;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            padding: 5px 6px !important;
+                            font-size: 10px !important;
+                        }
+                        h1 { font-size: 20px; }
+                        h2 { font-size: 14px; margin-bottom: 6px; }
+                        .footer { margin-top: 14px; }
                     }
                     @media (max-width: 900px) {
                         .grid { grid-template-columns: repeat(2, 1fr); }
@@ -3517,7 +3577,7 @@ async function imprimirPedido() {
                         </div>
                     </div>
 
-                    <div class="section">
+                    <div class="section section-dados">
                         <div class="section-header"><h2>Dados do Pedido</h2></div>
                         <div class="section-body info-grid">
                             <div><strong>Clínica:</strong> ${escaparHtml(pedido.nome_filial || 'N/A')}</div>
@@ -3531,7 +3591,7 @@ async function imprimirPedido() {
                         </div>
                     </div>
 
-                    <div class="section">
+                    <div class="section section-itens">
                         <div class="section-header"><h2>Itens do Pedido</h2></div>
                         <div class="section-body" style="padding:0;">
                             <table>
@@ -3567,7 +3627,7 @@ async function imprimirPedido() {
                         </div>
                     </div>
 
-                    <div class="section">
+                    <div class="section section-obs">
                         <div class="section-header"><h2>Observações</h2></div>
                         <div class="section-body obs">${escaparHtml(pedido.observacoes || 'Nenhuma observação registrada.')}</div>
                     </div>
@@ -4945,12 +5005,89 @@ function preencherDetalhesNfPedidoCompra(pedido) {
 }
 
 /**
- * Enviar email do pedido para o fornecedor
+ * Modal de log do envio de e-mail do pedido (fornecedor + compras).
+ */
+let modalLogEmailPedido = null;
+
+function abrirModalLogEmailPedido() {
+    const el = document.getElementById('modalLogEmailPedido');
+    if (!el) return null;
+    if (!modalLogEmailPedido) {
+        modalLogEmailPedido = new bootstrap.Modal(el, { backdrop: 'static', keyboard: false });
+    }
+    const body = document.getElementById('logEmailPedidoBody');
+    const status = document.getElementById('logEmailPedidoStatus');
+    const spinner = document.getElementById('logEmailPedidoSpinner');
+    const btnFechar = document.getElementById('btnFecharLogEmailPedido');
+    if (body) body.innerHTML = '';
+    if (status) {
+        status.textContent = 'Processando...';
+        status.className = 'badge text-bg-primary';
+    }
+    if (spinner) spinner.classList.remove('d-none');
+    if (btnFechar) btnFechar.disabled = true;
+    modalLogEmailPedido.show();
+    return modalLogEmailPedido;
+}
+
+function appendLogEmailPedido(entry) {
+    const body = document.getElementById('logEmailPedidoBody');
+    if (!body) return;
+    const level = (entry && entry.level) || 'info';
+    const ts = (entry && entry.ts) || new Date().toLocaleTimeString('pt-BR');
+    const msg = (entry && entry.message) || '';
+    const line = document.createElement('div');
+    line.className = `log-email-line log-email-${level}`;
+    line.innerHTML = `<span class="log-email-ts">[${escaparHtmlLog(ts)}]</span> <span class="log-email-msg">${escaparHtmlLog(msg)}</span>`;
+    body.appendChild(line);
+    body.scrollTop = body.scrollHeight;
+}
+
+function escaparHtmlLog(texto) {
+    return String(texto ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function finalizarModalLogEmailPedido(sucesso, mensagem) {
+    const status = document.getElementById('logEmailPedidoStatus');
+    const spinner = document.getElementById('logEmailPedidoSpinner');
+    const btnFechar = document.getElementById('btnFecharLogEmailPedido');
+    if (spinner) spinner.classList.add('d-none');
+    if (btnFechar) btnFechar.disabled = false;
+    if (status) {
+        status.textContent = sucesso ? 'Concluído' : 'Falhou';
+        status.className = sucesso ? 'badge text-bg-success' : 'badge text-bg-danger';
+    }
+    if (mensagem) {
+        appendLogEmailPedido({
+            ts: new Date().toLocaleTimeString('pt-BR'),
+            level: sucesso ? 'ok' : 'error',
+            message: mensagem
+        });
+    }
+
+    // Após finalizar, aguarda 2s e fecha o modal
+    setTimeout(() => {
+        if (modalLogEmailPedido) {
+            modalLogEmailPedido.hide();
+        } else {
+            const el = document.getElementById('modalLogEmailPedido');
+            const inst = el ? bootstrap.Modal.getInstance(el) : null;
+            if (inst) inst.hide();
+        }
+    }, 2000);
+}
+
+/**
+ * Enviar e-mail completo do pedido (fornecedor + compras) com modal de log
  */
 async function enviarEmailPedido() {
     try {
-        const pedidoId = document.querySelector('#modalVisualizarPedido').getAttribute('data-pedido-id');
-        
+        const pedidoId = document.querySelector('#modalVisualizarPedido')?.getAttribute('data-pedido-id');
+
         if (!pedidoId) {
             Swal.fire({
                 icon: 'error',
@@ -4959,51 +5096,37 @@ async function enviarEmailPedido() {
             });
             return;
         }
-        
-        // Mostrar loading
-        Swal.fire({
-            title: 'Enviando email...',
-            text: 'Aguarde enquanto enviamos o pedido para o fornecedor',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-        
-        // Fazer requisição para enviar email
-        const response = await fetch(`backend/api/pedidos_compra.php?action=enviar-email&id=${pedidoId}`, {
+
+        abrirModalLogEmailPedido();
+        appendLogEmailPedido({ level: 'info', message: 'Abrindo processo de envio...' });
+        appendLogEmailPedido({ level: 'info', message: `Pedido ID ${pedidoId} — enviando para fornecedor, compras e solicitante.` });
+
+        const response = await fetch(`backend/api/pedidos_compra.php?action=enviar-email&id=${encodeURIComponent(pedidoId)}`, {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' }
         });
-        
+
         const result = await response.json();
-        
-        if (result.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Email Enviado!',
-                text: result.message,
-                confirmButtonText: 'OK'
-            });
-        } else {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro ao Enviar Email',
-                text: result.error || 'Erro desconhecido ao enviar email',
-                confirmButtonText: 'OK'
-            });
+        const logs = Array.isArray(result.logs) ? result.logs : [];
+
+        for (const entry of logs) {
+            appendLogEmailPedido(entry);
+            await new Promise(r => setTimeout(r, 35));
         }
-        
+
+        if (result.success) {
+            finalizarModalLogEmailPedido(true, result.message || 'E-mails enviados.');
+        } else {
+            finalizarModalLogEmailPedido(false, result.error || 'Erro ao enviar e-mail');
+        }
     } catch (error) {
         console.error('Erro ao enviar email:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro interno ao enviar email',
-            confirmButtonText: 'OK'
+        appendLogEmailPedido({
+            level: 'error',
+            message: 'Erro interno no navegador: ' + (error.message || String(error))
         });
+        finalizarModalLogEmailPedido(false, 'Erro interno ao enviar e-mail');
     }
 }
 
